@@ -2,31 +2,33 @@
 
 namespace App\Modules\Rendering\Services;
 
-use App\Modules\Layout\Services\PaginationService;
+use App\Modules\Layout\Services\FontResolver;
 use App\Modules\Quran\Models\Surah;
 use App\Modules\Quran\Models\Reciter;
 use App\Modules\Quran\Models\AudioFile;
 use App\Modules\Quran\Models\Word;
+use App\Modules\Segmentation\Services\SegmentationService;
+use App\Modules\Segmentation\DTO\Segment;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class RenderPipeline
 {
-    protected FrameRenderer $frameRenderer;
+    protected SegmentRenderer $segmentRenderer;
     protected VideoComposer $videoComposer;
-    protected PaginationService $paginationService;
-    protected FrameTimingService $frameTimingService;
+    protected SegmentationService $segmentationService;
+    protected FontResolver $fontResolver;
 
     public function __construct(
-        FrameRenderer $frameRenderer,
+        SegmentRenderer $segmentRenderer,
         VideoComposer $videoComposer,
-        PaginationService $paginationService,
-        FrameTimingService $frameTimingService
+        SegmentationService $segmentationService,
+        FontResolver $fontResolver
     ) {
-        $this->frameRenderer = $frameRenderer;
+        $this->segmentRenderer = $segmentRenderer;
         $this->videoComposer = $videoComposer;
-        $this->paginationService = $paginationService;
-        $this->frameTimingService = $frameTimingService;
+        $this->segmentationService = $segmentationService;
+        $this->fontResolver = $fontResolver;
     }
 
     /**
@@ -37,7 +39,7 @@ class RenderPipeline
      */
     public function render(int $surahNumber): string
     {
-        Log::info("[RenderPipeline] Starting pagination rendering pipeline for Surah {$surahNumber}");
+        Log::info("[RenderPipeline] Starting segmentation rendering pipeline for Surah {$surahNumber}");
 
         // 1. Select Surah
         $surah = Surah::where('number', $surahNumber)->first();
@@ -70,65 +72,64 @@ class RenderPipeline
             throw new RuntimeException("Invalid audio duration in database: {$audioFile->duration_ms} ms");
         }
 
-        // 4. Load and group Quran words by [page_number, line_number]
+        // 4. Load ordered Word stream
         $ayahIds = $surah->ayahs()->pluck('id');
         $words = Word::whereIn('ayah_id', $ayahIds)
             ->orderBy('page_number')
             ->orderBy('line_number')
             ->orderBy('ayah_id')
             ->orderBy('word_index')
-            ->get();
+            ->get()
+            ->all();
 
-        $lines = [];
-        foreach ($words as $word) {
-            $page = $word->page_number;
-            $line = $word->line_number ?? 0;
-            $key = "{$page}_{$line}";
+        // 5. Segment the words
+        $segments = $this->segmentationService->segment($words, $totalDuration);
+        if (empty($segments)) {
+            throw new RuntimeException("Segmentation service returned no segments for Surah {$surahNumber}.");
+        }
 
-            if (!isset($lines[$key])) {
-                $lines[$key] = [
-                    'page' => $page,
-                    'line' => $line,
-                    'words' => [],
-                ];
+        // Populate segment metrics for debug/report output
+        $fontSize = config('layouts.reels.font_size', 56);
+        foreach ($segments as $segment) {
+            $segment->fontSize = $fontSize;
+            $segment->wordCount = count($segment->wordIds);
+
+            if (!empty($segment->words)) {
+                $firstWord = $segment->words[0];
+                $page = $firstWord->page_number;
+                $fontPath = $this->fontResolver->resolve($page);
+
+                $lineText = \App\Modules\Shared\Utils\GlyphStringCompiler::compile($segment->words);
+
+                $bbox = imagettfbbox($fontSize, 0, $fontPath, $lineText);
+                $segment->renderedWidth = abs($bbox[4] - $bbox[0]);
+            } else {
+                $segment->renderedWidth = 0;
             }
-            $lines[$key]['words'][] = $word;
         }
 
-        $sequentialLines = array_values($lines);
+        Log::info("[RenderPipeline] Segmented Surah {$surahNumber} into " . count($segments) . " segments.");
 
-        // 5. Paginate lines into frames
-        $frames = $this->paginationService->paginate($sequentialLines);
-        if (empty($frames)) {
-            throw new RuntimeException("Pagination service returned no frames for Surah {$surahNumber}.");
-        }
+        // 6. Generate debug segment JSON file
+        $this->writeDebugSegmentsJson($surahNumber, $segments);
 
-        Log::info("[RenderPipeline] Paginated Surah {$surahNumber} into " . count($frames) . " frames.");
-
-        // 6. Resolve frame timings
-        $frames = $this->frameTimingService->populateTimings($frames, $totalDuration);
-
-        // 7. Generate debug logs (pagination & timings)
-        $this->writeDebugJson($surahNumber, $frames);
-        $this->writeDebugTimingsJson($surahNumber, $frames);
-
-        // 8. Render all frames as PNGs and build frame schedule
+        // 7. Render all segments as PNGs and build frame schedule
         $composerFrames = [];
-        foreach ($frames as $frame) {
-            $paddedIndex = sprintf('%03d', $frame->index);
-            $framePath = storage_path("app/rendered_frames/surah_{$surahNumber}/frame_{$paddedIndex}.png");
+        foreach ($segments as $segment) {
+            $paddedIndex = sprintf('%03d', $segment->index);
+            $segmentPath = storage_path("app/rendered_segments/surah_{$surahNumber}/segment_{$paddedIndex}.png");
 
-            $this->frameRenderer->renderFrame($surah, $frame, $framePath);
+            $this->segmentRenderer->renderSegment($surah, $segment, $segmentPath);
 
-            $frameDurationSec = ($frame->endMs - $frame->startMs) / 1000.0;
+            $segmentDurationSec = ($segment->endMs - $segment->startMs) / 1000.0;
 
             $composerFrames[] = [
-                'image_path' => $framePath,
-                'duration' => $frameDurationSec,
+                'image_path' => $segmentPath,
+                'duration' => $segmentDurationSec,
             ];
         }
 
-        // 9. Compose the video from frames and audio
+        // 8. Compose the video from segments and audio
         $outputVideoPath = storage_path("app/output/surah_{$surahNumber}.mp4");
         $this->videoComposer->compose($composerFrames, $absoluteAudioPath, $outputVideoPath, $totalDuration);
 
@@ -138,62 +139,34 @@ class RenderPipeline
     }
 
     /**
-     * Write debugging pagination JSON file.
+     * Write debugging segments JSON file.
      *
      * @param int $surahNumber
-     * @param array $frames
+     * @param Segment[] $segments
      * @return void
      */
-    protected function writeDebugJson(int $surahNumber, array $frames): void
+    protected function writeDebugSegmentsJson(int $surahNumber, array $segments): void
     {
-        $debugDir = storage_path('app/debug/pagination');
+        $debugDir = storage_path('app/debug/segments');
         if (!file_exists($debugDir)) {
             mkdir($debugDir, 0755, true);
         }
 
         $debugData = [];
-        foreach ($frames as $frame) {
+        foreach ($segments as $segment) {
             $debugData[] = [
-                'frame' => $frame->index,
-                'startLine' => $frame->startLine,
-                'endLine' => $frame->endLine,
-                'lineCount' => count($frame->lines),
+                'segment' => $segment->index,
+                'startMs' => $segment->startMs,
+                'endMs' => $segment->endMs,
+                'durationMs' => $segment->durationMs,
+                'wordCount' => $segment->wordCount,
+                'renderedWidth' => $segment->renderedWidth,
+                'fontSize' => $segment->fontSize,
             ];
         }
 
-        $debugFile = $debugDir . DIRECTORY_SEPARATOR . "surah_{$surahNumber}_frames.json";
+        $debugFile = $debugDir . DIRECTORY_SEPARATOR . "surah_{$surahNumber}_segments.json";
         file_put_contents($debugFile, json_encode($debugData, JSON_PRETTY_PRINT));
-        Log::info("[RenderPipeline] Written pagination debug log to {$debugFile}");
-    }
-
-    /**
-     * Write debugging timings JSON file.
-     *
-     * @param int $surahNumber
-     * @param array $frames
-     * @return void
-     */
-    protected function writeDebugTimingsJson(int $surahNumber, array $frames): void
-    {
-        $debugDir = storage_path('app/debug/timings');
-        if (!file_exists($debugDir)) {
-            mkdir($debugDir, 0755, true);
-        }
-
-        $debugData = [];
-        foreach ($frames as $frame) {
-            $debugData[] = [
-                'frame' => $frame->index,
-                'startLine' => $frame->startLine,
-                'endLine' => $frame->endLine,
-                'startMs' => $frame->startMs,
-                'endMs' => $frame->endMs,
-                'durationMs' => $frame->endMs - $frame->startMs,
-            ];
-        }
-
-        $debugFile = $debugDir . DIRECTORY_SEPARATOR . "surah_{$surahNumber}_frame_timings.json";
-        file_put_contents($debugFile, json_encode($debugData, JSON_PRETTY_PRINT));
-        Log::info("[RenderPipeline] Written timings debug log to {$debugFile}");
+        Log::info("[RenderPipeline] Written segments debug log to {$debugFile}");
     }
 }

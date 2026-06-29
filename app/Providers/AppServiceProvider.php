@@ -11,7 +11,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(
+            \App\Modules\Segmentation\Constraints\SegmentConstraint::class,
+            \App\Modules\Segmentation\Constraints\ReelSingleLineConstraint::class
+        );
     }
 
     /**
