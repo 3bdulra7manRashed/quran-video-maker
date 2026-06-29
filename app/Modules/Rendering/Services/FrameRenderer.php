@@ -2,9 +2,9 @@
 
 namespace App\Modules\Rendering\Services;
 
+use App\Modules\Layout\DTO\Frame;
 use App\Modules\Layout\Services\FontResolver;
 use App\Modules\Quran\Models\Surah;
-use App\Modules\Quran\Models\Word;
 use ArPHP\I18N\Arabic;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -19,15 +19,19 @@ class FrameRenderer
     }
 
     /**
-     * Render a static PNG frame for a Surah.
+     * Render a single Frame object as a PNG.
      *
      * @param Surah $surah
-     * @param string $outputPath Path to save the rendered PNG frame.
+     * @param Frame $frame
+     * @param string $outputPath
      * @return void
      */
-    public function render(Surah $surah, string $outputPath): void
+    public function renderFrame(Surah $surah, Frame $frame, string $outputPath): void
     {
-        Log::info("[FrameRenderer] Starting frame render", ['surah' => $surah->number]);
+        Log::info("[FrameRenderer] Starting frame render", [
+            'surah' => $surah->number,
+            'frame_index' => $frame->index,
+        ]);
 
         // 1. Create a 1080x1920 true color image
         $width = 1080;
@@ -86,49 +90,14 @@ class FrameRenderer
 
         imagettftext($im, $reciterSize, 0, $reciterX, $reciterY, $white, $cairoFont, $reciterText);
 
-        // 5. Load and group Quran words by [page_number, line_number]
-        $ayahIds = $surah->ayahs()->pluck('id');
-        $words = Word::whereIn('ayah_id', $ayahIds)
-            ->orderBy('page_number')
-            ->orderBy('line_number')
-            ->orderBy('ayah_id')
-            ->orderBy('word_index')
-            ->get();
-
-        $lines = [];
-        foreach ($words as $word) {
-            $page = $word->page_number;
-            $line = $word->line_number ?? 0;
-            $key = "{$page}_{$line}";
-
-            if (!isset($lines[$key])) {
-                $lines[$key] = [
-                    'page' => $page,
-                    'line' => $line,
-                    'words' => [],
-                ];
-            }
-            $lines[$key]['words'][] = $word;
-        }
-
-        // 6. Draw lines of Quran text
+        // 5. Draw lines of Quran text for this specific frame
         $quranFontSize = 26;
-        $lineHeight = 65;
+        $lineHeight = 120;
         $startY = 480;
-        $maxY = 1800;
 
         $currentY = $startY;
 
-        foreach ($lines as $lineData) {
-            if ($currentY + $lineHeight > $maxY) {
-                Log::warning("[FrameRenderer] Content overflow, stopping layout rendering", [
-                    'surah' => $surah->number,
-                    'last_page' => $lineData['page'],
-                    'last_line' => $lineData['line'],
-                ]);
-                break;
-            }
-
+        foreach ($frame->lines as $lineData) {
             $page = $lineData['page'];
             $fontPath = $this->fontResolver->resolve($page);
 
@@ -150,7 +119,7 @@ class FrameRenderer
             $currentY += $lineHeight;
         }
 
-        // 7. Save the frame to PNG
+        // 6. Save the frame to PNG
         $outputDir = dirname($outputPath);
         if (!file_exists($outputDir)) {
             mkdir($outputDir, 0755, true);
