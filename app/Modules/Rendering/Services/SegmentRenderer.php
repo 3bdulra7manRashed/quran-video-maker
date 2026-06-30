@@ -6,6 +6,7 @@ use App\Modules\Layout\Services\FontResolver;
 use App\Modules\Layout\Strategies\ReelSingleLineLayoutStrategy;
 use App\Modules\Quran\Models\Surah;
 use App\Modules\Segmentation\DTO\Segment;
+use App\Modules\Shared\Services\QuranPathResolver;
 use ArPHP\I18N\Arabic;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -14,13 +15,16 @@ class SegmentRenderer
 {
     protected FontResolver $fontResolver;
     protected ReelSingleLineLayoutStrategy $layoutStrategy;
+    protected QuranPathResolver $pathResolver;
 
     public function __construct(
         FontResolver $fontResolver,
-        ReelSingleLineLayoutStrategy $layoutStrategy
+        ReelSingleLineLayoutStrategy $layoutStrategy,
+        QuranPathResolver $pathResolver
     ) {
         $this->fontResolver = $fontResolver;
         $this->layoutStrategy = $layoutStrategy;
+        $this->pathResolver = $pathResolver;
     }
 
     /**
@@ -44,7 +48,7 @@ class SegmentRenderer
         $im = imagecreatetruecolor($width, $height);
 
         // 2. Draw background
-        $backgroundPath = storage_path('app/backgrounds/default.png');
+        $backgroundPath = $this->pathResolver->backgrounds('default.png');
         if (!file_exists($backgroundPath)) {
             throw new RuntimeException("Background image not found: {$backgroundPath}");
         }

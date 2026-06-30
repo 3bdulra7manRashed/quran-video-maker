@@ -5,6 +5,7 @@ namespace App\Modules\Rendering\Services;
 use App\Modules\Layout\DTO\Frame;
 use App\Modules\Layout\Services\FontResolver;
 use App\Modules\Quran\Models\Surah;
+use App\Modules\Shared\Services\QuranPathResolver;
 use ArPHP\I18N\Arabic;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -12,10 +13,12 @@ use RuntimeException;
 class FrameRenderer
 {
     protected FontResolver $fontResolver;
+    protected QuranPathResolver $pathResolver;
 
-    public function __construct(FontResolver $fontResolver)
+    public function __construct(FontResolver $fontResolver, QuranPathResolver $pathResolver)
     {
         $this->fontResolver = $fontResolver;
+        $this->pathResolver = $pathResolver;
     }
 
     /**
@@ -39,7 +42,7 @@ class FrameRenderer
         $im = imagecreatetruecolor($width, $height);
 
         // 2. Draw background
-        $backgroundPath = storage_path('app/backgrounds/default.png');
+        $backgroundPath = $this->pathResolver->backgrounds('default.png');
         if (!file_exists($backgroundPath)) {
             throw new RuntimeException("Background image not found: {$backgroundPath}");
         }
@@ -90,36 +93,43 @@ class FrameRenderer
 
         imagettftext($im, $reciterSize, 0, $reciterX, $reciterY, $white, $cairoFont, $reciterText);
 
-        // 5. Draw lines of Quran text for this specific frame
+        // 5. Draw Quran lines
         $quranFontSize = 26;
         $lineHeight = 120;
-        $startY = 480;
+        $startY = 520;
 
-        $currentY = $startY;
+        foreach ($frame->lines as $lineIndex => $line) {
+            $words = $line['words'] ?? [];
+            if (empty($words)) {
+                continue;
+            }
 
-        foreach ($frame->lines as $lineData) {
-            $page = $lineData['page'];
+            // Resolve page font from the first word's page number
+            $firstWord = $words[0];
+            $page = $firstWord->page_number;
             $fontPath = $this->fontResolver->resolve($page);
 
             // Extract glyph strings
             $glyphStrings = array_map(function ($w) {
                 return $w->glyph_text;
-            }, $lineData['words']);
+            }, $words);
 
             // Reverse order of words for RTL layout rendering in LTR GD canvas
             $reversedGlyphs = array_reverse($glyphStrings);
             $lineText = implode(' ', $reversedGlyphs);
+
+            // Draw line centered horizontally
+            $y = $startY + ($lineIndex * $lineHeight);
 
             // Compute center position
             $bbox = imagettfbbox($quranFontSize, 0, $fontPath, $lineText);
             $textWidth = abs($bbox[4] - $bbox[0]);
             $lineX = (int) (($width - $textWidth) / 2);
 
-            imagettftext($im, $quranFontSize, 0, $lineX, $currentY, $white, $fontPath, $lineText);
-            $currentY += $lineHeight;
+            imagettftext($im, $quranFontSize, 0, $lineX, $y, $white, $fontPath, $lineText);
         }
 
-        // 6. Save the frame to PNG
+        // 6. Save image to destination path
         $outputDir = dirname($outputPath);
         if (!file_exists($outputDir)) {
             mkdir($outputDir, 0755, true);
@@ -128,6 +138,6 @@ class FrameRenderer
         imagepng($im, $outputPath);
         imagedestroy($im);
 
-        Log::info("[FrameRenderer] Saved frame to {$outputPath}");
+        Log::info("[FrameRenderer] Saved frame image to {$outputPath}");
     }
 }

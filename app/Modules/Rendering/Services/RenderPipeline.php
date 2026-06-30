@@ -9,6 +9,7 @@ use App\Modules\Quran\Models\AudioFile;
 use App\Modules\Quran\Models\Word;
 use App\Modules\Segmentation\Services\SegmentationService;
 use App\Modules\Segmentation\DTO\Segment;
+use App\Modules\Shared\Services\QuranPathResolver;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
@@ -18,28 +19,32 @@ class RenderPipeline
     protected VideoComposer $videoComposer;
     protected SegmentationService $segmentationService;
     protected FontResolver $fontResolver;
+    protected QuranPathResolver $pathResolver;
 
     public function __construct(
         SegmentRenderer $segmentRenderer,
         VideoComposer $videoComposer,
         SegmentationService $segmentationService,
-        FontResolver $fontResolver
+        FontResolver $fontResolver,
+        QuranPathResolver $pathResolver
     ) {
         $this->segmentRenderer = $segmentRenderer;
         $this->videoComposer = $videoComposer;
         $this->segmentationService = $segmentationService;
         $this->fontResolver = $fontResolver;
+        $this->pathResolver = $pathResolver;
     }
 
     /**
      * Run the video rendering pipeline for a given Surah number.
      *
      * @param int $surahNumber
+     * @param string $reciterSlug
      * @return string Path to the generated video.
      */
-    public function render(int $surahNumber): string
+    public function render(int $surahNumber, string $reciterSlug = 'yasser-al-dosari'): string
     {
-        Log::info("[RenderPipeline] Starting segmentation rendering pipeline for Surah {$surahNumber}");
+        Log::info("[RenderPipeline] Starting rendering pipeline for Surah {$surahNumber} and reciter '{$reciterSlug}'");
 
         // 1. Select Surah
         $surah = Surah::where('number', $surahNumber)->first();
@@ -47,10 +52,10 @@ class RenderPipeline
             throw new RuntimeException("Surah {$surahNumber} not found in database.");
         }
 
-        // 2. Select default Reciter
-        $reciter = Reciter::where('slug', 'yasser-al-dosari')->first();
+        // 2. Select Reciter
+        $reciter = Reciter::where('slug', $reciterSlug)->first();
         if (!$reciter) {
-            throw new RuntimeException("Default reciter 'yasser-al-dosari' not found in database.");
+            throw new RuntimeException("Reciter '{$reciterSlug}' not found in database.");
         }
 
         // 3. Load AudioFile metadata
@@ -62,7 +67,7 @@ class RenderPipeline
             throw new RuntimeException("Audio file metadata not found for Surah {$surahNumber} and reciter '{$reciter->slug}'.");
         }
 
-        $absoluteAudioPath = storage_path('app/quran/audio/' . $audioFile->file_path);
+        $absoluteAudioPath = $this->pathResolver->audio($audioFile->file_path);
         if (!file_exists($absoluteAudioPath)) {
             throw new RuntimeException("Audio file does not exist on disk: {$absoluteAudioPath}");
         }
@@ -82,7 +87,37 @@ class RenderPipeline
             ->get()
             ->all();
 
-        // 5. Segment the words
+        // 5. Check timings and apply proportional scheduling fallback if timings are unavailable
+        $hasTimings = false;
+        foreach ($words as $w) {
+            if ($w->char_type === 'word' && $w->start_ms_from_surah !== null) {
+                $hasTimings = true;
+                break;
+            }
+        }
+
+        if (!$hasTimings) {
+            Log::info("[RenderPipeline] Timings not found in DB for Surah {$surahNumber}. Falling back to proportional scheduling.");
+
+            $spokenWords = array_filter($words, fn($w) => $w->char_type === 'word');
+            $spokenCount = count($spokenWords);
+
+            if ($spokenCount > 0) {
+                $totalDurationMs = (int) round($totalDuration * 1000);
+                $durationPerWord = $totalDurationMs / $spokenCount;
+
+                $spokenIndex = 0;
+                foreach ($words as $w) {
+                    if ($w->char_type === 'word') {
+                        $w->start_ms_from_surah = (int) round($spokenIndex * $durationPerWord);
+                        $w->end_ms_from_surah = (int) round(($spokenIndex + 1) * $durationPerWord);
+                        $spokenIndex++;
+                    }
+                }
+            }
+        }
+
+        // 6. Segment the words
         $segments = $this->segmentationService->segment($words, $totalDuration);
         if (empty($segments)) {
             throw new RuntimeException("Segmentation service returned no segments for Surah {$surahNumber}.");
@@ -110,14 +145,14 @@ class RenderPipeline
 
         Log::info("[RenderPipeline] Segmented Surah {$surahNumber} into " . count($segments) . " segments.");
 
-        // 6. Generate debug segment JSON file
-        $this->writeDebugSegmentsJson($surahNumber, $segments);
+        // 7. Generate debug segment JSON file
+        $this->writeDebugSegmentsJson($surahNumber, $segments, $reciterSlug);
 
-        // 7. Render all segments as PNGs and build frame schedule
+        // 8. Render all segments as PNGs and build frame schedule
         $composerFrames = [];
         foreach ($segments as $segment) {
             $paddedIndex = sprintf('%03d', $segment->index);
-            $segmentPath = storage_path("app/rendered_segments/surah_{$surahNumber}/segment_{$paddedIndex}.png");
+            $segmentPath = $this->pathResolver->renderedSegments("surah_{$surahNumber}_{$reciterSlug}/segment_{$paddedIndex}.png");
 
             $this->segmentRenderer->renderSegment($surah, $segment, $segmentPath);
 
@@ -129,11 +164,12 @@ class RenderPipeline
             ];
         }
 
-        // 8. Compose the video from segments and audio
-        $outputVideoPath = storage_path("app/output/surah_{$surahNumber}.mp4");
+        // 9. Compose the video from segments and audio
+        $suffix = $reciterSlug === 'yasser-al-dosari' ? '' : "_{$reciterSlug}";
+        $outputVideoPath = $this->pathResolver->videos("surah_{$surahNumber}{$suffix}.mp4");
         $this->videoComposer->compose($composerFrames, $absoluteAudioPath, $outputVideoPath, $totalDuration);
 
-        Log::info("[RenderPipeline] Completed pagination pipeline for Surah {$surahNumber}");
+        Log::info("[RenderPipeline] Completed video generation for Surah {$surahNumber}");
 
         return $outputVideoPath;
     }
@@ -143,14 +179,13 @@ class RenderPipeline
      *
      * @param int $surahNumber
      * @param Segment[] $segments
+     * @param string $reciterSlug
      * @return void
      */
-    protected function writeDebugSegmentsJson(int $surahNumber, array $segments): void
+    protected function writeDebugSegmentsJson(int $surahNumber, array $segments, string $reciterSlug): void
     {
-        $debugDir = storage_path('app/debug/segments');
-        if (!file_exists($debugDir)) {
-            mkdir($debugDir, 0755, true);
-        }
+        $suffix = $reciterSlug === 'yasser-al-dosari' ? '' : "_{$reciterSlug}";
+        $debugFile = $this->pathResolver->debug("segments/surah_{$surahNumber}{$suffix}_segments.json");
 
         $debugData = [];
         foreach ($segments as $segment) {
@@ -165,7 +200,6 @@ class RenderPipeline
             ];
         }
 
-        $debugFile = $debugDir . DIRECTORY_SEPARATOR . "surah_{$surahNumber}_segments.json";
         file_put_contents($debugFile, json_encode($debugData, JSON_PRETTY_PRINT));
         Log::info("[RenderPipeline] Written segments debug log to {$debugFile}");
     }

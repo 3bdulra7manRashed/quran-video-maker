@@ -4,6 +4,7 @@ namespace App\Modules\Import\Services;
 
 use App\Modules\Quran\Models\Reciter;
 use App\Modules\Quran\Models\AudioFile;
+use App\Modules\Shared\Services\QuranPathResolver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
@@ -11,6 +12,13 @@ use RuntimeException;
 
 class ImportAudioMetadataService
 {
+    protected QuranPathResolver $pathResolver;
+
+    public function __construct(QuranPathResolver $pathResolver)
+    {
+        $this->pathResolver = $pathResolver;
+    }
+
     /**
      * Import audio metadata from local metadata.json files.
      *
@@ -22,7 +30,7 @@ class ImportAudioMetadataService
         $startTime = microtime(true);
 
         $report = [
-            'source'               => $sourcePath ?? storage_path('app/quran/audio/'),
+            'source'               => $sourcePath ?? $this->pathResolver->audio(),
             'reciters_imported'    => 0,
             'audio_files_imported' => 0,
             'skipped'              => 0,
@@ -69,7 +77,7 @@ class ImportAudioMetadataService
             return [$path];
         }
 
-        $dir = $path ?? storage_path('app/quran/audio/');
+        $dir = $path ?? $this->pathResolver->audio();
         if (!is_dir($dir)) {
             return [];
         }
@@ -79,14 +87,19 @@ class ImportAudioMetadataService
             return [rtrim($dir, DIRECTORY_SEPARATOR) . '/metadata.json'];
         }
 
-        $files = glob(rtrim($dir, DIRECTORY_SEPARATOR) . '/*/metadata.json');
-        if ($files === false) {
-            return [];
+        // Search one level deep for folders containing metadata.json (e.g. yasser-al-dosari/metadata.json)
+        $metadataFiles = [];
+        $subDirs = glob(rtrim($dir, DIRECTORY_SEPARATOR) . '/*', GLOB_ONLYDIR);
+        if ($subDirs) {
+            foreach ($subDirs as $subDir) {
+                $meta = $subDir . '/metadata.json';
+                if (file_exists($meta)) {
+                    $metadataFiles[] = $meta;
+                }
+            }
         }
 
-        natsort($files);
-
-        return array_values($files);
+        return $metadataFiles;
     }
 
     /**
@@ -94,37 +107,26 @@ class ImportAudioMetadataService
      */
     private function importFile(string $filePath, array &$report): void
     {
-        if (!file_exists($filePath)) {
-            throw new RuntimeException("File not found: {$filePath}");
-        }
+        Log::info("[ImportAudioMetadata] Processing file: {$filePath}");
 
-        $contents = file_get_contents($filePath);
-        if ($contents === false) {
-            throw new RuntimeException("Failed to read file: {$filePath}");
-        }
+        $content = file_get_contents($filePath);
+        $payload = json_decode($content, true);
 
-        $data = json_decode($contents, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new RuntimeException("Invalid JSON: " . json_last_error_msg());
+            throw new RuntimeException("Invalid JSON in file {$filePath}: " . json_last_error_msg());
         }
 
-        // Validate structure
-        if (empty($data['reciter']) || !is_array($data['reciter'])) {
+        // Validate payload structure
+        if (!isset($payload['reciter']) || !is_array($payload['reciter'])) {
             throw new InvalidArgumentException("Missing or invalid 'reciter' block.");
         }
 
-        $reciterData = $data['reciter'];
+        $reciterData = $payload['reciter'];
         if (empty($reciterData['name_arabic']) || empty($reciterData['name_english']) || empty($reciterData['slug'])) {
-            throw new InvalidArgumentException("Reciter block missing required fields: name_arabic, name_english, slug.");
+            throw new InvalidArgumentException("Reciter requires 'name_arabic', 'name_english', and 'slug'.");
         }
 
-        if (empty($data['audio_files']) || !is_array($data['audio_files'])) {
-            throw new InvalidArgumentException("Missing or empty 'audio_files' array.");
-        }
-
-        // Create or update reciter
-        $existingReciter = Reciter::where('slug', $reciterData['slug'])->first();
-        
+        // Find or create Reciter
         $reciter = Reciter::updateOrCreate(
             ['slug' => $reciterData['slug']],
             [
@@ -134,29 +136,26 @@ class ImportAudioMetadataService
             ]
         );
 
-        if (!$existingReciter) {
+        if ($reciter->wasRecentlyCreated) {
             $report['reciters_imported']++;
+            Log::info("[ImportAudioMetadata] Created new reciter: {$reciter->name_english} ({$reciter->slug})");
+        }
+
+        if (!isset($payload['audio_files']) || !is_array($payload['audio_files'])) {
+            throw new InvalidArgumentException("Missing or invalid 'audio_files' array.");
         }
 
         $seenSurahs = [];
-        $seenPaths = [];
-
-        foreach ($data['audio_files'] as $audioFile) {
-            $this->importSingleAudioFile($reciter, $audioFile, dirname($filePath), $seenSurahs, $seenPaths, $report);
+        foreach ($payload['audio_files'] as $audioFile) {
+            $this->validateAndImportAudioFile($reciter, $audioFile, $seenSurahs, $report);
         }
     }
 
     /**
-     * Validate and import a single audio file.
+     * Validate and import a single audio file entry.
      */
-    private function importSingleAudioFile(
-        Reciter $reciter,
-        array $audioFile,
-        string $baseDir,
-        array &$seenSurahs,
-        array &$seenPaths,
-        array &$report
-    ): void {
+    private function validateAndImportAudioFile(Reciter $reciter, array $audioFile, array &$seenSurahs, array &$report): void
+    {
         if (!isset($audioFile['surah_number']) || !is_int($audioFile['surah_number'])) {
             throw new InvalidArgumentException("Missing or invalid 'surah_number'.");
         }
@@ -171,7 +170,7 @@ class ImportAudioMetadataService
         }
 
         $relativeFilePath = $audioFile['file_path'];
-        $absoluteFilePath = storage_path('app/quran/audio/' . $relativeFilePath);
+        $absoluteFilePath = $this->pathResolver->audio($relativeFilePath);
 
         if (!file_exists($absoluteFilePath)) {
             throw new RuntimeException("Audio file does not exist on disk: {$absoluteFilePath}");
@@ -183,35 +182,19 @@ class ImportAudioMetadataService
         }
         $seenSurahs[] = $surahNumber;
 
-        if (in_array($relativeFilePath, $seenPaths, true)) {
-            throw new InvalidArgumentException("Duplicate file_path '{$relativeFilePath}' in metadata.");
-        }
-        $seenPaths[] = $relativeFilePath;
+        // Auto-resolve duration and format using ffprobe if missing
+        $durationMs = $audioFile['duration_ms'] ?? null;
+        $format = $audioFile['format'] ?? null;
 
-        // Resolve duration
-        $durationMs = isset($audioFile['duration_ms']) ? (int) $audioFile['duration_ms'] : 0;
-        if ($durationMs <= 0) {
-            // Fall back to FFprobe
-            $durationMs = $this->getAudioDurationMs($absoluteFilePath);
-        }
-
-        if ($durationMs <= 0) {
-            throw new InvalidArgumentException("Invalid duration resolved for Surah {$surahNumber}. Must be greater than 0.");
+        if ($durationMs === null || $format === null) {
+            Log::info("[ImportAudioMetadata] Probe missing duration/format for Surah {$surahNumber}");
+            $probed = $this->probeAudioFile($absoluteFilePath);
+            $durationMs = $durationMs ?? $probed['duration_ms'];
+            $format = $format ?? $probed['format'];
         }
 
-        // Idempotency check: see if database matches exactly
-        $existing = AudioFile::where('reciter_id', $reciter->id)
-            ->where('surah_number', $surahNumber)
-            ->first();
-
-        if ($existing) {
-            if ($existing->file_path === $relativeFilePath && $existing->duration_ms === $durationMs) {
-                $report['skipped']++;
-                return;
-            }
-        }
-
-        AudioFile::updateOrCreate(
+        // Save
+        $record = AudioFile::updateOrCreate(
             [
                 'reciter_id'   => $reciter->id,
                 'surah_number' => $surahNumber,
@@ -219,31 +202,53 @@ class ImportAudioMetadataService
             [
                 'file_path'   => $relativeFilePath,
                 'duration_ms' => $durationMs,
+                'format'      => $format,
+                'file_size'   => filesize($absoluteFilePath),
             ]
         );
 
         $report['audio_files_imported']++;
+        Log::debug("[ImportAudioMetadata] Imported AudioFile record: ID={$record->id}, Surah={$surahNumber}");
     }
 
     /**
-     * Resolve audio duration in milliseconds using FFprobe.
+     * Run ffprobe to resolve duration and format.
      */
-    private function getAudioDurationMs(string $path): int
+    private function probeAudioFile(string $filePath): array
     {
         $ffprobe = config('ffmpeg.ffprobe_path', 'ffprobe');
         
-        $cmd = escapeshellarg($ffprobe) . " -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 -i " . escapeshellarg($path);
-        
-        $output = shell_exec($cmd);
-        if ($output === null) {
-            throw new RuntimeException("Failed to execute FFprobe command: {$cmd}");
+        $cmd = sprintf(
+            '"%s" -v error -show_entries format=duration,format_name -of default=noprint_wrappers=1:nokey=1 "%s"',
+            $ffprobe,
+            $filePath
+        );
+
+        Log::debug("[ImportAudioMetadata] Running ffprobe command", ['cmd' => $cmd]);
+
+        $output = [];
+        $resultCode = -1;
+        exec($cmd . ' 2>&1', $output, $resultCode);
+
+        if ($resultCode !== 0 || count($output) < 2) {
+            $errorOutput = implode("\n", $output);
+            Log::error("[ImportAudioMetadata] ffprobe failed", [
+                'result_code' => $resultCode,
+                'output'      => $errorOutput,
+            ]);
+            throw new RuntimeException("ffprobe failed. Exit code {$resultCode}. Output:\n{$errorOutput}");
         }
-        
-        $durationSeconds = floatval(trim($output));
-        if ($durationSeconds <= 0) {
-            throw new RuntimeException("Invalid duration resolved via FFprobe: {$durationSeconds} seconds.");
-        }
-        
-        return (int) round($durationSeconds * 1000);
+
+        // Expected output:
+        // Line 1: format name (e.g. mp3)
+        // Line 2: duration in seconds (e.g. 12.633000)
+        $format = trim($output[0]);
+        $durationSeconds = (float) trim($output[1]);
+        $durationMs = (int) round($durationSeconds * 1000);
+
+        return [
+            'duration_ms' => $durationMs,
+            'format'      => $format,
+        ];
     }
 }

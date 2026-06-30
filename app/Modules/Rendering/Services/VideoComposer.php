@@ -2,11 +2,19 @@
 
 namespace App\Modules\Rendering\Services;
 
+use App\Modules\Shared\Services\QuranPathResolver;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class VideoComposer
 {
+    protected QuranPathResolver $pathResolver;
+
+    public function __construct(QuranPathResolver $pathResolver)
+    {
+        $this->pathResolver = $pathResolver;
+    }
+
     /**
      * Compose a sequence of frame images with durations and an audio track into an MP4 video using FFmpeg.
      *
@@ -39,10 +47,7 @@ class VideoComposer
         }
 
         // 1. Generate FFmpeg concat demuxer file
-        $tempDir = storage_path('app/temp');
-        if (!file_exists($tempDir)) {
-            mkdir($tempDir, 0755, true);
-        }
+        $tempDir = $this->pathResolver->temp();
 
         $concatFilePath = $tempDir . DIRECTORY_SEPARATOR . 'concat_' . uniqid() . '.txt';
         $concatContent = "";
@@ -62,51 +67,54 @@ class VideoComposer
         $concatContent .= "file '" . $escapedLastPath . "'\n";
 
         file_put_contents($concatFilePath, $concatContent);
-        Log::info("[VideoComposer] Created FFmpeg concat file", ['path' => $concatFilePath]);
 
+        // 2. Build FFmpeg command using configured path
         $ffmpeg = config('ffmpeg.ffmpeg_path', 'ffmpeg');
 
-        // 2. Construct the FFmpeg command
-        // Concat demuxer uses: -f concat -safe 0
+        // Target CFR 30 FPS. Specifying input duration limits encoding.
+        $durationArgs = "";
         if ($totalDuration !== null) {
-            $cmd = sprintf(
-                '%s -y -f concat -safe 0 -i %s -i %s -vf fps=fps=30 -c:v libx264 -tune stillimage -pix_fmt yuv420p -c:a aac -t %f %s 2>&1',
-                escapeshellarg($ffmpeg),
-                escapeshellarg($concatFilePath),
-                escapeshellarg($audioPath),
-                $totalDuration,
-                escapeshellarg($outputPath)
-            );
-        } else {
-            $cmd = sprintf(
-                '%s -y -f concat -safe 0 -i %s -i %s -vf fps=fps=30 -c:v libx264 -tune stillimage -pix_fmt yuv420p -c:a aac -shortest %s 2>&1',
-                escapeshellarg($ffmpeg),
-                escapeshellarg($concatFilePath),
-                escapeshellarg($audioPath),
-                escapeshellarg($outputPath)
-            );
+            $durationArgs = "-t " . esc_args(sprintf("%.6f", $totalDuration));
         }
 
-        Log::info("[VideoComposer] Running FFmpeg command", ['command' => $cmd]);
+        // Build cmd string with properly quoted paths
+        $cmd = sprintf(
+            '"%s" -y -f concat -safe 0 -i "%s" -i "%s" %s -c:v libx264 -pix_fmt yuv420p -vf fps=fps=30 -c:a aac -shortest "%s"',
+            $ffmpeg,
+            $concatFilePath,
+            $audioPath,
+            $durationArgs,
+            $outputPath
+        );
+
+        Log::info("[VideoComposer] Executing FFmpeg command", ['cmd' => $cmd]);
 
         $output = [];
-        $resultCode = null;
-        exec($cmd, $output, $resultCode);
+        $resultCode = -1;
+        exec($cmd . ' 2>&1', $output, $resultCode);
 
-        // Cleanup temporary concat file
+        // Clean up concat temp file
         if (file_exists($concatFilePath)) {
             unlink($concatFilePath);
         }
 
         if ($resultCode !== 0) {
-            $outputStr = implode("\n", $output);
-            Log::error("[VideoComposer] FFmpeg execution failed", [
+            $errorOutput = implode("\n", $output);
+            Log::error("[VideoComposer] FFmpeg composition failed", [
                 'result_code' => $resultCode,
-                'output' => $outputStr,
+                'output' => $errorOutput,
             ]);
-            throw new RuntimeException("FFmpeg failed with exit code {$resultCode}. Output:\n{$outputStr}");
+            throw new RuntimeException("FFmpeg video composition failed. Exit code {$resultCode}. Output:\n{$errorOutput}");
         }
 
-        Log::info("[VideoComposer] Video successfully generated at {$outputPath}");
+        Log::info("[VideoComposer] Successfully composed video", ['output_path' => $outputPath]);
     }
+}
+
+/**
+ * Escape arguments on Windows CLI
+ */
+function esc_args(string $arg): string
+{
+    return str_replace('"', '""', $arg);
 }

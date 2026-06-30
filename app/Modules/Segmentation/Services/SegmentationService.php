@@ -4,6 +4,7 @@ namespace App\Modules\Segmentation\Services;
 
 use App\Modules\Segmentation\Constraints\SegmentConstraint;
 use App\Modules\Segmentation\DTO\Segment;
+use App\Modules\Quran\Models\Word;
 use Illuminate\Support\Facades\Log;
 
 class SegmentationService
@@ -13,6 +14,41 @@ class SegmentationService
     public function __construct(SegmentConstraint $constraint)
     {
         $this->constraint = $constraint;
+    }
+
+    /**
+     * Determine if a word contains a Quranic pause marker.
+     *
+     * Primary Strategy: Check if the Uthmani text contains unicode characters representing
+     * superscript pause symbols (U+06D6 to U+06DC).
+     *
+     * Secondary Heuristic Fallback: If no unicode character is found in uthmani_text, inspect
+     * if the glyph_text is multi-character (length > 1), which indicates QCF pause marker
+     * suffix codepoints (like U+FB71, U+FB7C, U+FB8A) are present. Note: This is a fallback
+     * heuristic and does not guarantee that every multi-character glyph is a pause marker.
+     *
+     * @param Word $word
+     * @return bool
+     */
+    protected function hasPauseMarker(Word $word): bool
+    {
+        // 1. Primary: Unicode detection on uthmani_text
+        $text = $word->uthmani_text ?? '';
+        $len = mb_strlen($text);
+        for ($i = 0; $i < $len; $i++) {
+            $ord = mb_ord(mb_substr($text, $i, 1));
+            if ($ord >= 0x06D6 && $ord <= 0x06DC) {
+                return true;
+            }
+        }
+
+        // 2. Secondary Heuristic Fallback: multi-character glyph inspection
+        $glyph = $word->glyph_text ?? '';
+        if (mb_strlen($glyph) > 1) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -38,6 +74,9 @@ class SegmentationService
         $segments = [];
         $segmentIndex = 1;
 
+        $maxAyahs = config('layouts.reels.max_ayahs_per_segment', 1);
+        $mandatoryPause = config('layouts.reels.mandatory_pause_boundary', true);
+
         $currentIndex = 0;
         while ($currentIndex < $wordCount) {
             $segmentWords = [];
@@ -53,17 +92,18 @@ class SegmentationService
                 // Construct candidate words array (collected words + current word)
                 $candidateWords = array_slice($words, $currentIndex, $j - $currentIndex + 1);
 
-                // 1. Validation constraint check (exceeds width limit)
-                // This has the absolute highest priority! If adding the current word violates the constraint, we backtrack immediately.
+                // 1. Width validation check (Priority 3)
+                // Highest constraint priority: If adding this word violates the width constraint,
+                // we backtrack immediately and split at the previous boundary or previous word.
                 if (!$this->constraint->accepts($candidateWords)) {
                     $backtracked = false;
 
-                    // Backtrack to search for a boundary (verse end, pause, or line transition)
+                    // Backtrack to search for a boundary (pause marker or line transition)
                     for ($k = count($segmentWords) - 1; $k >= 0; $k--) {
                         $wordK = $segmentWords[$k];
                         $streamIndexK = $currentIndex + $k;
 
-                        $isMarker = ($wordK->char_type === 'end' || $wordK->char_type === 'pause');
+                        $isMarker = $this->hasPauseMarker($wordK);
                         $isLineBoundary = false;
                         if ($streamIndexK + 1 < $wordCount) {
                             $nextWordK = $words[$streamIndexK + 1];
@@ -88,7 +128,26 @@ class SegmentationService
                     break;
                 }
 
-                // If valid, add it to our segment words array
+                // 2. Single Ayah Rule (Priority 1)
+                // Close segment immediately at the ayah boundary transition without relying on end-marker columns.
+                if ($maxAyahs === 1) {
+                    $isLastWord = ($j === $wordCount - 1);
+                    if ($isLastWord || $words[$j + 1]->ayah_id !== $w->ayah_id) {
+                        $splitAtIndex = $j;
+                        $closed = true;
+                        break;
+                    }
+                }
+
+                // 3. Mandatory Pause Boundary (Priority 2)
+                // Close segment immediately when we encounter a pause marker.
+                if ($mandatoryPause && $this->hasPauseMarker($w)) {
+                    $splitAtIndex = $j;
+                    $closed = true;
+                    break;
+                }
+
+                // If valid and we don't close, add it to our segment words array
                 $segmentWords[] = $w;
 
                 // Update timings for spoken words
@@ -112,39 +171,19 @@ class SegmentationService
                     break;
                 }
 
-                // Collect while duration is below 8 seconds
-                if ($durationSec < 8.0) {
-                    continue;
-                }
-
-                // Duration reaches 8 seconds, search for suitable boundary (end or pause marker)
+                // 4. Preferred Duration Window (Priority 4)
+                // Split at line boundaries if segment duration is between 8s and 15s.
                 if ($durationSec >= 8.0 && $durationSec <= 15.0) {
-                    if ($w->char_type === 'end' || $w->char_type === 'pause') {
-                        $splitAtIndex = $j;
-                        $closed = true;
-                        break;
-                    }
-                    continue;
-                }
-
-                // Duration reaches 15 seconds, close at nearest valid boundary (marker or line transition)
-                if ($durationSec > 15.0 && $durationSec < 20.0) {
-                    if ($w->char_type === 'end' || $w->char_type === 'pause') {
-                        $splitAtIndex = $j;
-                        $closed = true;
-                        break;
-                    }
-                    // Check line boundary
                     $nextWord = $words[$j + 1];
                     if ($nextWord->line_number !== $w->line_number || $nextWord->page_number !== $w->page_number) {
                         $splitAtIndex = $j;
                         $closed = true;
                         break;
                     }
-                    continue;
                 }
 
-                // Duration reaches 20 seconds, close immediately at nearest line boundary
+                // 5. Hard Limit (Priority 5)
+                // If segment reaches 20s, force closure immediately at the nearest line boundary.
                 if ($durationSec >= 20.0) {
                     $backtracked = false;
                     for ($k = count($segmentWords) - 1; $k >= 0; $k--) {
