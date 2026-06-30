@@ -15,6 +15,11 @@ class AppServiceProvider extends ServiceProvider
             \App\Modules\Segmentation\Constraints\SegmentConstraint::class,
             \App\Modules\Segmentation\Constraints\ReelSingleLineConstraint::class
         );
+
+        $this->app->bind(
+            \App\Modules\Dataset\Providers\DatasetProvider::class,
+            \App\Modules\Dataset\Providers\QuranComDatasetProvider::class
+        );
     }
 
     /**

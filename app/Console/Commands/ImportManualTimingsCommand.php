@@ -6,9 +6,8 @@ use App\Modules\Quran\Models\Surah;
 use App\Modules\Quran\Models\Ayah;
 use App\Modules\Quran\Models\Word;
 use App\Modules\Quran\Models\Reciter;
+use App\Modules\Import\Services\ImportManualTimingsService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -20,7 +19,7 @@ class ImportManualTimingsCommand extends Command
 
     protected $description = 'Import manual word timings for a specific ayah range of a Surah';
 
-    public function handle(): int
+    public function handle(ImportManualTimingsService $service): int
     {
         $path = $this->argument('path');
         $reciterSlug = $this->option('reciter');
@@ -100,14 +99,14 @@ class ImportManualTimingsCommand extends Command
             return self::FAILURE;
         }
 
-        // Validate and match words
+        // Validate and match words (for diagnostic warning output)
         $mismatches = [];
         for ($i = 0; $i < $dbCount; $i++) {
             $dbWord = $spokenWords[$i];
             $jsonWord = $jsonWords[$i];
 
-            $normDb = $this->normalizeText($dbWord->uthmani_text ?? '');
-            $normJson = $this->normalizeText($jsonWord['text'] ?? '');
+            $normDb = $service->normalizeText($dbWord->uthmani_text ?? '');
+            $normJson = $service->normalizeText($jsonWord['text'] ?? '');
 
             if ($normDb !== $normJson) {
                 $mismatches[] = [
@@ -128,44 +127,13 @@ class ImportManualTimingsCommand extends Command
             $this->warn("Proceeding with sequential alignment because word counts match.");
         }
 
-        // TODO: Future migration:
-        // move timings into a reciter_word_timings table so multiple reciters can own independent timings for the same Quran words.
-        DB::beginTransaction();
         try {
-            $upsertData = [];
-            foreach ($spokenWords as $index => $word) {
-                $jsonWord = $jsonWords[$index];
-                $upsertData[] = [
-                    'reciter_id' => $reciter->id,
-                    'word_id' => $word->id,
-                    'start_ms' => (int) $jsonWord['start'],
-                    'end_ms' => (int) $jsonWord['end'],
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
-            }
-
-            \App\Modules\Quran\Models\ReciterWordTiming::upsert(
-                $upsertData,
-                ['reciter_id', 'word_id'],
-                ['start_ms', 'end_ms', 'updated_at']
-            );
-
-            DB::commit();
+            $service->import($data, $reciter->id);
             $this->info("Successfully imported manual timings for Surah {$surahNumber} (Ayahs {$fromAyah}-{$toAyah}).");
             return self::SUCCESS;
         } catch (\Throwable $e) {
-            DB::rollBack();
             $this->error("Database update failed: " . $e->getMessage());
             return self::FAILURE;
         }
-    }
-
-    private function normalizeText(string $str): string
-    {
-        $tashkeel = ['ِ', 'ُ', 'َ', 'ْ', 'ّ', 'ً', 'ٌ', 'ٍ', 'ٰ', 'ٓ', 'ۥ', 'ۦ', 'ۧ', 'ۨ', 'ۣ', 'ۥ', 'ۦ'];
-        $str = str_replace($tashkeel, '', $str);
-        $str = str_replace(['أ', 'إ', 'آ'], 'ا', $str);
-        return trim($str);
     }
 }
