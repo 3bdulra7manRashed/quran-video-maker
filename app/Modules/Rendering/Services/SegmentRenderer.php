@@ -3,7 +3,6 @@
 namespace App\Modules\Rendering\Services;
 
 use App\Modules\Layout\Services\FontResolver;
-use App\Modules\Layout\Strategies\ReelSingleLineLayoutStrategy;
 use App\Modules\Quran\Models\Surah;
 use App\Modules\Segmentation\DTO\Segment;
 use App\Modules\Shared\Services\QuranPathResolver;
@@ -14,16 +13,13 @@ use RuntimeException;
 class SegmentRenderer
 {
     protected FontResolver $fontResolver;
-    protected ReelSingleLineLayoutStrategy $layoutStrategy;
     protected QuranPathResolver $pathResolver;
 
     public function __construct(
         FontResolver $fontResolver,
-        ReelSingleLineLayoutStrategy $layoutStrategy,
         QuranPathResolver $pathResolver
     ) {
         $this->fontResolver = $fontResolver;
-        $this->layoutStrategy = $layoutStrategy;
         $this->pathResolver = $pathResolver;
     }
 
@@ -33,9 +29,10 @@ class SegmentRenderer
      * @param Surah $surah
      * @param Segment $segment
      * @param string $outputPath
+     * @param array $layoutData
      * @return void
      */
-    public function renderSegment(Surah $surah, Segment $segment, string $outputPath): void
+    public function renderSegment(Surah $surah, Segment $segment, string $outputPath, array $layoutData): void
     {
         Log::info("[SegmentRenderer] Starting segment render using layout strategy render model", [
             'surah' => $surah->number,
@@ -87,20 +84,25 @@ class SegmentRenderer
             throw new RuntimeException("Cairo-Regular.ttf font not found: {$cairoFont}");
         }
 
-        $rawReciterText = "ياسر الدوسري";
-        $arabic = new Arabic('Glyphs');
-        $reciterText = $arabic->utf8Glyphs($rawReciterText);
-        $reciterSize = 20;
-        $reciterY = 320;
+        $rawReciterText = $layoutData['reciterNameArabic'] ?? '';
+        $reciterText = '';
+        if ($rawReciterText !== '') {
+            $arabic = new Arabic('Glyphs');
+            $reciterText = $arabic->utf8Glyphs($rawReciterText);
+        }
 
-        $bbox = imagettfbbox($reciterSize, 0, $cairoFont, $reciterText);
-        $textWidth = abs($bbox[4] - $bbox[0]);
-        $reciterX = (int) (($width - $textWidth) / 2);
+        if ($reciterText !== '') {
+            $reciterSize = 20;
+            $reciterY = 320;
 
-        imagettftext($im, $reciterSize, 0, $reciterX, $reciterY, $white, $cairoFont, $reciterText);
+            $bbox = imagettfbbox($reciterSize, 0, $cairoFont, $reciterText);
+            $textWidth = abs($bbox[4] - $bbox[0]);
+            $reciterX = (int) (($width - $textWidth) / 2);
 
-        // 5. Retrieve layout Render Model from LayoutStrategy
-        $layoutData = $this->layoutStrategy->layout($segment);
+            imagettftext($im, $reciterSize, 0, $reciterX, $reciterY, $white, $cairoFont, $reciterText);
+        }
+
+        // 5. Draw Quran text units from Render Model
         $fontSize = $layoutData['fontSize'] ?? 56;
         $renderUnits = $layoutData['renderUnits'] ?? [];
 

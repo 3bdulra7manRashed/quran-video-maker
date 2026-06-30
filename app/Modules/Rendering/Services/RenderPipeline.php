@@ -3,6 +3,7 @@
 namespace App\Modules\Rendering\Services;
 
 use App\Modules\Layout\Services\FontResolver;
+use App\Modules\Layout\Strategies\ReelSingleLineLayoutStrategy;
 use App\Modules\Quran\Models\Surah;
 use App\Modules\Quran\Models\Reciter;
 use App\Modules\Quran\Models\AudioFile;
@@ -20,19 +21,22 @@ class RenderPipeline
     protected SegmentationService $segmentationService;
     protected FontResolver $fontResolver;
     protected QuranPathResolver $pathResolver;
+    protected ReelSingleLineLayoutStrategy $layoutStrategy;
 
     public function __construct(
         SegmentRenderer $segmentRenderer,
         VideoComposer $videoComposer,
         SegmentationService $segmentationService,
         FontResolver $fontResolver,
-        QuranPathResolver $pathResolver
+        QuranPathResolver $pathResolver,
+        ReelSingleLineLayoutStrategy $layoutStrategy
     ) {
         $this->segmentRenderer = $segmentRenderer;
         $this->videoComposer = $videoComposer;
         $this->segmentationService = $segmentationService;
         $this->fontResolver = $fontResolver;
         $this->pathResolver = $pathResolver;
+        $this->layoutStrategy = $layoutStrategy;
     }
 
     /**
@@ -154,7 +158,8 @@ class RenderPipeline
             $paddedIndex = sprintf('%03d', $segment->index);
             $segmentPath = $this->pathResolver->renderedSegments("surah_{$surahNumber}_{$reciterSlug}/segment_{$paddedIndex}.png");
 
-            $this->segmentRenderer->renderSegment($surah, $segment, $segmentPath);
+            $layoutData = $this->layoutStrategy->layout($segment, ['reciter' => $reciter]);
+            $this->segmentRenderer->renderSegment($surah, $segment, $segmentPath, $layoutData);
 
             $segmentDurationSec = ($segment->endMs - $segment->startMs) / 1000.0;
 

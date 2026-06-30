@@ -212,8 +212,36 @@ class SegmentationService
                 $splitAtIndex = $wordCount - 1;
             }
 
+            // Expand split boundary to include trailing non-spoken markers (e.g. end markers, pause markers, decorative glyphs)
+            while ($splitAtIndex + 1 < $wordCount && $words[$splitAtIndex + 1]->char_type !== 'word') {
+                $splitAtIndex++;
+            }
+
             // Extract words for this segment
             $finalWords = array_slice($words, $currentIndex, $splitAtIndex - $currentIndex + 1);
+
+            // Defensive validation: ensure at least one spoken word exists in the segment
+            $spokenWordCount = 0;
+            foreach ($finalWords as $fw) {
+                if ($fw->char_type === 'word') {
+                    $spokenWordCount++;
+                }
+            }
+
+            if ($spokenWordCount === 0) {
+                $wordIds = array_map(fn($fw) => $fw->id, $finalWords);
+                $ayahIds = array_unique(array_map(fn($fw) => $fw->ayah_id, $finalWords));
+                $glyphs = implode(' ', array_map(fn($fw) => $fw->glyph_text, $finalWords));
+
+                $errorMsg = "Invalid segment generated: segment contains no spoken words. " .
+                    "Segment Index: {$segmentIndex}, " .
+                    "Word IDs: [" . implode(', ', $wordIds) . "], " .
+                    "Ayah IDs: [" . implode(', ', $ayahIds) . "], " .
+                    "Glyphs: '{$glyphs}'";
+
+                Log::error("[SegmentationService] " . $errorMsg);
+                throw new \RuntimeException($errorMsg);
+            }
 
             // Calculate timing bounds
             $segStartMs = null;

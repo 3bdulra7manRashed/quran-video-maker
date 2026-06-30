@@ -27,9 +27,10 @@ class FrameRenderer
      * @param Surah $surah
      * @param Frame $frame
      * @param string $outputPath
+     * @param string $reciterNameArabic
      * @return void
      */
-    public function renderFrame(Surah $surah, Frame $frame, string $outputPath): void
+    public function renderFrame(Surah $surah, Frame $frame, string $outputPath, string $reciterNameArabic): void
     {
         Log::info("[FrameRenderer] Starting frame render", [
             'surah' => $surah->number,
@@ -81,17 +82,22 @@ class FrameRenderer
             throw new RuntimeException("Cairo-Regular.ttf font not found: {$cairoFont}");
         }
 
-        $rawReciterText = "ياسر الدوسري";
-        $arabic = new Arabic('Glyphs');
-        $reciterText = $arabic->utf8Glyphs($rawReciterText);
-        $reciterSize = 20;
-        $reciterY = 320;
+        $reciterText = '';
+        if ($reciterNameArabic !== '') {
+            $arabic = new Arabic('Glyphs');
+            $reciterText = $arabic->utf8Glyphs($reciterNameArabic);
+        }
 
-        $bbox = imagettfbbox($reciterSize, 0, $cairoFont, $reciterText);
-        $textWidth = abs($bbox[4] - $bbox[0]);
-        $reciterX = (int) (($width - $textWidth) / 2);
+        if ($reciterText !== '') {
+            $reciterSize = 20;
+            $reciterY = 320;
 
-        imagettftext($im, $reciterSize, 0, $reciterX, $reciterY, $white, $cairoFont, $reciterText);
+            $bbox = imagettfbbox($reciterSize, 0, $cairoFont, $reciterText);
+            $textWidth = abs($bbox[4] - $bbox[0]);
+            $reciterX = (int) (($width - $textWidth) / 2);
+
+            imagettftext($im, $reciterSize, 0, $reciterX, $reciterY, $white, $cairoFont, $reciterText);
+        }
 
         // 5. Draw Quran lines
         $quranFontSize = 26;
