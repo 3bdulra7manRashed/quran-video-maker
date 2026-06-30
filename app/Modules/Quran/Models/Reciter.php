@@ -21,4 +21,9 @@ class Reciter extends Model
     {
         return $this->hasMany(AudioFile::class);
     }
+
+    public function wordTimings()
+    {
+        return $this->hasMany(ReciterWordTiming::class);
+    }
 }

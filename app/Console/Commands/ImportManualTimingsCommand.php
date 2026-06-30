@@ -132,12 +132,25 @@ class ImportManualTimingsCommand extends Command
         // move timings into a reciter_word_timings table so multiple reciters can own independent timings for the same Quran words.
         DB::beginTransaction();
         try {
+            $upsertData = [];
             foreach ($spokenWords as $index => $word) {
                 $jsonWord = $jsonWords[$index];
-                $word->start_ms_from_surah = (int) $jsonWord['start'];
-                $word->end_ms_from_surah = (int) $jsonWord['end'];
-                $word->save();
+                $upsertData[] = [
+                    'reciter_id' => $reciter->id,
+                    'word_id' => $word->id,
+                    'start_ms' => (int) $jsonWord['start'],
+                    'end_ms' => (int) $jsonWord['end'],
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
             }
+
+            \App\Modules\Quran\Models\ReciterWordTiming::upsert(
+                $upsertData,
+                ['reciter_id', 'word_id'],
+                ['start_ms', 'end_ms', 'updated_at']
+            );
+
             DB::commit();
             $this->info("Successfully imported manual timings for Surah {$surahNumber} (Ayahs {$fromAyah}-{$toAyah}).");
             return self::SUCCESS;

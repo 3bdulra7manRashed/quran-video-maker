@@ -4,6 +4,8 @@ namespace App\Modules\Import\Services;
 
 use App\Modules\Quran\Models\Ayah;
 use App\Modules\Quran\Models\Word;
+use App\Modules\Quran\Models\Reciter;
+use App\Modules\Quran\Models\ReciterWordTiming;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
@@ -15,11 +17,20 @@ class ImportWordTimingsService
      * Import word timings from local JSON files.
      *
      * @param string|null $sourcePath Optional path to a specific file or directory.
+     * @param int|null $reciterId The target reciter ID (resolves default if null).
      * @return array Standardized report.
      */
-    public function import(?string $sourcePath = null): array
+    public function import(?string $sourcePath = null, ?int $reciterId = null): array
     {
         $startTime = microtime(true);
+
+        if ($reciterId === null) {
+            $defaultReciter = Reciter::where('is_default', true)->first();
+            if (!$defaultReciter) {
+                throw new RuntimeException("Default reciter not found in database.");
+            }
+            $reciterId = $defaultReciter->id;
+        }
 
         $report = [
             'source'            => $sourcePath ?? storage_path('app/quran/timings/'),
@@ -42,7 +53,7 @@ class ImportWordTimingsService
         foreach ($files as $file) {
             DB::beginTransaction();
             try {
-                $this->importFile($file, $report);
+                $this->importFile($file, $report, $reciterId);
                 DB::commit();
                 $report['files_processed']++;
             } catch (\Throwable $e) {
@@ -89,7 +100,7 @@ class ImportWordTimingsService
     /**
      * Import timings from a single file.
      */
-    private function importFile(string $filePath, array &$report): void
+    private function importFile(string $filePath, array &$report, int $reciterId): void
     {
         if (!file_exists($filePath)) {
             throw new RuntimeException("File not found: {$filePath}");
@@ -133,11 +144,17 @@ class ImportWordTimingsService
         $this->validateTimings($verseKey, $timings, $spokenWords);
 
         // Check if DB timings are already matching file timings exactly
+        $existingRecords = ReciterWordTiming::where('reciter_id', $reciterId)
+            ->whereIn('word_id', $spokenWords->pluck('id'))
+            ->get()
+            ->keyBy('word_id');
+
         $alreadyMatches = true;
         foreach ($timings as $index => $entry) {
             [, $startMs, $endMs] = $entry;
             $word = $spokenWords[$index];
-            if ($word->start_ms_from_surah !== $startMs || $word->end_ms_from_surah !== $endMs) {
+            $existing = $existingRecords->get($word->id);
+            if (!$existing || $existing->start_ms !== $startMs || $existing->end_ms !== $endMs) {
                 $alreadyMatches = false;
                 break;
             }
@@ -149,8 +166,26 @@ class ImportWordTimingsService
             return;
         }
 
-        // Perform CASE update
-        $this->updateWordTimings($spokenWords, $timings);
+        // Perform upsert into reciter_word_timings
+        $upsertData = [];
+        foreach ($timings as $index => $entry) {
+            [, $startMs, $endMs] = $entry;
+            $word = $spokenWords[$index];
+            $upsertData[] = [
+                'reciter_id' => $reciterId,
+                'word_id' => $word->id,
+                'start_ms' => $startMs,
+                'end_ms' => $endMs,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        ReciterWordTiming::upsert(
+            $upsertData,
+            ['reciter_id', 'word_id'],
+            ['start_ms', 'end_ms', 'updated_at']
+        );
 
         $report['timings_imported'] += count($timings);
 
@@ -217,45 +252,5 @@ class ImportWordTimingsService
 
             $previousEndMs = $endMs;
         }
-    }
-
-    /**
-     * Perform SQL CASE batched update for spoken words timings.
-     */
-    private function updateWordTimings($spokenWords, array $timings): void
-    {
-        $casesStart = [];
-        $casesEnd = [];
-        $startBindings = [];
-        $endBindings = [];
-        $ids = [];
-
-        foreach ($timings as $index => $entry) {
-            [, $startMs, $endMs] = $entry;
-            $word = $spokenWords[$index];
-
-            $casesStart[] = "WHEN ? THEN ?";
-            $startBindings[] = $word->id;
-            $startBindings[] = $startMs;
-
-            $casesEnd[] = "WHEN ? THEN ?";
-            $endBindings[] = $word->id;
-            $endBindings[] = $endMs;
-
-            $ids[] = $word->id;
-        }
-
-        $casesStartSql = implode(' ', $casesStart);
-        $casesEndSql = implode(' ', $casesEnd);
-        $idsPlaceholders = implode(',', array_fill(0, count($ids), '?'));
-
-        $query = "UPDATE words SET 
-                  start_ms_from_surah = CASE id {$casesStartSql} END,
-                  end_ms_from_surah = CASE id {$casesEndSql} END 
-                  WHERE id IN ({$idsPlaceholders})";
-
-        $allBindings = array_merge($startBindings, $endBindings, $ids);
-
-        DB::update($query, $allBindings);
     }
 }

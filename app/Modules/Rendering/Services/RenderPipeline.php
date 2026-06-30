@@ -22,6 +22,7 @@ class RenderPipeline
     protected FontResolver $fontResolver;
     protected QuranPathResolver $pathResolver;
     protected ReelSingleLineLayoutStrategy $layoutStrategy;
+    protected WordTimingResolver $timingResolver;
 
     public function __construct(
         SegmentRenderer $segmentRenderer,
@@ -29,7 +30,8 @@ class RenderPipeline
         SegmentationService $segmentationService,
         FontResolver $fontResolver,
         QuranPathResolver $pathResolver,
-        ReelSingleLineLayoutStrategy $layoutStrategy
+        ReelSingleLineLayoutStrategy $layoutStrategy,
+        WordTimingResolver $timingResolver
     ) {
         $this->segmentRenderer = $segmentRenderer;
         $this->videoComposer = $videoComposer;
@@ -37,6 +39,7 @@ class RenderPipeline
         $this->fontResolver = $fontResolver;
         $this->pathResolver = $pathResolver;
         $this->layoutStrategy = $layoutStrategy;
+        $this->timingResolver = $timingResolver;
     }
 
     /**
@@ -112,6 +115,15 @@ class RenderPipeline
 
         if (empty($words)) {
             throw new RuntimeException("No words found in database for the selected ayah range.");
+        }
+
+        // Resolve and assign reciter-specific timings in-memory (never save to DB!)
+        $timingMap = $this->timingResolver->resolve($reciter, $words);
+        foreach ($words as $w) {
+            if (isset($timingMap[$w->id])) {
+                $w->start_ms_from_surah = $timingMap[$w->id]['start_ms'];
+                $w->end_ms_from_surah = $timingMap[$w->id]['end_ms'];
+            }
         }
 
         // 5. Check timings and apply proportional scheduling fallback if timings are unavailable

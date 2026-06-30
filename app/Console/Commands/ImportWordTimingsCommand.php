@@ -8,13 +8,25 @@ use Illuminate\Console\Command;
 class ImportWordTimingsCommand extends Command
 {
     protected $signature = 'import:timings
-                            {--source= : Specific JSON file path or directory containing timings_*_*.json (default: storage/app/quran/timings/)}';
+                            {--source= : Specific JSON file path or directory containing timings_*_*.json (default: storage/app/quran/timings/)}
+                            {--reciter= : Optional reciter slug}';
 
     protected $description = 'Import word timings from local JSON files into the database.';
 
     public function handle(ImportWordTimingsService $service): int
     {
         $source = $this->option('source');
+        $reciterSlug = $this->option('reciter');
+
+        $reciterId = null;
+        if ($reciterSlug !== null) {
+            $reciter = \App\Modules\Quran\Models\Reciter::where('slug', $reciterSlug)->first();
+            if (!$reciter) {
+                $this->error("Reciter with slug '{$reciterSlug}' not found in database.");
+                return self::FAILURE;
+            }
+            $reciterId = $reciter->id;
+        }
 
         $this->info($source 
             ? "Importing word timings from specific source: {$source}" 
@@ -23,7 +35,7 @@ class ImportWordTimingsCommand extends Command
         $this->newLine();
 
         try {
-            $report = $service->import($source);
+            $report = $service->import($source, $reciterId);
         } catch (\Throwable $e) {
             $this->error("Import failed: {$e->getMessage()}");
             return self::FAILURE;
