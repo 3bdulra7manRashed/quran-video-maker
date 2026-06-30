@@ -55,11 +55,31 @@ class GenerateVideoJob implements ShouldQueue
                 $this->renderJob->to_ayah
             );
 
+            // Probe duration via ffprobe
+            $durationSeconds = 0.0;
+            try {
+                $ffprobe = config('ffmpeg.ffprobe_path', 'ffprobe');
+                $cmd = sprintf(
+                    '"%s" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "%s"',
+                    $ffprobe,
+                    $outputPath
+                );
+                $output = [];
+                $resultCode = -1;
+                exec($cmd . ' 2>&1', $output, $resultCode);
+                if ($resultCode === 0 && count($output) > 0) {
+                    $durationSeconds = (float) trim($output[0]);
+                }
+            } catch (\Throwable $e) {
+                Log::warning("[GenerateVideoJob] ffprobe failed to resolve duration for {$outputPath}: " . $e->getMessage());
+            }
+
             $this->renderJob->update([
                 'status' => 'completed',
                 'output_path' => $outputPath,
                 'output_filename' => basename($outputPath),
                 'progress' => 100,
+                'duration' => $durationSeconds,
                 'finished_at' => now(),
                 'completed_at' => now(),
             ]);

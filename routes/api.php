@@ -25,3 +25,4 @@ Route::get('/renders/{uuid}', [DatasetRenderController::class, 'show']);
 // Videos API routes
 Route::get('/videos', [VideoLibraryController::class, 'index']);
 Route::get('/videos/{filename}', [VideoLibraryController::class, 'download']);
+Route::delete('/videos/{filename}', [VideoLibraryController::class, 'destroy']);

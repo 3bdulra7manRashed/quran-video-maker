@@ -69,6 +69,8 @@ export interface VideoFile {
   surah: number;
   from_ayah: number | null;
   to_ayah: number | null;
+  duration_seconds: number;
+  duration_human: string;
   created_at: string;
   url: string;
 }
@@ -185,6 +187,17 @@ export class ApiService {
   async getVideos(): Promise<VideoFile[]> {
     const res = await fetch(`${this.baseUrl}/api/videos`);
     if (!res.ok) throw new Error('Failed to fetch videos');
+    return res.json();
+  }
+
+  async deleteVideo(filename: string): Promise<{ success: boolean }> {
+    const res = await fetch(`${this.baseUrl}/api/videos/${encodeURIComponent(filename)}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.message || 'Failed to delete video');
+    }
     return res.json();
   }
 }

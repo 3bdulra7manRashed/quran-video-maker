@@ -23,6 +23,7 @@ class RenderJob extends Model
         'completed_at',
         'finished_at',
         'progress',
+        'duration',
     ];
 
     protected $casts = [
@@ -31,6 +32,7 @@ class RenderJob extends Model
         'from_ayah' => 'integer',
         'to_ayah' => 'integer',
         'progress' => 'integer',
+        'duration' => 'float',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
         'finished_at' => 'datetime',
