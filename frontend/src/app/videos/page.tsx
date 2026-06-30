@@ -293,9 +293,18 @@ export default function VideosPage() {
               <div className="flex flex-col gap-2.5">
                 {/* Filename Header */}
                 <div className="flex flex-col gap-1 border-b border-zinc-900 pb-2">
-                  <span className="text-xs font-bold text-zinc-300 font-mono truncate" title={v.filename}>
-                    {v.filename}
-                  </span>
+                  <div className="flex justify-between items-start gap-2">
+                    <span className="text-xs font-bold text-zinc-300 font-mono truncate flex-1" title={v.filename}>
+                      {v.filename}
+                    </span>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold font-mono uppercase shrink-0 ${
+                      v.layout === 'youtube'
+                        ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                        : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    }`}>
+                      {v.layout === 'youtube' ? `YouTube (${v.max_lines ?? 1}L)` : 'Reels'}
+                    </span>
+                  </div>
                   <span className="text-[10px] text-zinc-500 font-mono">
                     {formatDatetime(v.created_at)}
                   </span>

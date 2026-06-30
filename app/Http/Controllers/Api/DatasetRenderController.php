@@ -21,12 +21,14 @@ class DatasetRenderController
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'reciter' => 'required|string|exists:reciters,slug',
-            'surah'   => 'required|integer|exists:surahs,number',
-            'scope'   => ['required', 'string', Rule::in(['full', 'single', 'range'])],
-            'ayah'    => 'required_if:scope,single|integer|min:1',
-            'from'    => 'required_if:scope,range|integer|min:1',
-            'to'      => 'required_if:scope,range|integer|min:1',
+            'reciter'   => 'required|string|exists:reciters,slug',
+            'surah'     => 'required|integer|exists:surahs,number',
+            'scope'     => ['required', 'string', Rule::in(['full', 'single', 'range'])],
+            'ayah'      => 'required_if:scope,single|integer|min:1',
+            'from'      => 'required_if:scope,range|integer|min:1',
+            'to'        => 'required_if:scope,range|integer|min:1',
+            'layout'    => 'sometimes|string|in:reels,youtube',
+            'max_lines' => 'sometimes|integer|min:1',
         ]);
 
         if ($validator->fails()) {
@@ -36,6 +38,8 @@ class DatasetRenderController
         $reciterSlug = $request->input('reciter');
         $surahNumber = (int) $request->input('surah');
         $scope = $request->input('scope');
+        $layout = $request->input('layout', 'reels');
+        $maxLines = (int) $request->input('max_lines', 1);
 
         $reciter = Reciter::where('slug', $reciterSlug)->firstOrFail();
         $surah = Surah::where('number', $surahNumber)->firstOrFail();
@@ -68,6 +72,8 @@ class DatasetRenderController
             'status'       => 'pending',
             'reciter_id'   => $reciter->id,
             'surah_number' => $surah->number,
+            'layout'       => $layout,
+            'max_lines'    => $maxLines,
             'from_ayah'    => $fromAyah,
             'to_ayah'      => $toAyah,
             'progress'     => 0,
@@ -143,6 +149,8 @@ class DatasetRenderController
                 'reciter'      => $job->reciter ? $job->reciter->name_english : 'Unknown',
                 'reciter_ar'   => $job->reciter ? $job->reciter->name_arabic : 'غير معروف',
                 'surah'        => $job->surah_number,
+                'layout'       => $job->layout ?? 'reels',
+                'max_lines'    => $job->max_lines ?? 1,
                 'from_ayah'    => $job->from_ayah,
                 'to_ayah'      => $job->to_ayah,
                 'progress'     => $job->progress,

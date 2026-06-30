@@ -12,6 +12,8 @@ interface GenerateVideoCardProps {
   fromAyah: number;
   toAyah: number;
   renderable: boolean;
+  layout: string;
+  maxLines: number;
 }
 
 export default function GenerateVideoCard({
@@ -22,6 +24,8 @@ export default function GenerateVideoCard({
   fromAyah,
   toAyah,
   renderable,
+  layout,
+  maxLines,
 }: GenerateVideoCardProps) {
   const { api } = useApi();
   const router = useRouter();
@@ -41,6 +45,8 @@ export default function GenerateVideoCard({
       reciter: reciterSlug,
       surah: surahNumber,
       scope,
+      layout,
+      max_lines: maxLines,
     };
 
     if (scope === 'single') {

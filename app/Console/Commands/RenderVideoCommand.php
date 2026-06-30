@@ -18,14 +18,28 @@ class RenderVideoCommand extends Command
                             {--reciter=yasser-al-dosari : The reciter slug (yasser-al-dosari or ali-jaber)}
                             {--from= : Start ayah number (optional, inclusive)}
                             {--to= : End ayah number (optional, inclusive)}
-                            {--ayah= : Shortcut for rendering a single ayah (equivalent to --from=N --to=N)}';
+                            {--ayah= : Shortcut for rendering a single ayah (equivalent to --from=N --to=N)}
+                            {--layout=reels : Layout type (reels or youtube)}
+                            {--max-lines=1 : Maximum Mushaf lines per screen (only used for youtube layout)}';
 
-    protected $description = 'Render a vertical reel video for a given Surah using static QCF glyphs and audio.';
+    protected $description = 'Render a video for a given Surah using static QCF glyphs and audio.';
 
     public function handle(RenderPipeline $pipeline, FontResolver $fontResolver, QuranPathResolver $pathResolver): int
     {
         $surahNumber = (int) $this->argument('surah_number');
         $reciterSlug = $this->option('reciter');
+        $layout = $this->option('layout');
+        $maxLines = (int) $this->option('max-lines');
+
+        if (!in_array($layout, ['reels', 'youtube'])) {
+            $this->error('The --layout option must be either reels or youtube.');
+            return self::FAILURE;
+        }
+
+        if ($maxLines < 1) {
+            $this->error('The --max-lines option must be at least 1.');
+            return self::FAILURE;
+        }
 
         $ayah = $this->option('ayah') !== null ? (int) $this->option('ayah') : null;
         $fromAyah = $this->option('from') !== null ? (int) $this->option('from') : null;
@@ -41,7 +55,7 @@ class RenderVideoCommand extends Command
             $toAyah = $ayah;
         }
 
-        $this->info("Initializing rendering pipeline for Surah {$surahNumber} and reciter '{$reciterSlug}'...");
+        $this->info("Initializing rendering pipeline for Surah {$surahNumber} and reciter '{$reciterSlug}' using layout '{$layout}'...");
 
         try {
             $this->validatePrerequisites($surahNumber, $reciterSlug, $fromAyah, $toAyah, $fontResolver, $pathResolver);
@@ -51,7 +65,7 @@ class RenderVideoCommand extends Command
         }
 
         try {
-            $outputPath = $pipeline->render($surahNumber, $reciterSlug, $fromAyah, $toAyah);
+            $outputPath = $pipeline->render($surahNumber, $reciterSlug, $fromAyah, $toAyah, $layout, $maxLines);
             $this->info("Successfully generated video!");
             $this->line("Output Path: {$outputPath}");
             return self::SUCCESS;

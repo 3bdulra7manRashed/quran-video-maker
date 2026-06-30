@@ -51,6 +51,8 @@ class VideoLibraryController
                     'surah'            => $job->surah_number,
                     'from_ayah'        => $job->from_ayah,
                     'to_ayah'          => $job->to_ayah,
+                    'layout'           => $job->layout ?? 'reels',
+                    'max_lines'        => $job->max_lines ?? 1,
                     'duration_seconds' => $duration,
                     'duration_human'   => $this->formatDurationHuman($duration),
                     'created_at'       => $job->updated_at->toIso8601String(),

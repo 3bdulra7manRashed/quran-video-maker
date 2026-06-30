@@ -24,6 +24,8 @@ class RenderJob extends Model
         'finished_at',
         'progress',
         'duration',
+        'layout',
+        'max_lines',
     ];
 
     protected $casts = [
@@ -33,6 +35,7 @@ class RenderJob extends Model
         'to_ayah' => 'integer',
         'progress' => 'integer',
         'duration' => 'float',
+        'max_lines' => 'integer',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
         'finished_at' => 'datetime',

@@ -4,6 +4,7 @@ namespace App\Modules\Rendering\Services;
 
 use App\Modules\Layout\Services\FontResolver;
 use App\Modules\Layout\Strategies\ReelSingleLineLayoutStrategy;
+use App\Modules\Layout\Strategies\YouTubeMushafLayoutStrategy;
 use App\Modules\Quran\Models\Surah;
 use App\Modules\Quran\Models\Reciter;
 use App\Modules\Quran\Models\AudioFile;
@@ -22,6 +23,7 @@ class RenderPipeline
     protected FontResolver $fontResolver;
     protected QuranPathResolver $pathResolver;
     protected ReelSingleLineLayoutStrategy $layoutStrategy;
+    protected YouTubeMushafLayoutStrategy $youtubeLayoutStrategy;
     protected WordTimingResolver $timingResolver;
 
     public function __construct(
@@ -31,6 +33,7 @@ class RenderPipeline
         FontResolver $fontResolver,
         QuranPathResolver $pathResolver,
         ReelSingleLineLayoutStrategy $layoutStrategy,
+        YouTubeMushafLayoutStrategy $youtubeLayoutStrategy,
         WordTimingResolver $timingResolver
     ) {
         $this->segmentRenderer = $segmentRenderer;
@@ -39,6 +42,7 @@ class RenderPipeline
         $this->fontResolver = $fontResolver;
         $this->pathResolver = $pathResolver;
         $this->layoutStrategy = $layoutStrategy;
+        $this->youtubeLayoutStrategy = $youtubeLayoutStrategy;
         $this->timingResolver = $timingResolver;
     }
 
@@ -49,13 +53,17 @@ class RenderPipeline
      * @param string $reciterSlug
      * @param int|null $fromAyah
      * @param int|null $toAyah
+     * @param string $layout
+     * @param int $maxLines
      * @return string Path to the generated video.
      */
     public function render(
         int $surahNumber,
         string $reciterSlug = 'yasser-al-dosari',
         ?int $fromAyah = null,
-        ?int $toAyah = null
+        ?int $toAyah = null,
+        string $layout = 'reels',
+        int $maxLines = 1
     ): string {
         Log::info("[RenderPipeline] Starting rendering pipeline", [
             'surah' => $surahNumber,
@@ -191,13 +199,13 @@ class RenderPipeline
         }
 
         // 6. Segment the words
-        $segments = $this->segmentationService->segment($words, $totalDuration);
+        $segments = $this->segmentationService->segment($words, $totalDuration, $layout, $maxLines, $reciter, $surahNumber);
         if (empty($segments)) {
             throw new RuntimeException("Segmentation service returned no segments for Surah {$surahNumber}.");
         }
 
         // Populate segment metrics for debug/report output
-        $fontSize = config('layouts.reels.font_size', 56);
+        $fontSize = ($layout === 'youtube') ? 50 : config('layouts.reels.font_size', 56);
         foreach ($segments as $segment) {
             $segment->fontSize = $fontSize;
             $segment->wordCount = count($segment->wordIds);
@@ -219,7 +227,7 @@ class RenderPipeline
         Log::info("[RenderPipeline] Segmented Surah {$surahNumber} into " . count($segments) . " segments.");
 
         // 7. Generate debug segment JSON file
-        $this->writeDebugSegmentsJson($surahNumber, $segments, $reciterSlug, $fromAyah, $toAyah);
+        $this->writeDebugSegmentsJson($surahNumber, $segments, $reciterSlug, $fromAyah, $toAyah, $layout);
 
         // 8. Render all segments as PNGs and build frame schedule
         $composerFrames = [];
@@ -230,9 +238,13 @@ class RenderPipeline
             if ($fromAyah !== null && $toAyah !== null) {
                 $rangeDir = ($fromAyah === $toAyah) ? "_ayah_{$fromAyah}" : "_from_{$fromAyah}_to_{$toAyah}";
             }
+            if ($layout === 'youtube') {
+                $rangeDir .= '_youtube';
+            }
             $segmentPath = $this->pathResolver->renderedSegments("surah_{$surahNumber}_{$reciterSlug}{$rangeDir}/segment_{$paddedIndex}.png");
 
-            $layoutData = $this->layoutStrategy->layout($segment, ['reciter' => $reciter]);
+            $activeStrategy = ($layout === 'youtube') ? $this->youtubeLayoutStrategy : $this->layoutStrategy;
+            $layoutData = $activeStrategy->layout($segment, ['reciter' => $reciter]);
             $this->segmentRenderer->renderSegment($surah, $segment, $segmentPath, $layoutData);
 
             $segmentDurationSec = ($segment->endMs - $segment->startMs) / 1000.0;
@@ -247,6 +259,9 @@ class RenderPipeline
         $suffix = $reciterSlug === 'yasser-al-dosari' ? '' : "_{$reciterSlug}";
         if ($fromAyah !== null && $toAyah !== null) {
             $suffix .= ($fromAyah === $toAyah) ? "_ayah_{$fromAyah}" : "_from_{$fromAyah}_to_{$toAyah}";
+        }
+        if ($layout === 'youtube') {
+            $suffix .= '_youtube';
         }
 
         $outputVideoPath = $this->pathResolver->videos("surah_{$surahNumber}{$suffix}.mp4");
@@ -276,11 +291,15 @@ class RenderPipeline
         array $segments,
         string $reciterSlug,
         ?int $fromAyah = null,
-        ?int $toAyah = null
+        ?int $toAyah = null,
+        string $layout = 'reels'
     ): void {
         $suffix = $reciterSlug === 'yasser-al-dosari' ? '' : "_{$reciterSlug}";
         if ($fromAyah !== null && $toAyah !== null) {
             $suffix .= ($fromAyah === $toAyah) ? "_ayah_{$fromAyah}" : "_from_{$fromAyah}_to_{$toAyah}";
+        }
+        if ($layout === 'youtube') {
+            $suffix .= '_youtube';
         }
         
         $debugFile = $this->pathResolver->debug("segments/surah_{$surahNumber}{$suffix}_segments.json");

@@ -13,7 +13,7 @@ class ReciterController
     public function index(): JsonResponse
     {
         $reciters = Reciter::orderBy('name_arabic')
-            ->get(['id', 'slug', 'name_arabic', 'name_english']);
+            ->get(['id', 'slug', 'name_arabic', 'name_english', 'source']);
 
         return response()->json($reciters);
     }

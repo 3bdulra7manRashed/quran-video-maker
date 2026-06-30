@@ -52,7 +52,9 @@ class GenerateVideoJob implements ShouldQueue
                 $this->renderJob->surah_number,
                 $reciter->slug,
                 $this->renderJob->from_ayah,
-                $this->renderJob->to_ayah
+                $this->renderJob->to_ayah,
+                $this->renderJob->layout ?? 'reels',
+                $this->renderJob->max_lines ?? 1
             );
 
             // Probe duration via ffprobe

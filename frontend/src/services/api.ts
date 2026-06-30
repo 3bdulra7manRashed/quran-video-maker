@@ -53,6 +53,8 @@ export interface RenderJobDetails {
   reciter: string;
   reciter_ar: string;
   surah: number;
+  layout?: string;
+  max_lines?: number;
   from_ayah: number | null;
   to_ayah: number | null;
   progress: number;
@@ -67,6 +69,8 @@ export interface VideoFile {
   reciter: string;
   reciter_en: string;
   surah: number;
+  layout?: string;
+  max_lines?: number;
   from_ayah: number | null;
   to_ayah: number | null;
   duration_seconds: number;
@@ -157,6 +161,8 @@ export class ApiService {
     ayah?: number;
     from?: number;
     to?: number;
+    layout?: string;
+    max_lines?: number;
   }): Promise<{ uuid: string; status: string }> {
     const res = await fetch(`${this.baseUrl}/api/renders`, {
       method: 'POST',

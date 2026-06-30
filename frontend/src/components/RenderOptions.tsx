@@ -15,6 +15,10 @@ interface RenderOptionsProps {
   onToAyahChange: (num: number) => void;
   maxAyahs: number;
   disabled: boolean;
+  layout: string;
+  onLayoutChange: (layout: string) => void;
+  maxLines: number;
+  onMaxLinesChange: (num: number) => void;
 }
 
 export default function RenderOptions({
@@ -28,6 +32,10 @@ export default function RenderOptions({
   onToAyahChange,
   maxAyahs,
   disabled,
+  layout,
+  onLayoutChange,
+  maxLines,
+  onMaxLinesChange,
 }: RenderOptionsProps) {
   return (
     <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 flex flex-col gap-5 shadow-2xl">
@@ -121,6 +129,71 @@ export default function RenderOptions({
             </div>
           </div>
         )}
+
+        {/* Layout & Style Selection */}
+        <div className="border-t border-zinc-900 pt-4 flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <label className="text-xs text-zinc-500 font-mono">Video Layout (الأبعاد والتخطيط):</label>
+            <div className="grid grid-cols-2 gap-2 bg-zinc-900/50 p-1 rounded-xl border border-zinc-900">
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => onLayoutChange('reels')}
+                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+                  layout === 'reels'
+                    ? 'bg-zinc-800 text-zinc-100 shadow'
+                    : 'text-zinc-500 hover:text-zinc-350'
+                }`}
+              >
+                Reels (Vertical 1080x1920)
+              </button>
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => onLayoutChange('youtube')}
+                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+                  layout === 'youtube'
+                    ? 'bg-zinc-800 text-zinc-100 shadow'
+                    : 'text-zinc-500 hover:text-zinc-350'
+                }`}
+              >
+                YouTube (Landscape 1920x1080)
+              </button>
+            </div>
+          </div>
+
+          {layout === 'youtube' && (
+            <div className="flex flex-col gap-2">
+              <label className="text-xs text-zinc-500 font-mono">Max Mushaf Lines per Screen (أسطر المصحف):</label>
+              <div className="grid grid-cols-2 gap-2 bg-zinc-900/50 p-1 rounded-xl border border-zinc-900">
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => onMaxLinesChange(1)}
+                  className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+                    maxLines === 1
+                      ? 'bg-zinc-800 text-zinc-100 shadow'
+                      : 'text-zinc-500 hover:text-zinc-350'
+                  }`}
+                >
+                  1 Line / screen
+                </button>
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => onMaxLinesChange(2)}
+                  className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+                    maxLines === 2
+                      ? 'bg-zinc-800 text-zinc-100 shadow'
+                      : 'text-zinc-500 hover:text-zinc-350'
+                  }`}
+                >
+                  2 Lines / screen
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

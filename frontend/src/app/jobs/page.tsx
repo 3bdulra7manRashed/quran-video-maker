@@ -142,8 +142,17 @@ export default function JobsPage() {
                   {getStatusBadge(job.status)}
                 </div>
 
-                <div className="text-xs text-zinc-400 bg-zinc-900/60 border border-zinc-900/40 px-3 py-2 rounded-xl font-medium">
-                  Scope: {formatScope(job)}
+                <div className="flex gap-2 text-2xs font-mono">
+                  <div className="bg-zinc-900/65 border border-zinc-900/40 px-3 py-2 rounded-xl font-semibold flex-1 text-center text-zinc-350">
+                    Scope: {formatScope(job)}
+                  </div>
+                  <div className={`px-3 py-2 rounded-xl font-bold flex-1 text-center border uppercase ${
+                    job.layout === 'youtube'
+                      ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                      : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                  }`}>
+                    {job.layout === 'youtube' ? `YouTube (${job.max_lines ?? 1}L)` : 'Reels'}
+                  </div>
                 </div>
 
                 {/* Progress bar */}

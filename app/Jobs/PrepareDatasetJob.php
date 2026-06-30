@@ -59,6 +59,13 @@ class PrepareDatasetJob implements ShouldQueue
             Log::info("[PrepareDatasetJob] Glyphs already available on disk. Skipping download/import.");
         }
 
+        // Custom reciter source logic bypass
+        if ($reciter->source === 'custom') {
+            Log::info("[PrepareDatasetJob] Custom reciter '{$this->reciterSlug}' detected. Skipping audio and timing downloads.");
+            Log::info("[PrepareDatasetJob] Completed preparation for {$this->reciterSlug} Surah {$this->surahNumber}");
+            return;
+        }
+
         // 2. Idempotent Audio Step
         if (!$provider->determineAudioAvailability($this->reciterSlug, $this->surahNumber)) {
             $provider->downloadAudio($this->reciterSlug, $this->surahNumber);

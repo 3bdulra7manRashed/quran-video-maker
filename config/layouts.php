@@ -12,4 +12,14 @@ return [
             'color' => '#000000',
         ],
     ],
+
+    'youtube' => [
+        'width' => 1920,
+        'height' => 1080,
+        'background' => [
+            'type' => 'solid',
+            'color' => '#000000',
+        ],
+        'max_lines_per_screen' => 1,
+    ],
 ];

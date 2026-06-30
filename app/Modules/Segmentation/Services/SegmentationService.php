@@ -56,10 +56,30 @@ class SegmentationService
      *
      * @param array $words Sorted array/collection of Word models.
      * @param float $totalAudioDurationSec
+     * @param string $layout
+     * @param int $maxLines
+     * @param mixed $reciter
+     * @param int|null $surahNumber
      * @return Segment[]
      */
-    public function segment(array $words, float $totalAudioDurationSec): array
-    {
+    public function segment(
+        array $words,
+        float $totalAudioDurationSec,
+        string $layout = 'reels',
+        int $maxLines = 1,
+        $reciter = null,
+        ?int $surahNumber = null
+    ): array {
+        if ($layout === 'youtube') {
+            return $this->segmentYouTubeMushaf(
+                $words,
+                $totalAudioDurationSec,
+                $maxLines,
+                $reciter,
+                $surahNumber
+            );
+        }
+
         Log::info("[SegmentationService] Starting segmentation with SegmentConstraint", [
             'words_count' => count($words),
             'audio_duration' => $totalAudioDurationSec,
@@ -302,6 +322,183 @@ class SegmentationService
         Log::info("[SegmentationService] Successfully completed segmentation", [
             'segments_count' => count($segments),
         ]);
+
+        return $segments;
+    }
+
+    /**
+     * Group words into Mushaf lines, merge them and calculate segment scheduling.
+     */
+    protected function segmentYouTubeMushaf(
+        array $words,
+        float $totalAudioDurationSec,
+        int $maxLines,
+        $reciter,
+        ?int $surahNumber
+    ): array {
+        Log::info("[SegmentationService] Starting YouTube Mushaf segmentation", [
+            'words_count' => count($words),
+            'max_lines' => $maxLines,
+            'surah' => $surahNumber,
+        ]);
+
+        if (empty($words) || !$reciter || !$surahNumber) {
+            return [];
+        }
+
+        // 1. Load all words for the entire Surah to assign unique, absolute sequential line numbers
+        $allSurahWords = Word::whereHas('ayah', function ($query) use ($surahNumber) {
+            $query->where('surah_id', function ($q) use ($surahNumber) {
+                $q->select('id')->from('surahs')->where('number', $surahNumber);
+            });
+        })
+        ->orderBy('page_number')
+        ->orderBy('line_number')
+        ->orderBy('ayah_id')
+        ->orderBy('word_index')
+        ->get()
+        ->all();
+
+        // 2. Group entire surah words into lines
+        $allLines = [];
+        $currentKey = null;
+        $lineWords = [];
+        foreach ($allSurahWords as $w) {
+            $key = $w->page_number . '_' . $w->line_number;
+            if ($currentKey !== null && $currentKey !== $key) {
+                $allLines[] = $lineWords;
+                $lineWords = [];
+            }
+            $currentKey = $key;
+            $lineWords[] = $w;
+        }
+        if (!empty($lineWords)) {
+            $allLines[] = $lineWords;
+        }
+
+        // 3. Map word ID to sequential 1-indexed line number in Surah
+        $wordToLineMap = [];
+        foreach ($allLines as $index => $lw) {
+            $lineNum = $index + 1;
+            foreach ($lw as $w) {
+                $wordToLineMap[$w->id] = $lineNum;
+            }
+        }
+
+        // 4. Resolve absolute start timings for all lines in the Surah
+        $lineTimingResolver = app(\App\Modules\Rendering\Services\LineTimingResolver::class);
+        $absoluteLineTimings = $lineTimingResolver->resolve(
+            $reciter,
+            $surahNumber,
+            $allSurahWords,
+            $totalAudioDurationSec,
+            $allLines
+        );
+
+        // 5. Group the requested words range into lines using the wordToLineMap
+        $rangeLines = [];
+        $currentLineNum = null;
+        $currentLineGroup = [];
+        foreach ($words as $w) {
+            $lineNum = $wordToLineMap[$w->id] ?? null;
+            if ($lineNum === null) {
+                continue;
+            }
+            if ($currentLineNum !== null && $currentLineNum !== $lineNum) {
+                $rangeLines[] = [
+                    'line_number' => $currentLineNum,
+                    'words' => $currentLineGroup,
+                ];
+                $currentLineGroup = [];
+            }
+            $currentLineNum = $lineNum;
+            $currentLineGroup[] = $w;
+        }
+        if (!empty($currentLineGroup)) {
+            $rangeLines[] = [
+                'line_number' => $currentLineNum,
+                'words' => $currentLineGroup,
+            ];
+        }
+
+        if (empty($rangeLines)) {
+            return [];
+        }
+
+        // 6. Normalize start timings relative to the first line in the range
+        $rangeStartMs = $absoluteLineTimings[$rangeLines[0]['line_number']] ?? 0;
+        $normalizedStartTimes = [];
+        foreach ($rangeLines as $rl) {
+            $lineNum = $rl['line_number'];
+            $normalizedStartTimes[$lineNum] = max(0, ($absoluteLineTimings[$lineNum] ?? 0) - $rangeStartMs);
+        }
+
+        // 7. Calculate trimmed video bounds
+        $lastLineNum = end($rangeLines)['line_number'];
+        $totalLinesCount = count($allLines);
+
+        if ($lastLineNum < $totalLinesCount) {
+            $rangeEndMs = $absoluteLineTimings[$lastLineNum + 1] ?? (int) round($totalAudioDurationSec * 1000);
+        } else {
+            $rangeEndMs = (int) round($totalAudioDurationSec * 1000);
+        }
+
+        $trimmedDurationMs = max(1, $rangeEndMs - $rangeStartMs);
+
+        // 8. Merge lines based on maxLines per screen (array_chunk)
+        $screens = [];
+        $chunks = array_chunk($rangeLines, $maxLines);
+        foreach ($chunks as $chunk) {
+            $screenWords = [];
+            $lineNumbers = [];
+            foreach ($chunk as $rl) {
+                $screenWords = array_merge($screenWords, $rl['words']);
+                $lineNumbers[] = $rl['line_number'];
+            }
+            $screens[] = [
+                'words' => $screenWords,
+                'line_numbers' => $lineNumbers,
+            ];
+        }
+
+        // 9. Generate DTO Segment items with zero gaps/overlaps scheduling
+        $segments = [];
+        foreach ($screens as $index => $screen) {
+            $segIndex = $index + 1;
+            $firstWordId = $screen['words'][0]->id;
+            $lastWordId = end($screen['words'])->id;
+            $wordIds = array_map(fn($w) => $w->id, $screen['words']);
+
+            // Schedule startMs and endMs
+            if ($index === 0) {
+                $segStartMs = 0;
+            } else {
+                $firstLineNum = $screen['line_numbers'][0];
+                $segStartMs = $normalizedStartTimes[$firstLineNum] ?? 0;
+            }
+
+            if ($index === count($screens) - 1) {
+                $segEndMs = $trimmedDurationMs;
+            } else {
+                $nextFirstLineNum = $screens[$index + 1]['line_numbers'][0];
+                $segEndMs = $normalizedStartTimes[$nextFirstLineNum] ?? $trimmedDurationMs;
+            }
+
+            // Safety check to prevent negative or zero duration segments
+            if ($segEndMs <= $segStartMs) {
+                $segEndMs = $segStartMs + 1;
+            }
+
+            $segments[] = new Segment(
+                $segIndex,
+                $firstWordId,
+                $lastWordId,
+                $wordIds,
+                $segStartMs,
+                $segEndMs,
+                $screen['words']
+            );
+        }
 
         return $segments;
     }
