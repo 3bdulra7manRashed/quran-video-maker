@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useApi } from '@/context/ApiContext';
 import { Reciter, Surah, DatasetStatus } from '@/services/api';
 import ReciterSelect from '@/components/ReciterSelect';
@@ -23,6 +23,18 @@ export default function ConsolePage() {
   const [loadingStatus, setLoadingStatus] = useState(false);
   const [loadingPrereqs, setLoadingPrereqs] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Polling ref to clear interval safely on selection change or unmount
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, []);
 
   // Render scope states
   const [scope, setScope] = useState<RenderScope>('full');
@@ -59,8 +71,13 @@ export default function ConsolePage() {
 
   // Fetch status whenever selections change
   useEffect(() => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+
     if (selectedReciter && selectedSurah !== '') {
-      fetchStatus();
+      loadDatasetStatus();
     } else {
       setStatus(null);
     }
@@ -75,7 +92,7 @@ export default function ConsolePage() {
     }
   }, [selectedSurah, maxAyahs]);
 
-  async function fetchStatus() {
+  async function loadDatasetStatus() {
     if (!selectedReciter || selectedSurah === '') return;
     setLoadingStatus(true);
     try {
@@ -90,23 +107,56 @@ export default function ConsolePage() {
 
   const handlePrepare = async () => {
     if (!selectedReciter || selectedSurah === '') return;
+
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+    }
+
     await api.prepareDataset(selectedReciter, selectedSurah);
-    // Refresh status
-    await fetchStatus();
+
+    setLoadingStatus(true);
+    let attempts = 0;
+    const maxAttempts = 30; // 60 seconds max
+
+    pollingIntervalRef.current = setInterval(async () => {
+      attempts++;
+      try {
+        const stats = await api.getDatasetStatus(selectedReciter, selectedSurah);
+        if (stats.renderable || attempts >= maxAttempts) {
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          setStatus(stats);
+          setLoadingStatus(false);
+        } else {
+          setStatus(stats);
+        }
+      } catch (err) {
+        console.error('Polling status failed:', err);
+        if (attempts >= maxAttempts) {
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          setLoadingStatus(false);
+        }
+      }
+    }, 2000);
   };
 
   const handleUploadAudio = async (file: File) => {
     if (!selectedReciter || selectedSurah === '') return;
     await api.uploadAudio(selectedReciter, selectedSurah, file);
     // Refresh status
-    await fetchStatus();
+    await loadDatasetStatus();
   };
 
   const handleUploadTimings = async (file: File) => {
     if (!selectedReciter) return;
     await api.uploadTimings(selectedReciter, file);
     // Refresh status
-    await fetchStatus();
+    await loadDatasetStatus();
   };
 
   return (
@@ -197,6 +247,7 @@ export default function ConsolePage() {
               onUploadAudio={handleUploadAudio}
               onUploadTimings={handleUploadTimings}
               disabled={selectedSurah === '' || !selectedReciter}
+              refreshing={loadingStatus}
             />
           </div>
         </div>
