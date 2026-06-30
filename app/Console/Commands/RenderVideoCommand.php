@@ -17,7 +17,8 @@ class RenderVideoCommand extends Command
                             {surah_number : The Surah number (8, 56, 78, or 108)} 
                             {--reciter=yasser-al-dosari : The reciter slug (yasser-al-dosari or ali-jaber)}
                             {--from= : Start ayah number (optional, inclusive)}
-                            {--to= : End ayah number (optional, inclusive)}';
+                            {--to= : End ayah number (optional, inclusive)}
+                            {--ayah= : Shortcut for rendering a single ayah (equivalent to --from=N --to=N)}';
 
     protected $description = 'Render a vertical reel video for a given Surah using static QCF glyphs and audio.';
 
@@ -25,9 +26,20 @@ class RenderVideoCommand extends Command
     {
         $surahNumber = (int) $this->argument('surah_number');
         $reciterSlug = $this->option('reciter');
-        
+
+        $ayah = $this->option('ayah') !== null ? (int) $this->option('ayah') : null;
         $fromAyah = $this->option('from') !== null ? (int) $this->option('from') : null;
         $toAyah = $this->option('to') !== null ? (int) $this->option('to') : null;
+
+        // --ayah shortcut: map to from/to
+        if ($ayah !== null) {
+            if ($fromAyah !== null || $toAyah !== null) {
+                $this->error('The --ayah option cannot be used together with --from or --to.');
+                return self::FAILURE;
+            }
+            $fromAyah = $ayah;
+            $toAyah = $ayah;
+        }
 
         $this->info("Initializing rendering pipeline for Surah {$surahNumber} and reciter '{$reciterSlug}'...");
 

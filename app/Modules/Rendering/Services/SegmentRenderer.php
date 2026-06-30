@@ -14,13 +14,16 @@ class SegmentRenderer
 {
     protected FontResolver $fontResolver;
     protected QuranPathResolver $pathResolver;
+    protected BackgroundFactory $backgroundFactory;
 
     public function __construct(
         FontResolver $fontResolver,
-        QuranPathResolver $pathResolver
+        QuranPathResolver $pathResolver,
+        BackgroundFactory $backgroundFactory
     ) {
         $this->fontResolver = $fontResolver;
         $this->pathResolver = $pathResolver;
+        $this->backgroundFactory = $backgroundFactory;
     }
 
     /**
@@ -45,14 +48,7 @@ class SegmentRenderer
         $im = imagecreatetruecolor($width, $height);
 
         // 2. Draw background
-        $backgroundPath = $this->pathResolver->backgrounds('default.png');
-        if (!file_exists($backgroundPath)) {
-            throw new RuntimeException("Background image not found: {$backgroundPath}");
-        }
-
-        $bg = imagecreatefrompng($backgroundPath);
-        imagecopy($im, $bg, 0, 0, 0, 0, $width, $height);
-        imagedestroy($bg);
+        $this->backgroundFactory->apply($im);
 
         // Colors
         $white = imagecolorallocate($im, 255, 255, 255);

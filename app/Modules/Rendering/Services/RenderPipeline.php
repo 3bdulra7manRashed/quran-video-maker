@@ -214,7 +214,10 @@ class RenderPipeline
         foreach ($segments as $segment) {
             $paddedIndex = sprintf('%03d', $segment->index);
             
-            $rangeDir = ($fromAyah !== null || $toAyah !== null) ? "_from_{$fromAyah}_to_{$toAyah}" : "";
+            $rangeDir = '';
+            if ($fromAyah !== null && $toAyah !== null) {
+                $rangeDir = ($fromAyah === $toAyah) ? "_ayah_{$fromAyah}" : "_from_{$fromAyah}_to_{$toAyah}";
+            }
             $segmentPath = $this->pathResolver->renderedSegments("surah_{$surahNumber}_{$reciterSlug}{$rangeDir}/segment_{$paddedIndex}.png");
 
             $layoutData = $this->layoutStrategy->layout($segment, ['reciter' => $reciter]);
@@ -230,8 +233,8 @@ class RenderPipeline
 
         // 9. Compose the video from segments and audio
         $suffix = $reciterSlug === 'yasser-al-dosari' ? '' : "_{$reciterSlug}";
-        if ($fromAyah !== null || $toAyah !== null) {
-            $suffix .= "_from_{$fromAyah}_to_{$toAyah}";
+        if ($fromAyah !== null && $toAyah !== null) {
+            $suffix .= ($fromAyah === $toAyah) ? "_ayah_{$fromAyah}" : "_from_{$fromAyah}_to_{$toAyah}";
         }
 
         $outputVideoPath = $this->pathResolver->videos("surah_{$surahNumber}{$suffix}.mp4");
@@ -264,8 +267,8 @@ class RenderPipeline
         ?int $toAyah = null
     ): void {
         $suffix = $reciterSlug === 'yasser-al-dosari' ? '' : "_{$reciterSlug}";
-        if ($fromAyah !== null || $toAyah !== null) {
-            $suffix .= "_from_{$fromAyah}_to_{$toAyah}";
+        if ($fromAyah !== null && $toAyah !== null) {
+            $suffix .= ($fromAyah === $toAyah) ? "_ayah_{$fromAyah}" : "_from_{$fromAyah}_to_{$toAyah}";
         }
         
         $debugFile = $this->pathResolver->debug("segments/surah_{$surahNumber}{$suffix}_segments.json");
