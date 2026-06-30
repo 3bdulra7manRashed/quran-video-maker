@@ -44,11 +44,22 @@ class RenderPipeline
      *
      * @param int $surahNumber
      * @param string $reciterSlug
+     * @param int|null $fromAyah
+     * @param int|null $toAyah
      * @return string Path to the generated video.
      */
-    public function render(int $surahNumber, string $reciterSlug = 'yasser-al-dosari'): string
-    {
-        Log::info("[RenderPipeline] Starting rendering pipeline for Surah {$surahNumber} and reciter '{$reciterSlug}'");
+    public function render(
+        int $surahNumber,
+        string $reciterSlug = 'yasser-al-dosari',
+        ?int $fromAyah = null,
+        ?int $toAyah = null
+    ): string {
+        Log::info("[RenderPipeline] Starting rendering pipeline", [
+            'surah' => $surahNumber,
+            'reciter' => $reciterSlug,
+            'from_ayah' => $fromAyah,
+            'to_ayah' => $toAyah
+        ]);
 
         // 1. Select Surah
         $surah = Surah::where('number', $surahNumber)->first();
@@ -81,8 +92,16 @@ class RenderPipeline
             throw new RuntimeException("Invalid audio duration in database: {$audioFile->duration_ms} ms");
         }
 
-        // 4. Load ordered Word stream
-        $ayahIds = $surah->ayahs()->pluck('id');
+        // 4. Load ordered Word stream (optionally filtered by ayah range)
+        $ayahQuery = $surah->ayahs();
+        if ($fromAyah !== null) {
+            $ayahQuery = $ayahQuery->where('ayah_number', '>=', $fromAyah);
+        }
+        if ($toAyah !== null) {
+            $ayahQuery = $ayahQuery->where('ayah_number', '<=', $toAyah);
+        }
+        $ayahIds = $ayahQuery->pluck('id');
+
         $words = Word::whereIn('ayah_id', $ayahIds)
             ->orderBy('page_number')
             ->orderBy('line_number')
@@ -90,6 +109,10 @@ class RenderPipeline
             ->orderBy('word_index')
             ->get()
             ->all();
+
+        if (empty($words)) {
+            throw new RuntimeException("No words found in database for the selected ayah range.");
+        }
 
         // 5. Check timings and apply proportional scheduling fallback if timings are unavailable
         $hasTimings = false;
@@ -100,24 +123,58 @@ class RenderPipeline
             }
         }
 
+        $audioStartMs = 0;
+        $audioEndMs = (int) round($totalDuration * 1000);
+
         if (!$hasTimings) {
-            Log::info("[RenderPipeline] Timings not found in DB for Surah {$surahNumber}. Falling back to proportional scheduling.");
+            Log::info("[RenderPipeline] Timings not found in DB. Falling back to proportional scheduling.");
 
             $spokenWords = array_filter($words, fn($w) => $w->char_type === 'word');
             $spokenCount = count($spokenWords);
 
             if ($spokenCount > 0) {
-                $totalDurationMs = (int) round($totalDuration * 1000);
-                $durationPerWord = $totalDurationMs / $spokenCount;
+                $durationPerWord = $audioEndMs / $spokenCount;
 
                 $spokenIndex = 0;
                 foreach ($words as $w) {
                     if ($w->char_type === 'word') {
+                        // Modify in-memory only (do not call save())
                         $w->start_ms_from_surah = (int) round($spokenIndex * $durationPerWord);
                         $w->end_ms_from_surah = (int) round(($spokenIndex + 1) * $durationPerWord);
                         $spokenIndex++;
                     }
                 }
+            }
+        } else {
+            // Find absolute bounds for trimming
+            $firstSpoken = null;
+            $lastSpoken = null;
+            foreach ($words as $w) {
+                if ($w->char_type === 'word' && $w->start_ms_from_surah !== null) {
+                    if ($firstSpoken === null || $w->start_ms_from_surah < $firstSpoken->start_ms_from_surah) {
+                        $firstSpoken = $w;
+                    }
+                    if ($lastSpoken === null || $w->end_ms_from_surah > $lastSpoken->end_ms_from_surah) {
+                        $lastSpoken = $w;
+                    }
+                }
+            }
+
+            if ($firstSpoken !== null && $lastSpoken !== null) {
+                $audioStartMs = $firstSpoken->start_ms_from_surah;
+                $audioEndMs = $lastSpoken->end_ms_from_surah;
+
+                // Normalize timings in-memory relative to trimmed start
+                foreach ($words as $w) {
+                    if ($w->char_type === 'word' && $w->start_ms_from_surah !== null) {
+                        // Modify in-memory only (do not call save())
+                        $w->start_ms_from_surah = max(0, $w->start_ms_from_surah - $audioStartMs);
+                        $w->end_ms_from_surah = max(0, $w->end_ms_from_surah - $audioStartMs);
+                    }
+                }
+                
+                // Update total duration constraint to match the trimmed segment length
+                $totalDuration = ($audioEndMs - $audioStartMs) / 1000.0;
             }
         }
 
@@ -150,13 +207,15 @@ class RenderPipeline
         Log::info("[RenderPipeline] Segmented Surah {$surahNumber} into " . count($segments) . " segments.");
 
         // 7. Generate debug segment JSON file
-        $this->writeDebugSegmentsJson($surahNumber, $segments, $reciterSlug);
+        $this->writeDebugSegmentsJson($surahNumber, $segments, $reciterSlug, $fromAyah, $toAyah);
 
         // 8. Render all segments as PNGs and build frame schedule
         $composerFrames = [];
         foreach ($segments as $segment) {
             $paddedIndex = sprintf('%03d', $segment->index);
-            $segmentPath = $this->pathResolver->renderedSegments("surah_{$surahNumber}_{$reciterSlug}/segment_{$paddedIndex}.png");
+            
+            $rangeDir = ($fromAyah !== null || $toAyah !== null) ? "_from_{$fromAyah}_to_{$toAyah}" : "";
+            $segmentPath = $this->pathResolver->renderedSegments("surah_{$surahNumber}_{$reciterSlug}{$rangeDir}/segment_{$paddedIndex}.png");
 
             $layoutData = $this->layoutStrategy->layout($segment, ['reciter' => $reciter]);
             $this->segmentRenderer->renderSegment($surah, $segment, $segmentPath, $layoutData);
@@ -171,8 +230,23 @@ class RenderPipeline
 
         // 9. Compose the video from segments and audio
         $suffix = $reciterSlug === 'yasser-al-dosari' ? '' : "_{$reciterSlug}";
+        if ($fromAyah !== null || $toAyah !== null) {
+            $suffix .= "_from_{$fromAyah}_to_{$toAyah}";
+        }
+
         $outputVideoPath = $this->pathResolver->videos("surah_{$surahNumber}{$suffix}.mp4");
-        $this->videoComposer->compose($composerFrames, $absoluteAudioPath, $outputVideoPath, $totalDuration);
+        
+        $audioStartSec = $audioStartMs / 1000.0;
+        $audioDurationSec = ($audioEndMs - $audioStartMs) / 1000.0;
+
+        $this->videoComposer->compose(
+            $composerFrames,
+            $absoluteAudioPath,
+            $outputVideoPath,
+            $totalDuration,
+            $audioStartSec,
+            $audioDurationSec
+        );
 
         Log::info("[RenderPipeline] Completed video generation for Surah {$surahNumber}");
 
@@ -181,15 +255,19 @@ class RenderPipeline
 
     /**
      * Write debugging segments JSON file.
-     *
-     * @param int $surahNumber
-     * @param Segment[] $segments
-     * @param string $reciterSlug
-     * @return void
      */
-    protected function writeDebugSegmentsJson(int $surahNumber, array $segments, string $reciterSlug): void
-    {
+    protected function writeDebugSegmentsJson(
+        int $surahNumber,
+        array $segments,
+        string $reciterSlug,
+        ?int $fromAyah = null,
+        ?int $toAyah = null
+    ): void {
         $suffix = $reciterSlug === 'yasser-al-dosari' ? '' : "_{$reciterSlug}";
+        if ($fromAyah !== null || $toAyah !== null) {
+            $suffix .= "_from_{$fromAyah}_to_{$toAyah}";
+        }
+        
         $debugFile = $this->pathResolver->debug("segments/surah_{$surahNumber}{$suffix}_segments.json");
 
         $debugData = [];

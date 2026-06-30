@@ -15,7 +15,9 @@ class RenderVideoCommand extends Command
 {
     protected $signature = 'render:video 
                             {surah_number : The Surah number (8, 56, 78, or 108)} 
-                            {--reciter=yasser-al-dosari : The reciter slug (yasser-al-dosari or ali-jaber)}';
+                            {--reciter=yasser-al-dosari : The reciter slug (yasser-al-dosari or ali-jaber)}
+                            {--from= : Start ayah number (optional, inclusive)}
+                            {--to= : End ayah number (optional, inclusive)}';
 
     protected $description = 'Render a vertical reel video for a given Surah using static QCF glyphs and audio.';
 
@@ -23,18 +25,21 @@ class RenderVideoCommand extends Command
     {
         $surahNumber = (int) $this->argument('surah_number');
         $reciterSlug = $this->option('reciter');
+        
+        $fromAyah = $this->option('from') !== null ? (int) $this->option('from') : null;
+        $toAyah = $this->option('to') !== null ? (int) $this->option('to') : null;
 
         $this->info("Initializing rendering pipeline for Surah {$surahNumber} and reciter '{$reciterSlug}'...");
 
         try {
-            $this->validatePrerequisites($surahNumber, $reciterSlug, $fontResolver, $pathResolver);
+            $this->validatePrerequisites($surahNumber, $reciterSlug, $fromAyah, $toAyah, $fontResolver, $pathResolver);
         } catch (\Throwable $e) {
             $this->error("Validation failed: {$e->getMessage()}");
             return self::FAILURE;
         }
 
         try {
-            $outputPath = $pipeline->render($surahNumber, $reciterSlug);
+            $outputPath = $pipeline->render($surahNumber, $reciterSlug, $fromAyah, $toAyah);
             $this->info("Successfully generated video!");
             $this->line("Output Path: {$outputPath}");
             return self::SUCCESS;
@@ -47,8 +52,14 @@ class RenderVideoCommand extends Command
     /**
      * Validate all prerequisites before initiating the render pipeline.
      */
-    private function validatePrerequisites(int $surahNumber, string $reciterSlug, FontResolver $fontResolver, QuranPathResolver $pathResolver): void
-    {
+    private function validatePrerequisites(
+        int $surahNumber,
+        string $reciterSlug,
+        ?int $fromAyah,
+        ?int $toAyah,
+        FontResolver $fontResolver,
+        QuranPathResolver $pathResolver
+    ): void {
         // 1. Validate supported surahs
         $supportedSurahs = [8, 56, 78, 108];
         if (!in_array($surahNumber, $supportedSurahs, true)) {
@@ -60,16 +71,35 @@ class RenderVideoCommand extends Command
         // 2. Validate Surah exists in database
         $surah = Surah::where('number', $surahNumber)->first();
         if (!$surah) {
-            throw new InvalidArgumentException("Surah {$surahNumber} not found in database. Run \'php artisan import:surahs\' first.");
+            throw new InvalidArgumentException("Surah {$surahNumber} not found in database. Run 'php artisan import:surahs' first.");
         }
 
-        // 3. Validate Reciter exists in database
+        // 3. Validate Ayah Range (Fail fast checks)
+        if ($fromAyah !== null || $toAyah !== null) {
+            if ($fromAyah === null || $toAyah === null) {
+                throw new InvalidArgumentException("Both --from and --to flags must be specified together for partial rendering.");
+            }
+
+            if ($fromAyah < 1) {
+                throw new InvalidArgumentException("The --from ayah number must be at least 1. Got: {$fromAyah}.");
+            }
+
+            if ($toAyah > $surah->verses_count) {
+                throw new InvalidArgumentException("The --to ayah number ({$toAyah}) exceeds total ayahs ({$surah->verses_count}) in Surah {$surahNumber}.");
+            }
+
+            if ($fromAyah > $toAyah) {
+                throw new InvalidArgumentException("The --from ayah number ({$fromAyah}) must be less than or equal to --to ayah number ({$toAyah}).");
+            }
+        }
+
+        // 4. Validate Reciter exists in database
         $reciter = Reciter::where('slug', $reciterSlug)->first();
         if (!$reciter) {
             throw new InvalidArgumentException("Reciter '{$reciterSlug}' not found in database. Check that the audio files have been imported.");
         }
 
-        // 4. Validate Audio File exists in database and on disk
+        // 5. Validate Audio File exists in database and on disk
         $audioFile = AudioFile::where('reciter_id', $reciter->id)
             ->where('surah_number', $surahNumber)
             ->first();
@@ -82,20 +112,28 @@ class RenderVideoCommand extends Command
             throw new InvalidArgumentException("Physical audio file does not exist on disk: {$absoluteAudioPath}");
         }
 
-        // 5. Validate Glyph file exists
+        // 6. Validate Glyph file exists
         $glyphPath = storage_path("app/quran/glyph/surah_{$surahNumber}.json");
         if (!file_exists($glyphPath)) {
             throw new InvalidArgumentException("Glyph source file not found: {$glyphPath}");
         }
 
-        // 6. Validate QCF header mapping exists in configuration
+        // 7. Validate QCF header mapping exists in configuration
         $headersConfig = config('qcf_surah_headers');
         if (!isset($headersConfig[$surahNumber])) {
             throw new InvalidArgumentException("No QCF_BSML header mapping configured for Surah {$surahNumber} in config/qcf_surah_headers.php.");
         }
 
-        // 7. Validate QCF fonts needed for this Surah exist on disk
-        $neededPages = $surah->ayahs()->pluck('page_number')->unique();
+        // 8. Validate QCF fonts needed for this Surah range exist on disk
+        $ayahQuery = $surah->ayahs();
+        if ($fromAyah !== null) {
+            $ayahQuery = $ayahQuery->where('ayah_number', '>=', $fromAyah);
+        }
+        if ($toAyah !== null) {
+            $ayahQuery = $ayahQuery->where('ayah_number', '<=', $toAyah);
+        }
+        
+        $neededPages = $ayahQuery->pluck('page_number')->unique();
         if ($neededPages->isEmpty()) {
             $neededPages = range($surah->start_page, $surah->end_page);
         }
