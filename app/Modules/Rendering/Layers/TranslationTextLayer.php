@@ -5,8 +5,17 @@ namespace App\Modules\Rendering\Layers;
 use App\Modules\Rendering\Contracts\RenderLayerInterface;
 use App\Modules\Rendering\Domain\FrameContext;
 
+use Illuminate\Support\Facades\Log;
+
 class TranslationTextLayer implements RenderLayerInterface
 {
+    public const DEFAULT_WIDTH = 1200;
+    public const WIDTH_STEPS = [1200, 1250];
+    public const DEFAULT_FONT_SIZE = 32;
+    public const FONT_STEPS = [32, 30];
+    public const MAX_TRANSLATION_LINES = 2;
+    public const MIN_FONT_SIZE = 30;
+
     protected array $translationSegments;
     protected array $widthCache = [];
 
@@ -32,6 +41,34 @@ class TranslationTextLayer implements RenderLayerInterface
             }
         }
         return null;
+    }
+
+    /**
+     * Measure wrapped translation layout.
+     *
+     * @param string $text
+     * @param float $fontSize
+     * @param string $fontPath
+     * @param float $width
+     * @param float $lineHeightMult
+     * @return array{lines: array, wrappedText: string, height: float, fontSize: float, width: float}
+     */
+    public function measureTranslationLayout(
+        string $text,
+        float $fontSize,
+        string $fontPath,
+        float $width,
+        float $lineHeightMult = 1.4
+    ): array {
+        $lines = $this->wrapText($text, $fontSize, $fontPath, $width);
+        $height = count($lines) * $fontSize * $lineHeightMult;
+        return [
+            'lines' => $lines,
+            'wrappedText' => implode("\n", $lines),
+            'height' => $height,
+            'fontSize' => $fontSize,
+            'width' => $width,
+        ];
     }
 
     /**
@@ -90,14 +127,81 @@ class TranslationTextLayer implements RenderLayerInterface
             }
         }
 
-        // 4. Compute wrapped lines
-        $lines = $this->wrapText($activeSegment->text, $fontSize, $fontPath, $maxWidth);
+        // Semantic Detection: YouTube layout with 1 Mushaf line per screen
+        $layoutType = $context->layoutData['layoutType'] ?? null;
+        $maxMushafLines = $context->layoutData['maxMushafLines'] ?? null;
+        $isSingleLineYoutube = ($layoutType === 'youtube' && $maxMushafLines === 1);
+
+        if ($isSingleLineYoutube) {
+            // Step 0: Render using default width and size from strategy bounds
+            $fontSize = self::DEFAULT_FONT_SIZE;
+            $maxWidth = self::DEFAULT_WIDTH;
+
+            $layoutResult = $this->measureTranslationLayout($activeSegment->text, $fontSize, $fontPath, $maxWidth, $lineHeightMult);
+            $lines = $layoutResult['lines'];
+
+            if (count($lines) > self::MAX_TRANSLATION_LINES) {
+                // Step 1: Width Expansion
+                foreach (self::WIDTH_STEPS as $candidateWidth) {
+                    if ($candidateWidth > $maxWidth) {
+                        $candidateLayout = $this->measureTranslationLayout($activeSegment->text, $fontSize, $fontPath, $candidateWidth, $lineHeightMult);
+                        if (count($candidateLayout['lines']) <= self::MAX_TRANSLATION_LINES) {
+                            $layoutResult = $candidateLayout;
+                            $lines = $layoutResult['lines'];
+                            $maxWidth = $candidateWidth;
+                            break;
+                        }
+                    }
+                }
+
+                // Step 2: Font Reduction
+                if (count($lines) > self::MAX_TRANSLATION_LINES) {
+                    // Try to keep width at maximum step
+                    $maxWidth = self::WIDTH_STEPS[count(self::WIDTH_STEPS) - 1];
+                    
+                    foreach (self::FONT_STEPS as $candidateFontSize) {
+                        if ($candidateFontSize < $fontSize) {
+                            $candidateLayout = $this->measureTranslationLayout($activeSegment->text, $candidateFontSize, $fontPath, $maxWidth, $lineHeightMult);
+                            if (count($candidateLayout['lines']) <= self::MAX_TRANSLATION_LINES) {
+                                $layoutResult = $candidateLayout;
+                                $lines = $layoutResult['lines'];
+                                $fontSize = $candidateFontSize;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Safety Net / final fallback if still exceeding
+                    if (count($lines) > self::MAX_TRANSLATION_LINES) {
+                        $fontSize = self::MIN_FONT_SIZE;
+                        $layoutResult = $this->measureTranslationLayout($activeSegment->text, $fontSize, $fontPath, $maxWidth, $lineHeightMult);
+                        $lines = $layoutResult['lines'];
+
+                        Log::warning("Translation exceeded maximum line target. Rendering with fallback dimensions while preserving full translation.", [
+                            'text' => $activeSegment->text,
+                            'fontSize' => $fontSize,
+                            'width' => $maxWidth,
+                            'lineCount' => count($lines),
+                        ]);
+                    }
+                }
+            }
+        } else {
+            // Render standard layout
+            $layoutResult = $this->measureTranslationLayout($activeSegment->text, $fontSize, $fontPath, $maxWidth, $lineHeightMult);
+            $lines = $layoutResult['lines'];
+        }
+
         if (empty($lines)) {
             return;
         }
 
+        // Ensure the renderer uses EXACTLY the same values that were measured
+        $fontSize = $layoutResult['fontSize'];
+        $maxWidth = $layoutResult['width'];
+        $totalHeight = $layoutResult['height'];
+
         // 5. Draw lines centered vertically around centerY
-        $totalHeight = count($lines) * $fontSize * $lineHeightMult;
         // The first line baseline Y (imagettftext positions text by the baseline)
         $startY = $centerY - ($totalHeight / 2) + $fontSize;
 

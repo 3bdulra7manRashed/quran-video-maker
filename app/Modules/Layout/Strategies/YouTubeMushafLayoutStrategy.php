@@ -47,6 +47,8 @@ class YouTubeMushafLayoutStrategy
         return [
             'width' => 1920,
             'height' => 1080,
+            'layoutType' => 'youtube',
+            'maxMushafLines' => $linesCount,
             'fontSize' => $fontSize,
             'header' => [
                 'show' => true,
