@@ -83,6 +83,15 @@ class ImportManualTimingsService
                 ['start_ms', 'end_ms', 'updated_at']
             );
 
+            // Store coverage metadata
+            \App\Modules\Quran\Models\DatasetMetadata::updateOrCreate([
+                'reciter_id' => $reciterId,
+                'surah_number' => $surahNumber,
+            ], [
+                'from_ayah' => $fromAyah ? (int) $fromAyah : null,
+                'to_ayah' => $toAyah ? (int) $toAyah : null,
+            ]);
+
             DB::commit();
 
             return [
@@ -93,6 +102,60 @@ class ImportManualTimingsService
             DB::rollBack();
             Log::error("[ImportManualTimingsService] Database update failed: " . $e->getMessage());
             throw new RuntimeException("Database update failed: " . $e->getMessage(), 0, $e);
+        }
+    }
+
+    /**
+     * Import manual Mushaf line timings (page_number + line_number).
+     *
+     * @param array $data Decoded JSON line timings data.
+     * @param int $reciterId Target reciter database ID.
+     * @return array Standardized report.
+     */
+    public function importLines(array $data, int $reciterId): array
+    {
+        $surahNumber = $data['surah'] ?? null;
+        $jsonLines = $data['lines'] ?? [];
+
+        if (!$surahNumber || empty($jsonLines)) {
+            throw new \InvalidArgumentException("JSON data must contain 'surah' and a non-empty 'lines' array.");
+        }
+
+        DB::beginTransaction();
+        try {
+            foreach ($jsonLines as $line) {
+                \App\Modules\Quran\Models\ReciterLineTiming::updateOrCreate([
+                    'reciter_id' => $reciterId,
+                    'surah_number' => $surahNumber,
+                    'page_number' => (int) $line['page_number'],
+                    'line_number' => (int) $line['line_number'],
+                ], [
+                    'start_ms' => (int) $line['start'],
+                ]);
+            }
+
+            // Store coverage metadata
+            $fromAyah = isset($data['from_ayah']) ? (int) $data['from_ayah'] : null;
+            $toAyah = isset($data['to_ayah']) ? (int) $data['to_ayah'] : null;
+
+            \App\Modules\Quran\Models\DatasetMetadata::updateOrCreate([
+                'reciter_id' => $reciterId,
+                'surah_number' => $surahNumber,
+            ], [
+                'from_ayah' => $fromAyah,
+                'to_ayah' => $toAyah,
+            ]);
+
+            DB::commit();
+
+            return [
+                'success' => true,
+                'timedLines' => count($jsonLines),
+            ];
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error("[ImportManualTimingsService] Lines import database update failed: " . $e->getMessage());
+            throw new RuntimeException("Lines database update failed: " . $e->getMessage(), 0, $e);
         }
     }
 

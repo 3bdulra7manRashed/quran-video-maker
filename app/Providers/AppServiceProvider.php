@@ -20,6 +20,16 @@ class AppServiceProvider extends ServiceProvider
             \App\Modules\Dataset\Providers\DatasetProvider::class,
             \App\Modules\Dataset\Providers\QuranComDatasetProvider::class
         );
+
+        $this->app->bind(
+            \App\Modules\Rendering\Contracts\TranslationRepositoryInterface::class,
+            \App\Modules\Rendering\Repositories\TranslationRepository::class
+        );
+
+        $this->app->bind(
+            \App\Modules\Rendering\Contracts\TranslationProviderInterface::class,
+            \App\Modules\Rendering\Providers\SahihInternationalTranslationProvider::class
+        );
     }
 
     /**

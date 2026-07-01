@@ -46,6 +46,10 @@ export default function ConsolePage() {
   const [layout, setLayout] = useState<string>('reels');
   const [maxLines, setMaxLines] = useState<number>(1);
 
+  // Translation states
+  const [withTranslation, setWithTranslation] = useState<boolean>(false);
+  const [translationSource, setTranslationSource] = useState<string>('sahih_international');
+
   // Get max ayahs for current selection
   const maxAyahs = selectedSurah !== '' 
     ? surahs.find(s => s.number === selectedSurah)?.verses_count || 114
@@ -230,6 +234,10 @@ export default function ConsolePage() {
               onLayoutChange={setLayout}
               maxLines={maxLines}
               onMaxLinesChange={setMaxLines}
+              withTranslation={withTranslation}
+              onWithTranslationChange={setWithTranslation}
+              translationSource={translationSource}
+              onTranslationSourceChange={setTranslationSource}
             />
 
             <GenerateVideoCard
@@ -242,6 +250,8 @@ export default function ConsolePage() {
               renderable={status?.renderable ?? false}
               layout={layout}
               maxLines={maxLines}
+              withTranslation={withTranslation}
+              translationSource={translationSource}
             />
           </div>
 

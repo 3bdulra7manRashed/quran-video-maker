@@ -4,24 +4,22 @@ namespace App\Modules\Quran\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class ReciterLineTiming extends Model
+class DatasetMetadata extends Model
 {
-    protected $table = 'reciter_line_timings';
+    protected $table = 'dataset_metadata';
 
     protected $fillable = [
         'reciter_id',
         'surah_number',
-        'page_number',
-        'line_number',
-        'start_ms',
+        'from_ayah',
+        'to_ayah',
     ];
 
     protected $casts = [
         'reciter_id' => 'integer',
         'surah_number' => 'integer',
-        'page_number' => 'integer',
-        'line_number' => 'integer',
-        'start_ms' => 'integer',
+        'from_ayah' => 'integer',
+        'to_ayah' => 'integer',
     ];
 
     public function reciter()

@@ -25,6 +25,8 @@ class RenderPipeline
     protected ReelSingleLineLayoutStrategy $layoutStrategy;
     protected YouTubeMushafLayoutStrategy $youtubeLayoutStrategy;
     protected WordTimingResolver $timingResolver;
+    protected \App\Modules\Dataset\Services\DatasetCoverageResolver $coverageResolver;
+    protected \App\Modules\Rendering\Services\TranslationSegmentBuilder $translationSegmentBuilder;
 
     public function __construct(
         SegmentRenderer $segmentRenderer,
@@ -34,7 +36,9 @@ class RenderPipeline
         QuranPathResolver $pathResolver,
         ReelSingleLineLayoutStrategy $layoutStrategy,
         YouTubeMushafLayoutStrategy $youtubeLayoutStrategy,
-        WordTimingResolver $timingResolver
+        WordTimingResolver $timingResolver,
+        \App\Modules\Dataset\Services\DatasetCoverageResolver $coverageResolver,
+        \App\Modules\Rendering\Services\TranslationSegmentBuilder $translationSegmentBuilder
     ) {
         $this->segmentRenderer = $segmentRenderer;
         $this->videoComposer = $videoComposer;
@@ -44,6 +48,8 @@ class RenderPipeline
         $this->layoutStrategy = $layoutStrategy;
         $this->youtubeLayoutStrategy = $youtubeLayoutStrategy;
         $this->timingResolver = $timingResolver;
+        $this->coverageResolver = $coverageResolver;
+        $this->translationSegmentBuilder = $translationSegmentBuilder;
     }
 
     /**
@@ -55,6 +61,8 @@ class RenderPipeline
      * @param int|null $toAyah
      * @param string $layout
      * @param int $maxLines
+     * @param bool $withTranslation
+     * @param string $translationSource
      * @return string Path to the generated video.
      */
     public function render(
@@ -63,13 +71,17 @@ class RenderPipeline
         ?int $fromAyah = null,
         ?int $toAyah = null,
         string $layout = 'reels',
-        int $maxLines = 1
+        int $maxLines = 1,
+        bool $withTranslation = false,
+        string $translationSource = 'sahih_international'
     ): string {
         Log::info("[RenderPipeline] Starting rendering pipeline", [
             'surah' => $surahNumber,
             'reciter' => $reciterSlug,
             'from_ayah' => $fromAyah,
-            'to_ayah' => $toAyah
+            'to_ayah' => $toAyah,
+            'with_translation' => $withTranslation,
+            'translation_source' => $translationSource,
         ]);
 
         // 1. Select Surah
@@ -82,6 +94,20 @@ class RenderPipeline
         $reciter = Reciter::where('slug', $reciterSlug)->first();
         if (!$reciter) {
             throw new RuntimeException("Reciter '{$reciterSlug}' not found in database.");
+        }
+
+        // Validate range against resolved coverage
+        $coverage = $this->coverageResolver->resolve($reciter->id, $surahNumber);
+        if ($coverage !== null) {
+            $from = $fromAyah ?? 1;
+            $to = $toAyah ?? $surah->ayahs()->max('ayah_number');
+
+            if ($from < $coverage['from_ayah'] || $to > $coverage['to_ayah']) {
+                throw new \InvalidArgumentException(
+                    "The uploaded dataset covers ayahs {$coverage['from_ayah']}–{$coverage['to_ayah']} only. " .
+                    "Requested range {$from}–{$to} is outside the available dataset."
+                );
+            }
         }
 
         // 3. Load AudioFile metadata
@@ -204,6 +230,15 @@ class RenderPipeline
             throw new RuntimeException("Segmentation service returned no segments for Surah {$surahNumber}.");
         }
 
+        // Build Translation Layer if requested
+        $translationLayer = null;
+        if ($withTranslation) {
+            $translationSegments = $this->translationSegmentBuilder->build($segments, $surahNumber);
+            $translationLayer = new \App\Modules\Rendering\Layers\TranslationTextLayer($translationSegments);
+            // Verify instantiation by logging the segments count
+            Log::info("[RenderPipeline] Instantiated TranslationTextLayer with " . count($translationSegments) . " segments.");
+        }
+
         // Populate segment metrics for debug/report output
         $fontSize = ($layout === 'youtube') ? 50 : config('layouts.reels.font_size', 56);
         foreach ($segments as $segment) {
@@ -245,7 +280,20 @@ class RenderPipeline
 
             $activeStrategy = ($layout === 'youtube') ? $this->youtubeLayoutStrategy : $this->layoutStrategy;
             $layoutData = $activeStrategy->layout($segment, ['reciter' => $reciter]);
-            $this->segmentRenderer->renderSegment($surah, $segment, $segmentPath, $layoutData);
+
+            $translationSegment = null;
+            if ($translationLayer) {
+                $translationSegment = $translationLayer->getSegmentForArabic($segment);
+            }
+
+            $this->segmentRenderer->renderSegment(
+                $surah,
+                $segment,
+                $segmentPath,
+                $layoutData,
+                $translationLayer,
+                $translationSegment
+            );
 
             $segmentDurationSec = ($segment->endMs - $segment->startMs) / 1000.0;
 

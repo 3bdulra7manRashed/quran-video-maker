@@ -21,14 +21,16 @@ class DatasetRenderController
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'reciter'   => 'required|string|exists:reciters,slug',
-            'surah'     => 'required|integer|exists:surahs,number',
-            'scope'     => ['required', 'string', Rule::in(['full', 'single', 'range'])],
-            'ayah'      => 'required_if:scope,single|integer|min:1',
-            'from'      => 'required_if:scope,range|integer|min:1',
-            'to'        => 'required_if:scope,range|integer|min:1',
-            'layout'    => 'sometimes|string|in:reels,youtube',
-            'max_lines' => 'sometimes|integer|min:1',
+            'reciter'            => 'required|string|exists:reciters,slug',
+            'surah'              => 'required|integer|exists:surahs,number',
+            'scope'              => ['required', 'string', Rule::in(['full', 'single', 'range'])],
+            'ayah'               => 'required_if:scope,single|integer|min:1',
+            'from'               => 'required_if:scope,range|integer|min:1',
+            'to'                 => 'required_if:scope,range|integer|min:1',
+            'layout'             => 'sometimes|string|in:reels,youtube',
+            'max_lines'          => 'sometimes|integer|min:1',
+            'with_translation'   => 'sometimes|boolean',
+            'translation_source' => 'sometimes|string',
         ]);
 
         if ($validator->fails()) {
@@ -67,16 +69,21 @@ class DatasetRenderController
             $toAyah = $to;
         }
 
+        $withTranslation = (bool) $request->input('with_translation', false);
+        $translationSource = $withTranslation ? $request->input('translation_source', 'sahih_international') : null;
+
         // Create the RenderJob model record
         $renderJob = RenderJob::create([
-            'status'       => 'pending',
-            'reciter_id'   => $reciter->id,
-            'surah_number' => $surah->number,
-            'layout'       => $layout,
-            'max_lines'    => $maxLines,
-            'from_ayah'    => $fromAyah,
-            'to_ayah'      => $toAyah,
-            'progress'     => 0,
+            'status'             => 'pending',
+            'reciter_id'         => $reciter->id,
+            'surah_number'       => $surah->number,
+            'layout'             => $layout,
+            'max_lines'          => $maxLines,
+            'from_ayah'          => $fromAyah,
+            'to_ayah'            => $toAyah,
+            'progress'           => 0,
+            'with_translation'   => $withTranslation,
+            'translation_source' => $translationSource,
         ]);
 
         // Dispatch GenerateVideoJob to queue
@@ -108,9 +115,11 @@ class DatasetRenderController
         };
 
         $response = [
-            'uuid'     => $job->uuid,
-            'status'   => $status,
-            'progress' => $job->progress,
+            'uuid'               => $job->uuid,
+            'status'             => $status,
+            'progress'           => $job->progress,
+            'with_translation'   => (bool) ($job->with_translation ?? false),
+            'translation_source' => $job->translation_source,
         ];
 
         if ($status === 'completed') {
@@ -144,18 +153,20 @@ class DatasetRenderController
             };
 
             $res = [
-                'uuid'         => $job->uuid,
-                'status'       => $status,
-                'reciter'      => $job->reciter ? $job->reciter->name_english : 'Unknown',
-                'reciter_ar'   => $job->reciter ? $job->reciter->name_arabic : 'غير معروف',
-                'surah'        => $job->surah_number,
-                'layout'       => $job->layout ?? 'reels',
-                'max_lines'    => $job->max_lines ?? 1,
-                'from_ayah'    => $job->from_ayah,
-                'to_ayah'      => $job->to_ayah,
-                'progress'     => $job->progress,
-                'created_at'   => $job->created_at->toIso8601String(),
-                'error'        => $job->error_message,
+                'uuid'               => $job->uuid,
+                'status'             => $status,
+                'reciter'            => $job->reciter ? $job->reciter->name_english : 'Unknown',
+                'reciter_ar'         => $job->reciter ? $job->reciter->name_arabic : 'غير معروف',
+                'surah'              => $job->surah_number,
+                'layout'             => $job->layout ?? 'reels',
+                'max_lines'          => $job->max_lines ?? 1,
+                'from_ayah'          => $job->from_ayah,
+                'to_ayah'            => $job->to_ayah,
+                'progress'           => $job->progress,
+                'created_at'         => $job->created_at->toIso8601String(),
+                'error'              => $job->error_message,
+                'with_translation'   => (bool) ($job->with_translation ?? false),
+                'translation_source' => $job->translation_source,
             ];
 
             if ($status === 'completed') {

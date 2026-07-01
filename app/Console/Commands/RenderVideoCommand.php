@@ -20,7 +20,9 @@ class RenderVideoCommand extends Command
                             {--to= : End ayah number (optional, inclusive)}
                             {--ayah= : Shortcut for rendering a single ayah (equivalent to --from=N --to=N)}
                             {--layout=reels : Layout type (reels or youtube)}
-                            {--max-lines=1 : Maximum Mushaf lines per screen (only used for youtube layout)}';
+                            {--max-lines=1 : Maximum Mushaf lines per screen (only used for youtube layout)}
+                            {--with-translation : Enable translation rendering (default: false)}
+                            {--translation-source=sahih_international : The translation source (default: sahih_international)}';
 
     protected $description = 'Render a video for a given Surah using static QCF glyphs and audio.';
 
@@ -30,6 +32,8 @@ class RenderVideoCommand extends Command
         $reciterSlug = $this->option('reciter');
         $layout = $this->option('layout');
         $maxLines = (int) $this->option('max-lines');
+        $withTranslation = $this->option('with-translation');
+        $translationSource = $this->option('translation-source');
 
         if (!in_array($layout, ['reels', 'youtube'])) {
             $this->error('The --layout option must be either reels or youtube.');
@@ -65,7 +69,7 @@ class RenderVideoCommand extends Command
         }
 
         try {
-            $outputPath = $pipeline->render($surahNumber, $reciterSlug, $fromAyah, $toAyah, $layout, $maxLines);
+            $outputPath = $pipeline->render($surahNumber, $reciterSlug, $fromAyah, $toAyah, $layout, $maxLines, $withTranslation, $translationSource);
             $this->info("Successfully generated video!");
             $this->line("Output Path: {$outputPath}");
             return self::SUCCESS;
@@ -87,7 +91,7 @@ class RenderVideoCommand extends Command
         QuranPathResolver $pathResolver
     ): void {
         // 1. Validate supported surahs
-        $supportedSurahs = [8, 56, 78, 108];
+        $supportedSurahs = [8, 20, 56, 78, 108];
         if (!in_array($surahNumber, $supportedSurahs, true)) {
             throw new InvalidArgumentException(
                 "Surah {$surahNumber} is not supported. Supported surahs are: " . implode(', ', $supportedSurahs)

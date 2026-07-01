@@ -37,17 +37,25 @@ class LineTimingResolver
         $manualTimings = ReciterLineTiming::where('reciter_id', $reciter->id)
             ->where('surah_number', $surahNumber)
             ->get()
-            ->keyBy('line_number');
+            ->keyBy(fn ($item) => $item->page_number . ':' . $item->line_number);
 
         if ($manualTimings->isNotEmpty()) {
             Log::info("[LineTimingResolver] Using manual line timings for reciter {$reciter->slug}, surah {$surahNumber}.");
             $map = [];
             foreach ($lineGroups as $idx => $group) {
                 $lineNumber = $idx + 1; // 1-indexed sequential line number in the Surah
-                if ($manualTimings->has($lineNumber)) {
-                    $map[$lineNumber] = $manualTimings->get($lineNumber)->start_ms;
+                
+                if (!empty($group)) {
+                    $firstWord = $group[0];
+                    $pageKey = $firstWord->page_number . ':' . $firstWord->line_number;
+                    
+                    if ($manualTimings->has($pageKey)) {
+                        $map[$lineNumber] = $manualTimings->get($pageKey)->start_ms;
+                    } else {
+                        // Fallback to 0 if missing for some reason
+                        $map[$lineNumber] = 0;
+                    }
                 } else {
-                    // Fallback to 0 if missing for some reason
                     $map[$lineNumber] = 0;
                 }
             }

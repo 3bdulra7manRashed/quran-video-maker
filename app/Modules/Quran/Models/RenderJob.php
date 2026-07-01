@@ -26,6 +26,8 @@ class RenderJob extends Model
         'duration',
         'layout',
         'max_lines',
+        'with_translation',
+        'translation_source',
     ];
 
     protected $casts = [
@@ -36,6 +38,7 @@ class RenderJob extends Model
         'progress' => 'integer',
         'duration' => 'float',
         'max_lines' => 'integer',
+        'with_translation' => 'boolean',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
         'finished_at' => 'datetime',

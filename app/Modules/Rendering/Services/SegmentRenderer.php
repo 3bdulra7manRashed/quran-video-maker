@@ -34,13 +34,22 @@ class SegmentRenderer
      * @param Segment $segment
      * @param string $outputPath
      * @param array $layoutData
+     * @param \App\Modules\Rendering\Layers\TranslationTextLayer|null $translationLayer
      * @return void
      */
-    public function renderSegment(Surah $surah, Segment $segment, string $outputPath, array $layoutData): void
+    public function renderSegment(
+        Surah $surah,
+        Segment $segment,
+        string $outputPath,
+        array $layoutData,
+        ?\App\Modules\Rendering\Layers\TranslationTextLayer $translationLayer = null,
+        ?\App\Modules\Rendering\Domain\TranslationSegment $translationSegment = null
+    ): void
     {
         Log::info("[SegmentRenderer] Starting segment render using layout-agnostic model", [
             'surah' => $surah->number,
             'segment_index' => $segment->index,
+            'has_translation_layer' => !is_null($translationLayer)
         ]);
 
         // 1. Resolve canvas dimensions
@@ -125,6 +134,18 @@ class SegmentRenderer
 
                 imagettftext($im, $fontSize, 0, $lineX, $centerY, $white, $fontPath, $lineText);
             }
+        }
+
+        // 4.5. Draw Translation Layer if provided
+        if ($translationLayer) {
+            $context = new \App\Modules\Rendering\Domain\FrameContext(
+                $im,
+                $width,
+                $height,
+                $layoutData,
+                $segment
+            );
+            $translationLayer->render($translationSegment, $context);
         }
 
         // 5. Save the segment frame to PNG

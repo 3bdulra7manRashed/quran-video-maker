@@ -62,6 +62,8 @@ export interface RenderJobDetails {
   error: string | null;
   filename?: string;
   url?: string;
+  with_translation?: boolean;
+  translation_source?: string | null;
 }
 
 export interface VideoFile {
@@ -163,6 +165,8 @@ export class ApiService {
     to?: number;
     layout?: string;
     max_lines?: number;
+    with_translation?: boolean;
+    translation_source?: string;
   }): Promise<{ uuid: string; status: string }> {
     const res = await fetch(`${this.baseUrl}/api/renders`, {
       method: 'POST',

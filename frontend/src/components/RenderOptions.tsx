@@ -19,6 +19,10 @@ interface RenderOptionsProps {
   onLayoutChange: (layout: string) => void;
   maxLines: number;
   onMaxLinesChange: (num: number) => void;
+  withTranslation: boolean;
+  onWithTranslationChange: (val: boolean) => void;
+  translationSource: string;
+  onTranslationSourceChange: (source: string) => void;
 }
 
 export default function RenderOptions({
@@ -36,6 +40,10 @@ export default function RenderOptions({
   onLayoutChange,
   maxLines,
   onMaxLinesChange,
+  withTranslation,
+  onWithTranslationChange,
+  translationSource,
+  onTranslationSourceChange,
 }: RenderOptionsProps) {
   return (
     <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 flex flex-col gap-5 shadow-2xl">
@@ -191,6 +199,43 @@ export default function RenderOptions({
                   2 Lines / screen
                 </button>
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Translation Settings */}
+        <div className="border-t border-zinc-900 pt-4 flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col">
+              <label htmlFor="withTranslation" className="text-xs text-zinc-300 font-semibold cursor-pointer">
+                Include Translation
+              </label>
+              <span className="text-[10px] text-zinc-500 font-mono">تضمين الترجمة الإنجليزية</span>
+            </div>
+            <input
+              id="withTranslation"
+              type="checkbox"
+              disabled={disabled}
+              checked={withTranslation}
+              onChange={(e) => onWithTranslationChange(e.target.checked)}
+              className="w-4 h-4 accent-emerald-500 rounded bg-zinc-900 border-zinc-800 focus:ring-emerald-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            />
+          </div>
+
+          {withTranslation && (
+            <div className="flex flex-col gap-2">
+              <label htmlFor="translationSource" className="text-xs text-zinc-500 font-mono">
+                Translation Source (مصدر الترجمة):
+              </label>
+              <select
+                id="translationSource"
+                disabled={disabled}
+                value={translationSource}
+                onChange={(e) => onTranslationSourceChange(e.target.value)}
+                className="w-full bg-zinc-900 border border-zinc-800 text-zinc-200 px-3 py-2 rounded-xl focus:outline-none focus:border-zinc-700 transition-colors font-sans text-xs cursor-pointer"
+              >
+                <option value="sahih_international">Sahih International (English)</option>
+              </select>
             </div>
           )}
         </div>

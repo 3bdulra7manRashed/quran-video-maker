@@ -437,8 +437,8 @@ class SegmentationService
         $lastLineNum = end($rangeLines)['line_number'];
         $totalLinesCount = count($allLines);
 
-        if ($lastLineNum < $totalLinesCount) {
-            $rangeEndMs = $absoluteLineTimings[$lastLineNum + 1] ?? (int) round($totalAudioDurationSec * 1000);
+        if ($lastLineNum < $totalLinesCount && isset($absoluteLineTimings[$lastLineNum + 1]) && $absoluteLineTimings[$lastLineNum + 1] > $rangeStartMs) {
+            $rangeEndMs = $absoluteLineTimings[$lastLineNum + 1];
         } else {
             $rangeEndMs = (int) round($totalAudioDurationSec * 1000);
         }
@@ -478,15 +478,25 @@ class SegmentationService
             }
 
             if ($index === count($screens) - 1) {
+                // Rule 2: For the final line/screen, end_ms = audio_duration_ms (trimmedDurationMs)
                 $segEndMs = $trimmedDurationMs;
             } else {
                 $nextFirstLineNum = $screens[$index + 1]['line_numbers'][0];
-                $segEndMs = $normalizedStartTimes[$nextFirstLineNum] ?? $trimmedDurationMs;
+                $nextStart = $normalizedStartTimes[$nextFirstLineNum] ?? 0;
+
+                // Rule 1 & 3: For every line except the last: end_ms = next_line_start_ms.
+                // If next line timing is missing, zero, or less than/equal to current start time: end_ms = audio_duration_ms (trimmedDurationMs)
+                if ($nextStart === 0 || $nextStart <= $segStartMs) {
+                    $segEndMs = $trimmedDurationMs;
+                } else {
+                    $segEndMs = $nextStart;
+                }
             }
 
-            // Safety check to prevent negative or zero duration segments
+            // Rule 4 & 5: Ensure duration_ms = end_ms - start_ms > 0
+            // Add a defensive fallback so that no segment can end up with a duration of 0 ms.
             if ($segEndMs <= $segStartMs) {
-                $segEndMs = $segStartMs + 1;
+                $segEndMs = $segStartMs + 1000;
             }
 
             $segments[] = new Segment(

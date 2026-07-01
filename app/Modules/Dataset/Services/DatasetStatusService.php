@@ -13,10 +13,12 @@ use App\Modules\Shared\Services\QuranPathResolver;
 class DatasetStatusService
 {
     protected QuranPathResolver $pathResolver;
+    protected DatasetCoverageResolver $coverageResolver;
 
-    public function __construct(QuranPathResolver $pathResolver)
+    public function __construct(QuranPathResolver $pathResolver, DatasetCoverageResolver $coverageResolver)
     {
         $this->pathResolver = $pathResolver;
+        $this->coverageResolver = $coverageResolver;
     }
 
     /**
@@ -37,6 +39,11 @@ class DatasetStatusService
 
         $renderable = $glyphs && $audio;
 
+        $coverage = null;
+        if ($reciter) {
+            $coverage = $this->coverageResolver->resolve($reciter->id, $surahNumber);
+        }
+
         return [
             'reciter' => $reciterSlug,
             'surah' => $surahNumber,
@@ -44,6 +51,7 @@ class DatasetStatusService
             'audio' => $audio,
             'timings' => $timings,
             'renderable' => $renderable,
+            'coverage' => $coverage,
         ];
     }
 
@@ -153,6 +161,17 @@ class DatasetStatusService
             ->count();
 
         if ($timedSpoken === 0) {
+            $manualLineCount = \App\Modules\Quran\Models\ReciterLineTiming::where('reciter_id', $reciter->id)
+                ->where('surah_number', $surah->number)
+                ->count();
+
+            if ($manualLineCount > 0) {
+                return [
+                    'mode' => 'partial',
+                    'count' => $manualLineCount,
+                ];
+            }
+
             return [
                 'mode' => 'none',
                 'timedWords' => 0,
