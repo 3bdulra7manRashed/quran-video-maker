@@ -21,6 +21,8 @@ Route::post('/datasets/timings', [DatasetTimingsController::class, 'upload']);
 Route::get('/renders', [DatasetRenderController::class, 'index']);
 Route::post('/renders', [DatasetRenderController::class, 'store']);
 Route::get('/renders/{uuid}', [DatasetRenderController::class, 'show']);
+Route::post('/renders/{uuid}/cancel', [DatasetRenderController::class, 'cancel']);
+Route::post('/render-jobs/{id}/cancel', [DatasetRenderController::class, 'cancelById']);
 
 // Videos API routes
 Route::get('/videos', [VideoLibraryController::class, 'index']);

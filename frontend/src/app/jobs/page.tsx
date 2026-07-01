@@ -28,6 +28,17 @@ export default function JobsPage() {
     }
   }
 
+  // Cancel job request
+  const handleCancel = async (uuid: string) => {
+    try {
+      await api.cancelRender(uuid);
+      await loadJobs();
+    } catch (err: any) {
+      console.error('Failed to cancel job:', err);
+      alert(err.message || 'Failed to cancel render job.');
+    }
+  };
+
   useEffect(() => {
     loadJobs();
     
@@ -67,6 +78,18 @@ export default function JobsPage() {
         return (
           <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 animate-pulse">
             Running (جاري العمل)
+          </span>
+        );
+      case 'cancelling':
+        return (
+          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse">
+            Cancelling... (جاري الإلغاء)
+          </span>
+        );
+      case 'cancelled':
+        return (
+          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-zinc-800 text-zinc-500 border border-zinc-700/50">
+            Cancelled (ملغى)
           </span>
         );
       case 'queued':
@@ -178,7 +201,7 @@ export default function JobsPage() {
                 </div>
 
                 {/* Progress bar */}
-                {(job.status === 'running' || job.status === 'queued' || job.status === 'completed') && (
+                {(job.status === 'running' || job.status === 'queued' || job.status === 'completed' || job.status === 'cancelling') && (
                   <div className="flex flex-col gap-1.5 mt-1">
                     <div className="flex items-center justify-between text-2xs font-mono text-zinc-500">
                       <span>Progress</span>
@@ -187,7 +210,7 @@ export default function JobsPage() {
                     <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden">
                       <div
                         className={`h-full transition-all duration-500 ${
-                          job.status === 'completed' ? 'bg-emerald-500' : 'bg-blue-500'
+                          job.status === 'completed' ? 'bg-emerald-500' : (job.status === 'cancelling' ? 'bg-amber-500' : 'bg-blue-500')
                         }`}
                         style={{ width: `${job.progress}%` }}
                       ></div>
@@ -201,6 +224,13 @@ export default function JobsPage() {
                     <strong>Error:</strong> {job.error}
                   </div>
                 )}
+
+                {/* Cancelled Banner */}
+                {job.status === 'cancelled' && (
+                  <div className="bg-zinc-900/60 border border-zinc-800 text-zinc-500 p-3 rounded-xl text-xs font-mono">
+                    ℹ️ Render cancelled by user.
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons */}
@@ -210,6 +240,24 @@ export default function JobsPage() {
                 </span>
 
                 <div className="flex gap-2">
+                  {(job.status === 'queued' || job.status === 'running') && (
+                    <button
+                      onClick={() => handleCancel(job.uuid)}
+                      className="bg-red-500/10 hover:bg-red-500/20 text-red-450 text-xs px-3 py-1.5 rounded-lg border border-red-500/30 transition-all font-semibold active:scale-95 cursor-pointer"
+                    >
+                      Cancel Render
+                    </button>
+                  )}
+
+                  {job.status === 'cancelling' && (
+                    <button
+                      disabled
+                      className="bg-amber-500/10 text-amber-450 text-xs px-3 py-1.5 rounded-lg border border-amber-500/20 opacity-70 cursor-not-allowed font-semibold"
+                    >
+                      Cancelling...
+                    </button>
+                  )}
+
                   {job.status === 'completed' && job.url && job.filename && (
                     <>
                       <button

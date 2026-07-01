@@ -183,4 +183,93 @@ class DatasetRenderController
     // TODO: Roadmap implementation: POST /api/renders/{uuid}/retry
     // For retrying failed jobs:
     // public function retry(string $uuid): JsonResponse { ... }
+
+    /**
+     * Cancel a render job via UUID.
+     *
+     * POST /api/renders/{uuid}/cancel
+     */
+    public function cancel(string $uuid): JsonResponse
+    {
+        $job = RenderJob::where('uuid', $uuid)->first();
+        if (!$job) {
+            return response()->json(['error' => 'Render job not found.'], 404);
+        }
+        return $this->cancelJob($job);
+    }
+
+    /**
+     * Cancel a render job via database ID or UUID.
+     *
+     * POST /api/render-jobs/{id}/cancel
+     */
+    public function cancelById(string $id): JsonResponse
+    {
+        $job = RenderJob::where('id', $id)->orWhere('uuid', $id)->first();
+        if (!$job) {
+            return response()->json(['error' => 'Render job not found.'], 404);
+        }
+        return $this->cancelJob($job);
+    }
+
+    /**
+     * Common method to process cancellation transitions.
+     */
+    protected function cancelJob(RenderJob $job): JsonResponse
+    {
+        if ($job->isCompleted()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Cannot cancel a completed job.',
+                'status' => $job->status
+            ], 422);
+        }
+
+        if ($job->isFailed()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Cannot cancel a failed job.',
+                'status' => $job->status
+            ], 422);
+        }
+
+        if ($job->isCancelled()) {
+            return response()->json([
+                'success' => true,
+                'status' => 'cancelled'
+            ]);
+        }
+
+        if ($job->isPending()) {
+            $job->update([
+                'status' => 'cancelled',
+                'progress' => 0,
+                'finished_at' => now(),
+                'completed_at' => now(),
+            ]);
+            return response()->json([
+                'success' => true,
+                'status' => 'cancelled'
+            ]);
+        }
+
+        if ($job->isProcessing()) {
+            $job->update([
+                'status' => 'cancelling',
+            ]);
+            return response()->json([
+                'success' => true,
+                'status' => 'cancelling'
+            ]);
+        }
+
+        if ($job->isCancelling()) {
+            return response()->json([
+                'success' => true,
+                'status' => 'cancelling'
+            ]);
+        }
+
+        return response()->json(['error' => 'Invalid job status.'], 400);
+    }
 }

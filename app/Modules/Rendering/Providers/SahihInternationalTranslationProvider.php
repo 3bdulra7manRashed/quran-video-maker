@@ -22,6 +22,11 @@ class SahihInternationalTranslationProvider implements TranslationProviderInterf
         return $this->repository->getAyahTranslation($surahNumber, $ayahNumber, $this->source());
     }
 
+    public function getAyahTranslations(int $surahNumber): array
+    {
+        return $this->repository->getAyahTranslations($surahNumber, $this->source());
+    }
+
     /**
      * Get the source identifier for the provider.
      */

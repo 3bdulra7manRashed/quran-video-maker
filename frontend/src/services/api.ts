@@ -38,7 +38,7 @@ export interface UploadResponse {
 
 export interface RenderJobResponse {
   uuid: string;
-  status: 'queued' | 'running' | 'completed' | 'failed';
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelling' | 'cancelled';
   progress?: number;
   video?: {
     filename: string;
@@ -49,7 +49,7 @@ export interface RenderJobResponse {
 
 export interface RenderJobDetails {
   uuid: string;
-  status: 'queued' | 'running' | 'completed' | 'failed';
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelling' | 'cancelled';
   reciter: string;
   reciter_ar: string;
   surah: number;
@@ -185,6 +185,20 @@ export class ApiService {
   async getRenderStatus(uuid: string): Promise<RenderJobResponse> {
     const res = await fetch(`${this.baseUrl}/api/renders/${uuid}`);
     if (!res.ok) throw new Error('Failed to fetch render status');
+    return res.json();
+  }
+
+  async cancelRender(uuid: string): Promise<{ success: boolean; status: string }> {
+    const res = await fetch(`${this.baseUrl}/api/renders/${uuid}/cancel`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Failed to cancel render job');
+    }
     return res.json();
   }
 

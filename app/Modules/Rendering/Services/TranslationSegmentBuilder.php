@@ -27,6 +27,9 @@ class TranslationSegmentBuilder
     {
         $translationSegments = [];
 
+        // Load all translations for this Surah in a single query
+        $translationsMap = $this->provider->getAyahTranslations($surahNumber);
+
         foreach ($arabicSegments as $segment) {
             // Find unique, sorted ayah numbers inside the segment words
             $ayahNumbers = [];
@@ -67,10 +70,10 @@ class TranslationSegmentBuilder
             $fromAyah = min($ayahNumbers);
             $toAyah = max($ayahNumbers);
 
-            // Fetch and assemble translations for each ayah in range
+            // Fetch and assemble translations for each ayah in range using cached map
             $texts = [];
             for ($ayah = $fromAyah; $ayah <= $toAyah; $ayah++) {
-                $texts[] = $this->provider->getAyahTranslation($surahNumber, $ayah);
+                $texts[] = $translationsMap[$ayah] ?? $this->provider->getAyahTranslation($surahNumber, $ayah);
             }
             $combinedText = implode(' ', array_filter($texts));
 

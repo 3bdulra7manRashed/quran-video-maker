@@ -35,6 +35,19 @@ class GenerateVideoJob implements ShouldQueue
             'surah' => $this->renderJob->surah_number,
         ]);
 
+        // Check if cancelled while pending
+        $this->renderJob->refresh();
+        if ($this->renderJob->isCancelled() || $this->renderJob->isCancelling()) {
+            Log::info("[GenerateVideoJob] Job {$this->renderJob->uuid} was cancelled before starting. Exiting immediately.");
+            $this->renderJob->update([
+                'status' => 'cancelled',
+                'progress' => 0,
+                'finished_at' => now(),
+                'completed_at' => now(),
+            ]);
+            return;
+        }
+
         $this->renderJob->update([
             'status' => 'processing',
             'started_at' => now(),
@@ -56,7 +69,8 @@ class GenerateVideoJob implements ShouldQueue
                 $this->renderJob->layout ?? 'reels',
                 $this->renderJob->max_lines ?? 1,
                 (bool) ($this->renderJob->with_translation ?? false),
-                $this->renderJob->translation_source ?? 'sahih_international'
+                $this->renderJob->translation_source ?? 'sahih_international',
+                $this->renderJob
             );
 
             // Probe duration via ffprobe
@@ -91,6 +105,29 @@ class GenerateVideoJob implements ShouldQueue
             Log::info("[GenerateVideoJob] Successfully completed video render job", [
                 'uuid' => $this->renderJob->uuid,
                 'output' => $outputPath,
+            ]);
+
+        } catch (\App\Modules\Rendering\Exceptions\RenderCancelledException $e) {
+            Log::info("[GenerateVideoJob] Cooperative cancellation caught for job {$this->renderJob->uuid}. Starting cleanup.");
+            
+            try {
+                $reciterSlug = $this->renderJob->reciter ? $this->renderJob->reciter->slug : 'yasser-al-dosari';
+                $pipeline->cleanup(
+                    $this->renderJob->surah_number,
+                    $reciterSlug,
+                    $this->renderJob->from_ayah,
+                    $this->renderJob->to_ayah,
+                    $this->renderJob->layout ?? 'reels'
+                );
+            } catch (\Throwable $cleanupEx) {
+                Log::error("[GenerateVideoJob] Cleanup failed after cancellation: " . $cleanupEx->getMessage());
+            }
+
+            $this->renderJob->update([
+                'status' => 'cancelled',
+                'progress' => 0,
+                'finished_at' => now(),
+                'completed_at' => now(),
             ]);
 
         } catch (\Throwable $e) {

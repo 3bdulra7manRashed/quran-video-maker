@@ -27,6 +27,7 @@ class RenderPipeline
     protected WordTimingResolver $timingResolver;
     protected \App\Modules\Dataset\Services\DatasetCoverageResolver $coverageResolver;
     protected \App\Modules\Rendering\Services\TranslationSegmentBuilder $translationSegmentBuilder;
+    protected \App\Modules\Rendering\Services\RenderCancellationGuard $cancellationGuard;
 
     public function __construct(
         SegmentRenderer $segmentRenderer,
@@ -38,7 +39,8 @@ class RenderPipeline
         YouTubeMushafLayoutStrategy $youtubeLayoutStrategy,
         WordTimingResolver $timingResolver,
         \App\Modules\Dataset\Services\DatasetCoverageResolver $coverageResolver,
-        \App\Modules\Rendering\Services\TranslationSegmentBuilder $translationSegmentBuilder
+        \App\Modules\Rendering\Services\TranslationSegmentBuilder $translationSegmentBuilder,
+        \App\Modules\Rendering\Services\RenderCancellationGuard $cancellationGuard
     ) {
         $this->segmentRenderer = $segmentRenderer;
         $this->videoComposer = $videoComposer;
@@ -50,6 +52,7 @@ class RenderPipeline
         $this->timingResolver = $timingResolver;
         $this->coverageResolver = $coverageResolver;
         $this->translationSegmentBuilder = $translationSegmentBuilder;
+        $this->cancellationGuard = $cancellationGuard;
     }
 
     /**
@@ -73,8 +76,11 @@ class RenderPipeline
         string $layout = 'reels',
         int $maxLines = 1,
         bool $withTranslation = false,
-        string $translationSource = 'sahih_international'
+        string $translationSource = 'sahih_international',
+        ?\App\Modules\Quran\Models\RenderJob $renderJob = null
     ): string {
+        $this->cancellationGuard->ensureNotCancelled($renderJob);
+
         Log::info("[RenderPipeline] Starting rendering pipeline", [
             'surah' => $surahNumber,
             'reciter' => $reciterSlug,
@@ -224,6 +230,9 @@ class RenderPipeline
             }
         }
 
+        // Checkpoint 1: Before segment generation
+        $this->cancellationGuard->ensureNotCancelled($renderJob);
+
         // 6. Segment the words
         $segments = $this->segmentationService->segment($words, $totalDuration, $layout, $maxLines, $reciter, $surahNumber);
         if (empty($segments)) {
@@ -264,9 +273,16 @@ class RenderPipeline
         // 7. Generate debug segment JSON file
         $this->writeDebugSegmentsJson($surahNumber, $segments, $reciterSlug, $fromAyah, $toAyah, $layout);
 
+        // Checkpoint 2: Before frame rendering starts
+        $this->cancellationGuard->ensureNotCancelled($renderJob);
+
         // 8. Render all segments as PNGs and build frame schedule
         $composerFrames = [];
-        foreach ($segments as $segment) {
+        foreach ($segments as $idx => $segment) {
+            // Checkpoint 3: Periodically during frame generation (every 5 frames)
+            if ($idx % 5 === 0) {
+                $this->cancellationGuard->ensureNotCancelled($renderJob);
+            }
             $paddedIndex = sprintf('%03d', $segment->index);
             
             $rangeDir = '';
@@ -314,6 +330,9 @@ class RenderPipeline
 
         $outputVideoPath = $this->pathResolver->videos("surah_{$surahNumber}{$suffix}.mp4");
         
+        // Checkpoint 4: Before FFmpeg finalization
+        $this->cancellationGuard->ensureNotCancelled($renderJob);
+
         $audioStartSec = $audioStartMs / 1000.0;
         $audioDurationSec = ($audioEndMs - $audioStartMs) / 1000.0;
 
@@ -327,6 +346,9 @@ class RenderPipeline
         );
 
         Log::info("[RenderPipeline] Completed video generation for Surah {$surahNumber}");
+
+        // Checkpoint 5: Before saving final outputs
+        $this->cancellationGuard->ensureNotCancelled($renderJob);
 
         return $outputVideoPath;
     }
@@ -367,5 +389,62 @@ class RenderPipeline
 
         file_put_contents($debugFile, json_encode($debugData, JSON_PRETTY_PRINT));
         Log::info("[RenderPipeline] Written segments debug log to {$debugFile}");
+    }
+
+    /**
+     * Clean up temporary frames, partial video output, and debug json logs.
+     */
+    public function cleanup(
+        int $surahNumber,
+        string $reciterSlug,
+        ?int $fromAyah = null,
+        ?int $toAyah = null,
+        string $layout = 'reels'
+    ): void {
+        Log::info("[RenderPipeline] Starting cancellation cleanup for Surah {$surahNumber}, reciter {$reciterSlug}");
+
+        $rangeDir = '';
+        if ($fromAyah !== null && $toAyah !== null) {
+            $rangeDir = ($fromAyah === $toAyah) ? "_ayah_{$fromAyah}" : "_from_{$fromAyah}_to_{$toAyah}";
+        }
+        if ($layout === 'youtube') {
+            $rangeDir .= '_youtube';
+        }
+
+        // 1. Clean up temporary frame directory
+        $segmentsDir = $this->pathResolver->renderedSegments("surah_{$surahNumber}_{$reciterSlug}{$rangeDir}");
+        if (is_dir($segmentsDir)) {
+            $files = glob($segmentsDir . '/*.png');
+            if ($files) {
+                foreach ($files as $file) {
+                    if (file_exists($file)) {
+                        unlink($file);
+                    }
+                }
+            }
+            @rmdir($segmentsDir);
+            Log::info("[RenderPipeline] Cleaned up temporary frames directory: {$segmentsDir}");
+        }
+
+        // 2. Clean up partial/final video file
+        $suffix = $reciterSlug === 'yasser-al-dosari' ? '' : "_{$reciterSlug}";
+        if ($fromAyah !== null && $toAyah !== null) {
+            $suffix .= ($fromAyah === $toAyah) ? "_ayah_{$fromAyah}" : "_from_{$fromAyah}_to_{$toAyah}";
+        }
+        if ($layout === 'youtube') {
+            $suffix .= '_youtube';
+        }
+        $outputVideoPath = $this->pathResolver->videos("surah_{$surahNumber}{$suffix}.mp4");
+        if (file_exists($outputVideoPath)) {
+            unlink($outputVideoPath);
+            Log::info("[RenderPipeline] Cleaned up video output file: {$outputVideoPath}");
+        }
+
+        // 3. Clean up debug segments json
+        $debugFile = $this->pathResolver->debug("segments/surah_{$surahNumber}{$suffix}_segments.json");
+        if (file_exists($debugFile)) {
+            unlink($debugFile);
+            Log::info("[RenderPipeline] Cleaned up debug segments json log: {$debugFile}");
+        }
     }
 }
