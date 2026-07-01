@@ -14,6 +14,8 @@ interface GenerateVideoCardProps {
   renderable: boolean;
   layout: string;
   maxLines: number;
+  withTranslation: boolean;
+  translationSource: string;
 }
 
 export default function GenerateVideoCard({
@@ -26,6 +28,8 @@ export default function GenerateVideoCard({
   renderable,
   layout,
   maxLines,
+  withTranslation,
+  translationSource,
 }: GenerateVideoCardProps) {
   const { api } = useApi();
   const router = useRouter();
@@ -47,6 +51,8 @@ export default function GenerateVideoCard({
       scope,
       layout,
       max_lines: maxLines,
+      with_translation: withTranslation,
+      translation_source: translationSource,
     };
 
     if (scope === 'single') {

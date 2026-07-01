@@ -55,6 +55,20 @@ class YouTubeMushafLayoutStrategy
                 'reciterText' => $reciterNameArabic,
             ],
             'renderUnits' => $renderUnits,
+            'translationBounds' => $this->getTranslationBounds(),
+        ];
+    }
+
+    public function getTranslationBounds(): array
+    {
+        return [
+            'y' => 860,              // Center Y coordinate of translation block (below Arabic)
+            'width' => 1200,          // Maximum wrapping width (safe margins on 1920 canvas)
+            'margin' => 360,          // Balanced safe margin bounds (centered inside 1920px canvas)
+            'fontSize' => 32,         // Elegant Georgia serif size for landscape visual hierarchy
+            'lineHeight' => 1.4,      // Comfortable line height spacing for Georgia
+            'fontPath' => base_path('fonts/georgia.ttf'), // Publication-grade Georgia font for English prose
+            'color' => [225, 225, 225], // Sharp off-white matching Reels visual style
         ];
     }
 }

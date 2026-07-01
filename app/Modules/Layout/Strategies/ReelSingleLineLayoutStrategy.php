@@ -39,12 +39,12 @@ class ReelSingleLineLayoutStrategy
     {
         return [
             'y' => 1180,              // Center Y coordinate of translation block (below Arabic at 960)
-            'width' => 800,           // More focused wrapping width to look publication-style and elegant
-            'margin' => 140,          // Safe margin bounds (centered inside 1080px canvas)
-            'fontSize' => 30,         // Georgia serif font has a larger visual footprint; 30px is very refined
-            'lineHeight' => 1.45,     // Elegant line height spacing for serif typography
+            'width' => 620,           // Reduced container width (focused translation layout)
+            'margin' => 230,          // Balanced safe margin bounds (centered inside 1080px canvas)
+            'fontSize' => 27,         // Slightly smaller Georgia serif size (down by 3px) for visual subordination
+            'lineHeight' => 1.4,      // Tighter but comfortable line height spacing for Georgia
             'fontPath' => base_path('fonts/georgia.ttf'), // Publication-grade Georgia font for English prose
-            'color' => [200, 200, 200], // Muted off-white/light-gray to establish secondary visual hierarchy
+            'color' => [225, 225, 225], // Slightly brighter off-white to enhance clarity and sharpness
         ];
     }
 }

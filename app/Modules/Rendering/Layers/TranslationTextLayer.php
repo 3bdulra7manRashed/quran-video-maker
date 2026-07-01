@@ -8,6 +8,7 @@ use App\Modules\Rendering\Domain\FrameContext;
 class TranslationTextLayer implements RenderLayerInterface
 {
     protected array $translationSegments;
+    protected array $widthCache = [];
 
     /**
      * @param \App\Modules\Rendering\Domain\TranslationSegment[] $translationSegments
@@ -117,14 +118,18 @@ class TranslationTextLayer implements RenderLayerInterface
     }
 
     /**
-     * Wrap text into lines according to maximum width.
+     * Wrap text into lines using a balanced partitioning algorithm.
      */
     protected function wrapText(string $text, float $fontSize, string $fontPath, float $maxWidth): array
     {
         $words = explode(' ', $text);
-        $lines = [];
-        $currentLine = '';
+        if (empty($words)) {
+            return [];
+        }
 
+        // 1. Run greedy wrap first to get the baseline minimum line count
+        $greedyLines = [];
+        $currentLine = '';
         foreach ($words as $word) {
             $testLine = $currentLine === '' ? $word : $currentLine . ' ' . $word;
             $bbox = imagettfbbox($fontSize, 0, $fontPath, $testLine);
@@ -134,16 +139,131 @@ class TranslationTextLayer implements RenderLayerInterface
                 $currentLine = $testLine;
             } else {
                 if ($currentLine !== '') {
-                    $lines[] = $currentLine;
+                    $greedyLines[] = $currentLine;
                 }
                 $currentLine = $word;
             }
         }
-
         if ($currentLine !== '') {
-            $lines[] = $currentLine;
+            $greedyLines[] = $currentLine;
         }
 
-        return $lines;
+        $linesCount = count($greedyLines);
+        if ($linesCount <= 1) {
+            return $greedyLines;
+        }
+
+        // 2. Clear width cache and compute optimal partition
+        $this->widthCache = [];
+        $totalWordsCount = count($words);
+        
+        $totalWidth = $this->getSliceWidth($words, 0, $totalWordsCount - 1, $fontSize, $fontPath);
+        $targetLineLength = $totalWidth / $linesCount;
+
+        $result = $this->findBestPartition(
+            $words,
+            0,
+            $totalWordsCount - 1,
+            $linesCount,
+            $fontSize,
+            $fontPath,
+            $maxWidth,
+            $targetLineLength
+        );
+
+        if ($result['penalty'] === INF || empty($result['splits'])) {
+            return $greedyLines; // Fallback to greedy if no valid partition found
+        }
+
+        // Reconstruct the lines from the split indices
+        $balancedLines = [];
+        $start = 0;
+        foreach ($result['splits'] as $splitIndex) {
+            $slice = array_slice($words, $start, $splitIndex - $start + 1);
+            $balancedLines[] = implode(' ', $slice);
+            $start = $splitIndex + 1;
+        }
+        // Last line
+        $slice = array_slice($words, $start);
+        $balancedLines[] = implode(' ', $slice);
+
+        return $balancedLines;
+    }
+
+    /**
+     * Compute and cache the visual width of a word slice.
+     */
+    protected function getSliceWidth(array $words, int $start, int $end, float $fontSize, string $fontPath): float
+    {
+        $key = $start . '_' . $end;
+        if (isset($this->widthCache[$key])) {
+            return $this->widthCache[$key];
+        }
+
+        $slice = array_slice($words, $start, $end - $start + 1);
+        $text = implode(' ', $slice);
+        $bbox = imagettfbbox($fontSize, 0, $fontPath, $text);
+        $width = abs($bbox[4] - $bbox[0]);
+        
+        $this->widthCache[$key] = $width;
+        return $width;
+    }
+
+    /**
+     * Find the best splits recursively by minimizing squared line length deviation.
+     */
+    protected function findBestPartition(
+        array $words,
+        int $start,
+        int $end,
+        int $linesCount,
+        float $fontSize,
+        string $fontPath,
+        float $maxWidth,
+        float $targetLineLength
+    ): array {
+        // Base case: 1 line remaining
+        if ($linesCount === 1) {
+            $width = $this->getSliceWidth($words, $start, $end, $fontSize, $fontPath);
+            if ($width > $maxWidth) {
+                return ['penalty' => INF, 'splits' => []];
+            }
+            $penalty = pow($width - $targetLineLength, 2);
+            return ['penalty' => $penalty, 'splits' => []];
+        }
+
+        $bestPenalty = INF;
+        $bestSplits = [];
+        
+        $minRemainingWords = $linesCount - 1;
+        
+        for ($i = $start; $i <= $end - $minRemainingWords; $i++) {
+            $firstLineWidth = $this->getSliceWidth($words, $start, $i, $fontSize, $fontPath);
+            if ($firstLineWidth > $maxWidth) {
+                break;
+            }
+            
+            $subResult = $this->findBestPartition(
+                $words,
+                $i + 1,
+                $end,
+                $linesCount - 1,
+                $fontSize,
+                $fontPath,
+                $maxWidth,
+                $targetLineLength
+            );
+            
+            if ($subResult['penalty'] !== INF) {
+                $firstLinePenalty = pow($firstLineWidth - $targetLineLength, 2);
+                $totalPenalty = $firstLinePenalty + $subResult['penalty'];
+                if ($totalPenalty < $bestPenalty) {
+                    $bestPenalty = $totalPenalty;
+                    $bestSplits = array_merge([$i], $subResult['splits']);
+                }
+            }
+        }
+        
+        return ['penalty' => $bestPenalty, 'splits' => $bestSplits];
     }
 }

@@ -155,6 +155,28 @@ export default function JobsPage() {
                   </div>
                 </div>
 
+                {/* Translation Info */}
+                <div className="bg-zinc-900/40 border border-zinc-900/30 p-2.5 rounded-xl text-2xs font-mono flex flex-col gap-1 text-zinc-400">
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-500">Translation:</span>
+                    {job.with_translation ? (
+                      <span className="text-emerald-400 font-bold">Enabled</span>
+                    ) : (
+                      <span className="text-zinc-500">Disabled</span>
+                    )}
+                  </div>
+                  {job.with_translation && (
+                    <div className="flex justify-between items-center border-t border-zinc-900/50 pt-1 mt-0.5">
+                      <span className="text-zinc-500">Source:</span>
+                      <span className="text-zinc-300 font-semibold uppercase">
+                        {job.translation_source === 'sahih_international'
+                          ? 'Sahih International'
+                          : job.translation_source || 'Unknown'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
                 {/* Progress bar */}
                 {(job.status === 'running' || job.status === 'queued' || job.status === 'completed') && (
                   <div className="flex flex-col gap-1.5 mt-1">
