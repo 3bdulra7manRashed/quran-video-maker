@@ -30,13 +30,10 @@ class ContentNormalizer
         return trim($text);
     }
 
-    /**
-     * Normalize Arabic text to contain ONLY simplified letters (no punctuation, no spaces, no non-Arabic characters) for comparison.
-     */
     public static function cleanForComparison(string $text): string
     {
-        $normalized = self::normalizeArabic($text);
-        // Keep only characters in the Arabic unicode range (0x0600 - 0x06FF), stripping all others (punctuation, space, English)
+        $normalized = self::normalizeForMatching($text);
+        // Keep only characters in the Arabic unicode range (0x0621 - 0x064A), stripping all others (punctuation, space, English)
         return preg_replace('/[^\x{0621}-\x{064A}]/u', '', $normalized);
     }
 
@@ -77,6 +74,40 @@ class ContentNormalizer
         // 4. Collapse multiple spaces
         $text = preg_replace('/\s+/', ' ', $text);
         
+        return trim($text);
+    }
+
+    /**
+     * Normalize Arabic text specifically for segment-to-word timing alignment.
+     */
+    public static function normalizeForMatching(string $text): string
+    {
+        // 1. Remove ayah numbers and digit sequences (standard, Arabic, Persian)
+        $text = preg_replace('/[0-9\x{0660}-\x{0669}\x{06F0}-\x{06F9}]+/u', '', $text);
+
+        // 2. Remove all tashkeel and Quranic combining marks
+        $text = preg_replace('/[\x{064B}-\x{065F}\x{0670}]/u', '', $text);
+        $text = preg_replace('/\p{Mn}/u', '', $text);
+
+        // 3. Remove Quranic symbols, stop marks, and small letter glyphs (e.g. small ya/waw U+06E5, U+06E6)
+        $text = preg_replace('/[۞ۭۚۖۗۘۙۛۢ\x{06DD}\x{06DE}\x{06D6}-\x{06DC}\x{06DF}-\x{06ED}]/u', '', $text);
+
+        // 4. Normalize all forms of alif to bare alif (ا)
+        $text = preg_replace('/[أإآٱ]/u', 'ا', $text);
+
+        // 5. Normalize Ya forms (ى -> ي)
+        $text = preg_replace('/ى/u', 'ي', $text);
+
+        // 6. Normalize Ta Marbutah forms (ة -> ه)
+        $text = preg_replace('/ة/u', 'ه', $text);
+
+        // 7. Remove Tatweel (ـ)
+        $text = preg_replace('/ـ/u', '', $text);
+
+        // 8. Collapse multiple spaces into one
+        $text = preg_replace('/\s+/', ' ', $text);
+
+        // 8. Trim leading and trailing spaces
         return trim($text);
     }
 }

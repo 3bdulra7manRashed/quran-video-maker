@@ -21,6 +21,8 @@
   "twoLinesPerScreen": "سطرين / شاشة",
   "includeTranslation": "تضمين الترجمة",
   "includeTranslationDesc": "تضمين الترجمة الإنجليزية",
+  "useGeneratedContent": "فرض المحتوى المولد مسبقاً",
+  "useGeneratedContentDesc": "استخدام محاذاة أجزاء الآيات المولدة مسبقاً (في حال وجودها)",
   "translationSourceLabel": "مصدر الترجمة:",
   "sahihInternational": "صحيح الدولية (إنجليزي)",
   "generateVideo": "تصدير الفيديو",

@@ -53,6 +53,9 @@ export default function ConsolePage() {
   const [withTranslation, setWithTranslation] = useState<boolean>(false);
   const [translationSource, setTranslationSource] = useState<string>('sahih_international');
 
+  // AI content states
+  const [useGeneratedContent, setUseGeneratedContent] = useState<boolean>(false);
+
   // Get max ayahs for current selection
   const maxAyahs = selectedSurah !== '' 
     ? surahs.find(s => s.number === selectedSurah)?.verses_count || 114
@@ -240,6 +243,8 @@ export default function ConsolePage() {
               onWithTranslationChange={setWithTranslation}
               translationSource={translationSource}
               onTranslationSourceChange={setTranslationSource}
+              useGeneratedContent={useGeneratedContent}
+              onUseGeneratedContentChange={setUseGeneratedContent}
             />
 
             <GenerateVideoCard
@@ -254,6 +259,7 @@ export default function ConsolePage() {
               maxLines={maxLines}
               withTranslation={withTranslation}
               translationSource={translationSource}
+              useGeneratedContent={useGeneratedContent}
             />
 
             <GenerateContentCard

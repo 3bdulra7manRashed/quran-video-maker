@@ -256,6 +256,7 @@ export class ApiService {
     errors: string[];
     warnings: string[];
     segments?: Array<{ order: number; arabic: string; translation: string; tafsir: string }>;
+    repairedJson?: string;
   }> {
     const res = await fetch(`${this.baseUrl}/api/datasets/preview-import`, {
       method: 'POST',

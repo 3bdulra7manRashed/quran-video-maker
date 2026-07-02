@@ -24,6 +24,8 @@ interface RenderOptionsProps {
   onWithTranslationChange: (val: boolean) => void;
   translationSource: string;
   onTranslationSourceChange: (source: string) => void;
+  useGeneratedContent: boolean;
+  onUseGeneratedContentChange: (val: boolean) => void;
 }
 
 export default function RenderOptions({
@@ -45,6 +47,8 @@ export default function RenderOptions({
   onWithTranslationChange,
   translationSource,
   onTranslationSourceChange,
+  useGeneratedContent,
+  onUseGeneratedContentChange,
 }: RenderOptionsProps) {
   const t = useT();
 
@@ -240,6 +244,26 @@ export default function RenderOptions({
               </select>
             </div>
           )}
+        </div>
+
+        {/* Force Generated Content Settings */}
+        <div className="border-t border-zinc-900 pt-4 flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col">
+              <label htmlFor="useGeneratedContent" className="text-xs text-zinc-300 font-semibold cursor-pointer">
+                {t('render.useGeneratedContent')}
+              </label>
+              <span className="text-[10px] text-zinc-500 font-mono">{t('render.useGeneratedContentDesc')}</span>
+            </div>
+            <input
+              id="useGeneratedContent"
+              type="checkbox"
+              disabled={disabled}
+              checked={useGeneratedContent}
+              onChange={(e) => onUseGeneratedContentChange(e.target.checked)}
+              className="w-4 h-4 accent-emerald-500 rounded bg-zinc-900 border-zinc-800 focus:ring-emerald-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            />
+          </div>
         </div>
       </div>
     </div>

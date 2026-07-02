@@ -70,7 +70,8 @@ class GenerateVideoJob implements ShouldQueue
                 $this->renderJob->max_lines ?? 1,
                 (bool) ($this->renderJob->with_translation ?? false),
                 $this->renderJob->translation_source ?? 'sahih_international',
-                $this->renderJob
+                $this->renderJob,
+                (bool) ($this->renderJob->use_generated_content ?? false)
             );
 
             // Probe duration via ffprobe

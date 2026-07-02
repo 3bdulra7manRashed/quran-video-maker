@@ -43,6 +43,7 @@ export default function GenerateContentCard({
   
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isRepaired, setIsRepaired] = useState<boolean>(false);
 
   if (layout !== 'reels' || surahNumber === '' || !reciterSlug) {
     return null;
@@ -92,6 +93,7 @@ export default function GenerateContentCard({
     setErrors([]);
     setWarnings([]);
     setSegments([]);
+    setIsRepaired(false);
 
     if (!jsonInput.trim()) {
       setErrors(['JSON input cannot be empty.']);
@@ -115,6 +117,10 @@ export default function GenerateContentCard({
       setWarnings(res.warnings || []);
       if (res.segments) {
         setSegments(res.segments);
+      }
+      if (res.repairedJson) {
+        setJsonInput(res.repairedJson);
+        setIsRepaired(true);
       }
     } catch (err: any) {
       setErrors([err.message || 'Validation request failed.']);
@@ -259,6 +265,7 @@ export default function GenerateContentCard({
           onChange={(e) => {
             setJsonInput(e.target.value);
             setIsValid(null); // Reset validation state on change
+            setIsRepaired(false);
           }}
           placeholder={t('common.contentPipeline.pasteJsonPlaceholder')}
           className="w-full h-32 bg-zinc-900/30 border border-zinc-900 focus:border-zinc-800 rounded-xl p-3 text-xs font-mono text-zinc-300 focus:outline-none resize-y"
@@ -292,6 +299,19 @@ export default function GenerateContentCard({
                 : 'bg-red-500/5 border-red-500/25 text-red-400'
             }`}>
               <span>{isValid ? '✅ JSON is Valid & Matches Official Scriptures Verbatim' : '❌ Validation Errors Found'}</span>
+            </div>
+          )}
+
+          {/* REPAIRED WARNING BANNER */}
+          {isRepaired && (
+            <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 p-3 rounded-xl flex flex-col gap-1">
+              <span className="text-xs font-bold flex items-center gap-1">
+                <span>⚠️</span> <span>Warning</span>
+              </span>
+              <p className="text-[11px] leading-relaxed">
+                AI response contained malformed quotation marks.<br />
+                The JSON was repaired automatically before validation.
+              </p>
             </div>
           )}
 

@@ -77,7 +77,8 @@ class RenderPipeline
         int $maxLines = 1,
         bool $withTranslation = false,
         string $translationSource = 'sahih_international',
-        ?\App\Modules\Quran\Models\RenderJob $renderJob = null
+        ?\App\Modules\Quran\Models\RenderJob $renderJob = null,
+        bool $useGeneratedContent = false
     ): string {
         $this->cancellationGuard->ensureNotCancelled($renderJob);
 
@@ -234,23 +235,54 @@ class RenderPipeline
         $this->cancellationGuard->ensureNotCancelled($renderJob);
 
         // 6. Segment the words
-        $resolver = app(\App\Services\ContentGeneration\ApprovedContentResolver::class);
-        $approvedSegmentsData = $resolver->resolve($reciter->id, $surahNumber, $fromAyah, $toAyah, $layout);
-
         $hasApprovedGeneratedContent = false;
         $alignedRanges = [];
-        if ($approvedSegmentsData !== null) {
-            $hasApprovedGeneratedContent = true;
-        }
 
-        if ($hasApprovedGeneratedContent) {
-            $aligner = app(\App\Services\ContentGeneration\GeneratedContentWordAligner::class);
-            $segmentBuilder = app(\App\Services\ContentGeneration\ApprovedSegmentBuilder::class);
-            
-            $alignedRanges = $aligner->align($approvedSegmentsData, $words);
-            $segments = $segmentBuilder->build($alignedRanges);
-            Log::info("[RenderPipeline] Loaded " . count($segments) . " segments from approved generated content.");
+        if ($useGeneratedContent) {
+            $resolver = app(\App\Services\ContentGeneration\ApprovedContentResolver::class);
+            $approvedSegmentsData = $resolver->resolve($reciter->id, $surahNumber, $fromAyah, $toAyah, $layout);
+
+            if ($approvedSegmentsData !== null) {
+                Log::info('RENDER SOURCE', [
+                    'source' => 'approved_generated',
+                ]);
+
+                try {
+                    $aligner = app(\App\Services\ContentGeneration\GeneratedContentWordAligner::class);
+                    $segmentBuilder = app(\App\Services\ContentGeneration\ApprovedSegmentBuilder::class);
+                    
+                    $alignedRanges = $aligner->align($approvedSegmentsData, $words);
+                    
+                    // Validate aligned ranges using ReelsSegmentValidator
+                    $reelsValidator = app(\App\Services\ContentGeneration\ReelsSegmentValidator::class);
+                    $reelsValidator->validate($alignedRanges);
+
+                    $segments = $segmentBuilder->build($alignedRanges);
+                    $hasApprovedGeneratedContent = true;
+                    Log::info("[RenderPipeline] Loaded " . count($segments) . " segments from approved generated content.");
+                } catch (\App\Services\ContentGeneration\Exceptions\MissingTimingException $e) {
+                    if (app()->environment('local', 'testing')) {
+                        throw $e;
+                    }
+                    
+                    Log::warning("[RenderPipeline] Production Fallback: Missing timings detected in approved generated content. Falling back to default segmentation.", [
+                        'message' => $e->getMessage(),
+                        'segment_order' => $e->getSegmentOrder(),
+                    ]);
+                    // Fallback to default segmentation
+                    $hasApprovedGeneratedContent = false;
+                    $segments = $this->segmentationService->segment($words, $totalDuration, $layout, $maxLines, $reciter, $surahNumber);
+                }
+            } else {
+                Log::info('RENDER SOURCE', [
+                    'source' => 'default',
+                ]);
+                $segments = $this->segmentationService->segment($words, $totalDuration, $layout, $maxLines, $reciter, $surahNumber);
+            }
         } else {
+            Log::info('RENDER SOURCE', [
+                'source' => 'default',
+            ]);
             $segments = $this->segmentationService->segment($words, $totalDuration, $layout, $maxLines, $reciter, $surahNumber);
         }
 

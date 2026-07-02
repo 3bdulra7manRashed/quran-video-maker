@@ -31,6 +31,7 @@ class DatasetRenderController
             'max_lines'          => 'sometimes|integer|min:1',
             'with_translation'   => 'sometimes|boolean',
             'translation_source' => 'sometimes|string',
+            'use_generated_content' => 'sometimes|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -71,6 +72,7 @@ class DatasetRenderController
 
         $withTranslation = (bool) $request->input('with_translation', false);
         $translationSource = $withTranslation ? $request->input('translation_source', 'sahih_international') : null;
+        $useGeneratedContent = (bool) $request->input('use_generated_content', false);
 
         // Create the RenderJob model record
         $renderJob = RenderJob::create([
@@ -84,6 +86,7 @@ class DatasetRenderController
             'progress'           => 0,
             'with_translation'   => $withTranslation,
             'translation_source' => $translationSource,
+            'use_generated_content' => $useGeneratedContent,
         ]);
 
         // Dispatch GenerateVideoJob to queue
@@ -120,6 +123,7 @@ class DatasetRenderController
             'progress'           => $job->progress,
             'with_translation'   => (bool) ($job->with_translation ?? false),
             'translation_source' => $job->translation_source,
+            'use_generated_content' => (bool) ($job->use_generated_content ?? false),
         ];
 
         if ($status === 'completed') {
@@ -167,6 +171,7 @@ class DatasetRenderController
                 'error'              => $job->error_message,
                 'with_translation'   => (bool) ($job->with_translation ?? false),
                 'translation_source' => $job->translation_source,
+                'use_generated_content' => (bool) ($job->use_generated_content ?? false),
             ];
 
             if ($status === 'completed') {

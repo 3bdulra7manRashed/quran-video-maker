@@ -21,6 +21,8 @@
   "twoLinesPerScreen": "2 Lines / screen",
   "includeTranslation": "Include Translation",
   "includeTranslationDesc": "Include English translation",
+  "useGeneratedContent": "Force Pre-generated Content",
+  "useGeneratedContentDesc": "Force pre-generated segment alignments (if they exist)",
   "translationSourceLabel": "Translation Source:",
   "sahihInternational": "Sahih International (English)",
   "generateVideo": "Generate Video",

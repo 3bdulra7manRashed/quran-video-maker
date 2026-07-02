@@ -67,17 +67,42 @@ class ContentGenerationController extends Controller
         $fromAyah = $request->input('from_ayah') ? (int)$request->input('from_ayah') : null;
         $toAyah = $request->input('to_ayah') ? (int)$request->input('to_ayah') : null;
 
+        $originalParseError = null;
+        $repaired = false;
+        $repairedJson = null;
+
         $data = json_decode($jsonStr, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            return response()->json([
-                'isValid' => false,
-                'errors' => ['Invalid JSON format: ' . json_last_error_msg()],
-                'warnings' => [],
-            ], 200);
+            $originalParseError = json_last_error_msg();
+            Log::warning("AI JSON parse failed: {$originalParseError}. Attempting repair.");
+
+            $repairService = new \App\Services\ContentGeneration\AiJsonRepairService();
+            $repairedJson = $repairService->repair($jsonStr);
+            $data = json_decode($repairedJson, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                Log::error("AI JSON repair failed: " . json_last_error_msg());
+                return response()->json([
+                    'isValid' => false,
+                    'errors' => ['Invalid JSON. The AI response is severely malformed and could not be repaired automatically.'],
+                    'warnings' => [],
+                ], 200);
+            }
+
+            Log::info("AI JSON repair succeeded.");
+            $repaired = true;
         }
 
         $result = ContentValidator::validate($data, $surahNumber, $fromAyah, $toAyah);
         
+        if ($repaired) {
+            if (!isset($result['warnings'])) {
+                $result['warnings'] = [];
+            }
+            $result['warnings'][] = 'AI response contained malformed quotation marks and was repaired automatically.';
+            $result['repairedJson'] = $repairedJson;
+        }
+
         // Normalize fields for preview visual representation
         if ($result['isValid'] && isset($data['segments'])) {
             foreach ($data['segments'] as &$seg) {
@@ -128,7 +153,14 @@ class ContentGenerationController extends Controller
 
         $data = json_decode($jsonStr, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            return response()->json(['error' => 'Invalid JSON structure.'], 400);
+            Log::warning("AI JSON parse failed in approveImport. Attempting repair.");
+            $repairService = new \App\Services\ContentGeneration\AiJsonRepairService();
+            $jsonStr = $repairService->repair($jsonStr);
+            $data = json_decode($jsonStr, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                return response()->json(['error' => 'Invalid JSON structure.'], 400);
+            }
         }
 
         $result = ContentValidator::validate($data, $surahNumber, $fromAyah, $toAyah);
