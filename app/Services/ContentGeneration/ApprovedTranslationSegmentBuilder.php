@@ -8,33 +8,30 @@ use Illuminate\Support\Collection;
 class ApprovedTranslationSegmentBuilder
 {
     /**
-     * Build TranslationSegment DTOs from approved segments and aligned ranges.
+     * Build TranslationSegment DTOs from approved segments and finalized Arabic Segment DTOs.
      *
      * @param Collection $approvedSegments Collection of ReelsGeneratedContent models.
-     * @param array $alignedRanges
+     * @param \App\Modules\Segmentation\DTO\Segment[] $segments
      * @param int $surahNumber
      * @return TranslationSegment[]
      */
-    public function build(Collection $approvedSegments, array $alignedRanges, int $surahNumber): array
+    public function build(Collection $approvedSegments, array $segments, int $surahNumber): array
     {
         $translationSegments = [];
 
-        foreach ($alignedRanges as $range) {
-            $genSeg = $approvedSegments->firstWhere('segment_order', $range['segmentOrder']);
+        foreach ($segments as $segment) {
+            $genSeg = $approvedSegments->firstWhere('segment_order', $segment->index);
             if (!$genSeg) {
                 continue;
             }
 
-            $words = $range['words'];
+            $words = $segment->words;
             $ayahNumbers = array_unique(array_map(function ($w) {
                 return $w->ayah ? $w->ayah->ayah_number : 1;
             }, $words));
 
             $fromAyah = min($ayahNumbers);
             $toAyah = max($ayahNumbers);
-
-            $startMs = $words[0]->start_ms_from_surah ?? 0;
-            $endMs = end($words)->end_ms_from_surah ?? 0;
 
             $textClean = ContentNormalizer::normalizeTranslation($genSeg->translation);
 
@@ -43,8 +40,8 @@ class ApprovedTranslationSegmentBuilder
                 $textClean,
                 $fromAyah,
                 $toAyah,
-                $startMs,
-                $endMs
+                $segment->startMs,
+                $segment->endMs
             );
         }
 

@@ -179,4 +179,67 @@ class GeneratedContentWordAlignerTest extends TestCase
             $this->assertEquals(2, $matchedWords[1]->id);
         }
     }
+
+    /**
+     * Test that trailing empty-normalized words are consumed.
+     * Database: [وَٱزْدُجِرَ, ٩, فَدَعَا]
+     * Segment: وَٱزْدُجِرَ ٩
+     * Expected: consumes [وَٱزْدُجِرَ, ٩], index points to فَدَعَا
+     */
+    public function test_trailing_empty_normalized_words_are_consumed_scenario_1(): void
+    {
+        $segments = collect([
+            $this->createSegment(1, "وَٱزْدُجِرَ ٩"),
+        ]);
+
+        $words = [
+            $this->createWord(1, "وَٱزْدُجِرَ"),
+            $this->createWord(2, "٩"),
+            $this->createWord(3, "فَدَعَا"),
+        ];
+
+        $ranges = $this->aligner->align($segments, $words);
+
+        $this->assertCount(1, $ranges);
+        $this->assertEquals(1, $ranges[0]['segmentOrder']);
+        $this->assertEquals(1, $ranges[0]['startWordId']);
+        $this->assertEquals(2, $ranges[0]['endWordId']);
+        $this->assertCount(2, $ranges[0]['words']);
+        
+        $segments2 = collect([
+            $this->createSegment(1, "وَٱزْدُجِرَ ٩"),
+            $this->createSegment(2, "فَدَعَا"),
+        ]);
+
+        $ranges2 = $this->aligner->align($segments2, $words);
+        $this->assertCount(2, $ranges2);
+        $this->assertEquals(3, $ranges2[1]['startWordId']);
+    }
+
+    /**
+     * Test that trailing empty-normalized words are consumed.
+     * Database: [فَٱنتَصِرْ, ١٠, فَفَتَحْنَا]
+     * Segment: فَٱنتَصِرْ ١٠
+     * Expected: consumes [فَٱنتَصِرْ, ١٠], index points to فَفَتَحْنَا
+     */
+    public function test_trailing_empty_normalized_words_are_consumed_scenario_2(): void
+    {
+        $segments = collect([
+            $this->createSegment(1, "فَٱنتَصِرْ ١٠"),
+            $this->createSegment(2, "فَفَتَحْنَا"),
+        ]);
+
+        $words = [
+            $this->createWord(1, "فَٱنتَصِرْ"),
+            $this->createWord(2, "١٠"),
+            $this->createWord(3, "فَفَتَحْنَا"),
+        ];
+
+        $ranges = $this->aligner->align($segments, $words);
+
+        $this->assertCount(2, $ranges);
+        $this->assertEquals(1, $ranges[0]['startWordId']);
+        $this->assertEquals(2, $ranges[0]['endWordId']);
+        $this->assertEquals(3, $ranges[1]['startWordId']);
+    }
 }

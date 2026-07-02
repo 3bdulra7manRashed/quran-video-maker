@@ -136,6 +136,51 @@ class PromptBuilder
             '{{layout_constraints}}' => $layoutConstraints,
         ];
 
-        return strtr($template, $replacements);
+        $output = strtr($template, $replacements);
+
+        $strictInstructions = <<<'PROMPT'
+
+
+## Output Format (STRICT)
+
+Return your answer as a single valid JSON object wrapped inside exactly one Markdown JSON code block.
+
+Example:
+
+```json
+{
+  "segments": [
+    {
+      "order": 1,
+      "arabic": "...",
+      "translation": "...",
+      "tafsir": "..."
+    }
+  ]
+}
+```
+
+Rules:
+
+- Return exactly one Markdown `json` code block and absolutely nothing else.
+- Do not return explanations, notes, headings, comments, markdown lists, or prose before or after the JSON.
+- All JSON keys and string values must use double quotes (`"`).
+- Escape all quotation marks inside strings correctly using `\"`.
+- Do not include trailing commas.
+- Preserve all provided Arabic, translation, and tafsir text exactly as given.
+- Do not rewrite, paraphrase, invent, summarize, or modify any text.
+- The response must be valid JSON that can be parsed directly.
+
+Before returning your answer, internally verify that:
+
+- The JSON can be parsed successfully by `JSON.parse()`.
+- All quotation marks inside strings are properly escaped.
+- All commas, brackets, and braces are syntactically valid.
+- The response contains exactly one Markdown `json` code block and absolutely nothing else.
+
+If any check fails, regenerate the entire response until it is valid.
+PROMPT;
+
+        return $output . $strictInstructions;
     }
 }

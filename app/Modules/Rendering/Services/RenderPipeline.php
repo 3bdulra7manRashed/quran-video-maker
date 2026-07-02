@@ -247,32 +247,18 @@ class RenderPipeline
                     'source' => 'approved_generated',
                 ]);
 
-                try {
-                    $aligner = app(\App\Services\ContentGeneration\GeneratedContentWordAligner::class);
-                    $segmentBuilder = app(\App\Services\ContentGeneration\ApprovedSegmentBuilder::class);
-                    
-                    $alignedRanges = $aligner->align($approvedSegmentsData, $words);
-                    
-                    // Validate aligned ranges using ReelsSegmentValidator
-                    $reelsValidator = app(\App\Services\ContentGeneration\ReelsSegmentValidator::class);
-                    $reelsValidator->validate($alignedRanges);
+                $aligner = app(\App\Services\ContentGeneration\GeneratedContentWordAligner::class);
+                $segmentBuilder = app(\App\Services\ContentGeneration\ApprovedSegmentBuilder::class);
+                
+                $alignedRanges = $aligner->align($approvedSegmentsData, $words);
+                
+                // Validate aligned ranges using ReelsSegmentValidator
+                $reelsValidator = app(\App\Services\ContentGeneration\ReelsSegmentValidator::class);
+                $reelsValidator->validate($alignedRanges);
 
-                    $segments = $segmentBuilder->build($alignedRanges);
-                    $hasApprovedGeneratedContent = true;
-                    Log::info("[RenderPipeline] Loaded " . count($segments) . " segments from approved generated content.");
-                } catch (\App\Services\ContentGeneration\Exceptions\MissingTimingException $e) {
-                    if (app()->environment('local', 'testing')) {
-                        throw $e;
-                    }
-                    
-                    Log::warning("[RenderPipeline] Production Fallback: Missing timings detected in approved generated content. Falling back to default segmentation.", [
-                        'message' => $e->getMessage(),
-                        'segment_order' => $e->getSegmentOrder(),
-                    ]);
-                    // Fallback to default segmentation
-                    $hasApprovedGeneratedContent = false;
-                    $segments = $this->segmentationService->segment($words, $totalDuration, $layout, $maxLines, $reciter, $surahNumber);
-                }
+                $segments = $segmentBuilder->build($alignedRanges, $audioEndMs);
+                $hasApprovedGeneratedContent = true;
+                Log::info("[RenderPipeline] Loaded " . count($segments) . " segments from approved generated content.");
             } else {
                 Log::info('RENDER SOURCE', [
                     'source' => 'default',
@@ -295,7 +281,7 @@ class RenderPipeline
         if ($withTranslation) {
             if ($hasApprovedGeneratedContent) {
                 $approvedTranslationBuilder = app(\App\Services\ContentGeneration\ApprovedTranslationSegmentBuilder::class);
-                $translationSegments = $approvedTranslationBuilder->build($approvedSegmentsData, $alignedRanges, $surahNumber);
+                $translationSegments = $approvedTranslationBuilder->build($approvedSegmentsData, $segments, $surahNumber);
             } else {
                 $translationSegments = $this->translationSegmentBuilder->build($segments, $surahNumber);
             }

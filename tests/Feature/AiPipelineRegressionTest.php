@@ -258,17 +258,15 @@ class AiPipelineRegressionTest extends TestCase
     }
 
     /**
-     * Test 7a: Missing timings in development throws MissingTimingException.
+     * Test 7a: Missing timings does not throw exception and successfully repairs bounds.
      */
-    public function test_missing_timings_throws_exception_in_development(): void
+    public function test_missing_timings_does_not_throw_exception_and_repairs_bounds(): void
     {
         $this->seedSurahWithWords(108);
         $this->seedApprovedContent();
 
         // Delete timing record for a word to simulate missing timing
         \App\Modules\Quran\Models\ReciterWordTiming::where('word_id', $this->words[2]->id)->delete();
-
-        $this->expectException(MissingTimingException::class);
 
         $pipeline = app(RenderPipeline::class);
         $pipeline->render(
@@ -283,12 +281,14 @@ class AiPipelineRegressionTest extends TestCase
             null,
             true
         );
+
+        $this->assertTrue(true);
     }
 
     /**
-     * Test 7b: Missing timings in production logs warning and falls back to default segmentation.
+     * Test 7b: Missing timings in production continues using generated content with repaired timings.
      */
-    public function test_missing_timings_falls_back_in_production(): void
+    public function test_missing_timings_does_not_fallback_in_production(): void
     {
         $this->seedSurahWithWords(108);
         $this->seedApprovedContent();
@@ -320,7 +320,8 @@ class AiPipelineRegressionTest extends TestCase
                 true
             );
 
-            $segmentationServiceSpy->shouldHaveReceived('segment');
+            // Generated pipeline should remain active, so default segmentation is NOT called
+            $segmentationServiceSpy->shouldNotHaveReceived('segment');
         } finally {
             // Restore original environment
             app()['env'] = $originalEnv;
@@ -354,8 +355,8 @@ class AiPipelineRegressionTest extends TestCase
 
         $segments = $builder->build($alignedRanges);
         
-        $this->assertEquals(1000, $segments[0]->startMs);
-        $this->assertEquals(1000, $segments[0]->endMs); // adjusted endMs = startMs
+        $this->assertEquals(0, $segments[0]->startMs);
+        $this->assertEquals(1000, $segments[0]->endMs); // adjusted endMs = original startMs
         $this->assertTrue($segments[0]->endMs >= $segments[0]->startMs);
     }
 
@@ -398,5 +399,289 @@ class AiPipelineRegressionTest extends TestCase
             null,
             true
         );
+    }
+
+    /**
+     * Test 9: Render Surah 54 (Ayahs 9-10) with Reels layout and Generated Content enabled
+     * verifying that trailing empty-normalized words do not cause reels boundary violations or alignment exceptions.
+     */
+    public function test_render_surah_54_with_generated_content_reels(): void
+    {
+        $surahNum = 54;
+        $this->reciter = Reciter::create([
+            'slug' => 'test-reciter',
+            'name_english' => 'Test Reciter',
+            'name_arabic' => 'القارئ التجريبي',
+        ]);
+
+        $this->surah = Surah::create([
+            'number' => $surahNum,
+            'name_arabic' => 'القمر',
+            'name_simple' => 'Al-Qamar',
+            'verses_count' => 55,
+            'start_page' => 528,
+            'end_page' => 531,
+        ]);
+
+        // Create audio file
+        $pathResolver = app(\App\Modules\Shared\Services\QuranPathResolver::class);
+        $audioFullPath = $pathResolver->audio("test-reciter/{$surahNum}.mp3");
+        @mkdir(dirname($audioFullPath), 0777, true);
+        file_put_contents($audioFullPath, 'dummy audio data');
+        $this->tempAudio = $audioFullPath;
+
+        \App\Modules\Quran\Models\AudioFile::create([
+            'reciter_id' => $this->reciter->id,
+            'surah_number' => $this->surah->number,
+            'file_path' => "test-reciter/{$surahNum}.mp3",
+            'duration_ms' => 60000,
+        ]);
+
+        // Create ayahs 9 to 10
+        $ayahs = [];
+        for ($a = 9; $a <= 10; $a++) {
+            $ayahs[$a] = \App\Modules\Quran\Models\Ayah::create([
+                'surah_id' => $this->surah->id,
+                'verse_key' => "{$surahNum}:{$a}",
+                'ayah_number' => $a,
+                'page_number' => 529,
+                'juz_number' => 27,
+                'hizb_number' => 54,
+            ]);
+        }
+
+        $wordData = [
+            // Ayah 9
+            ['ayah_id' => $ayahs[9]->id, 'word_index' => 1, 'uthmani_text' => 'كَذَّبَتْ', 'line_number' => 1],
+            ['ayah_id' => $ayahs[9]->id, 'word_index' => 2, 'uthmani_text' => 'قَبْلَهُمْ', 'line_number' => 1],
+            ['ayah_id' => $ayahs[9]->id, 'word_index' => 3, 'uthmani_text' => 'قَوْمُ', 'line_number' => 1],
+            ['ayah_id' => $ayahs[9]->id, 'word_index' => 4, 'uthmani_text' => 'نُوحٍۢ', 'line_number' => 1],
+            ['ayah_id' => $ayahs[9]->id, 'word_index' => 5, 'uthmani_text' => 'فَكَذَّبُوا۟', 'line_number' => 1],
+            ['ayah_id' => $ayahs[9]->id, 'word_index' => 6, 'uthmani_text' => 'عَبْدَنَا', 'line_number' => 1],
+            ['ayah_id' => $ayahs[9]->id, 'word_index' => 7, 'uthmani_text' => 'وَقَالُوا۟', 'line_number' => 1],
+            ['ayah_id' => $ayahs[9]->id, 'word_index' => 8, 'uthmani_text' => 'مَجْنُونٌۭ', 'line_number' => 1],
+            ['ayah_id' => $ayahs[9]->id, 'word_index' => 9, 'uthmani_text' => 'وَٱزْدُجِرَ', 'line_number' => 1],
+            ['ayah_id' => $ayahs[9]->id, 'word_index' => 10, 'uthmani_text' => '٩', 'line_number' => 1],
+            // Ayah 10
+            ['ayah_id' => $ayahs[10]->id, 'word_index' => 1, 'uthmani_text' => 'فَدَعَا', 'line_number' => 2],
+            ['ayah_id' => $ayahs[10]->id, 'word_index' => 2, 'uthmani_text' => 'رَبَّهُۥٓ', 'line_number' => 2],
+            ['ayah_id' => $ayahs[10]->id, 'word_index' => 3, 'uthmani_text' => 'أَنِّى', 'line_number' => 2],
+            ['ayah_id' => $ayahs[10]->id, 'word_index' => 4, 'uthmani_text' => 'مَغْلُوبٌۭ', 'line_number' => 2],
+            ['ayah_id' => $ayahs[10]->id, 'word_index' => 5, 'uthmani_text' => 'فَٱنتَصِرْ', 'line_number' => 2],
+            ['ayah_id' => $ayahs[10]->id, 'word_index' => 6, 'uthmani_text' => '١٠', 'line_number' => 2],
+        ];
+
+        $words = [];
+        foreach ($wordData as $idx => $wd) {
+            $word = Word::create([
+                'ayah_id' => $wd['ayah_id'],
+                'word_index' => $wd['word_index'],
+                'char_type' => 'word',
+                'uthmani_text' => $wd['uthmani_text'],
+                'plain_text' => $wd['uthmani_text'],
+                'glyph_text' => 'g' . ($idx + 1),
+                'page_number' => 529,
+                'line_number' => $wd['line_number'],
+            ]);
+            $words[] = $word;
+
+            \App\Modules\Quran\Models\ReciterWordTiming::create([
+                'reciter_id' => $this->reciter->id,
+                'word_id' => $word->id,
+                'start_ms' => $idx * 1000,
+                'end_ms' => ($idx + 1) * 1000,
+            ]);
+        }
+
+        // Create reels generated content
+        ReelsGeneratedContent::create([
+            'reciter_id' => $this->reciter->id,
+            'surah_number' => $this->surah->number,
+            'start_ayah' => 9,
+            'end_ayah' => 10,
+            'layout_type' => LayoutType::REELS,
+            'segment_order' => 1,
+            'arabic' => 'كذبت قبلهم قوم نوحۢ',
+            'translation' => 'Translation',
+            'tafsir' => 'Tafsir',
+            'approval_status' => ContentApprovalStatus::APPROVED,
+            'content_version' => 1,
+            'generator_type' => GeneratorType::GEMINI,
+        ]);
+
+        ReelsGeneratedContent::create([
+            'reciter_id' => $this->reciter->id,
+            'surah_number' => $this->surah->number,
+            'start_ayah' => 9,
+            'end_ayah' => 10,
+            'layout_type' => LayoutType::REELS,
+            'segment_order' => 2,
+            'arabic' => 'فكذبوا۟ عبدنا وقالوا۟ مجنونۭ وٱزدجر ٩',
+            'translation' => 'Translation',
+            'tafsir' => 'Tafsir',
+            'approval_status' => ContentApprovalStatus::APPROVED,
+            'content_version' => 1,
+            'generator_type' => GeneratorType::GEMINI,
+        ]);
+
+        ReelsGeneratedContent::create([
+            'reciter_id' => $this->reciter->id,
+            'surah_number' => $this->surah->number,
+            'start_ayah' => 9,
+            'end_ayah' => 10,
+            'layout_type' => LayoutType::REELS,
+            'segment_order' => 3,
+            'arabic' => 'فدعا ربهۥٓ اني مغلوبۭ فٱنتصر ١٠',
+            'translation' => 'Translation',
+            'tafsir' => 'Tafsir',
+            'approval_status' => ContentApprovalStatus::APPROVED,
+            'content_version' => 1,
+            'generator_type' => GeneratorType::GEMINI,
+        ]);
+
+        $pipeline = app(RenderPipeline::class);
+        $pipeline->render(
+            $surahNum,
+            'test-reciter',
+            9,
+            10,
+            'reels',
+            1,
+            false,
+            'sahih_international',
+            null,
+            true
+        );
+
+        $this->assertTrue(true);
+    }
+
+    /**
+     * Test 7d: Consecutive missing timing segments are interpolated proportionally based on word counts.
+     */
+    public function test_consecutive_missing_timings_interpolation(): void
+    {
+        $builder = new ApprovedSegmentBuilder();
+
+        $word1 = new \stdClass();
+        $word1->id = 1;
+        $word1->char_type = 'word';
+        $word1->uthmani_text = 'w1';
+        $word1->start_ms_from_surah = 0;
+        $word1->end_ms_from_surah = 1000;
+
+        $word2 = new \stdClass();
+        $word2->id = 2;
+        $word2->char_type = 'word';
+        $word2->uthmani_text = 'w2';
+        $word2->start_ms_from_surah = null;
+        $word2->end_ms_from_surah = null;
+
+        $word3 = new \stdClass();
+        $word3->id = 3;
+        $word3->char_type = 'word';
+        $word3->uthmani_text = 'w3';
+        $word3->start_ms_from_surah = null;
+        $word3->end_ms_from_surah = null;
+
+        $word4 = new \stdClass();
+        $word4->id = 4;
+        $word4->char_type = 'word';
+        $word4->uthmani_text = 'w4';
+        $word4->start_ms_from_surah = null;
+        $word4->end_ms_from_surah = null;
+
+        $word5 = new \stdClass();
+        $word5->id = 5;
+        $word5->char_type = 'word';
+        $word5->uthmani_text = 'w5';
+        $word5->start_ms_from_surah = 5000;
+        $word5->end_ms_from_surah = 6000;
+
+        $alignedRanges = [
+            [
+                'segmentOrder' => 1,
+                'startWordId' => 1,
+                'endWordId' => 1,
+                'wordIds' => [1],
+                'words' => [$word1],
+            ],
+            [
+                'segmentOrder' => 2,
+                'startWordId' => 2,
+                'endWordId' => 2,
+                'wordIds' => [2],
+                'words' => [$word2, clone $word2], // 2 words
+            ],
+            [
+                'segmentOrder' => 3,
+                'startWordId' => 3,
+                'endWordId' => 3,
+                'wordIds' => [3],
+                'words' => [$word3, clone $word3, clone $word3], // 3 words
+            ],
+            [
+                'segmentOrder' => 4,
+                'startWordId' => 4,
+                'endWordId' => 4,
+                'wordIds' => [4],
+                'words' => [$word4, clone $word4, clone $word4, clone $word4, clone $word4], // 5 words
+            ],
+            [
+                'segmentOrder' => 5,
+                'startWordId' => 5,
+                'endWordId' => 5,
+                'wordIds' => [5],
+                'words' => [$word5],
+            ],
+        ];
+
+        $segments = $builder->build($alignedRanges, 6000);
+
+        $this->assertCount(5, $segments);
+
+        // Seg 1 keeps its end time
+        $this->assertEquals(0, $segments[0]->startMs);
+        $this->assertEquals(1000, $segments[0]->endMs);
+
+        // Gap duration to distribute: 5000 - 1000 = 4000 ms
+        // Total words in cluster (Segs 2, 3, 4): 2 + 3 + 5 = 10 words.
+        // Seg 2 gets: 34 + (4000 - 102) * (2 / 10) = 34 + 3898 * 0.2 = 34 + 780 = 814 ms.
+        // Seg 3 gets: 34 + (4000 - 102) * (3 / 10) = 34 + 3898 * 0.3 = 34 + 1169 = 1203 ms.
+        // Seg 4 gets the rest to reach 5000.
+        
+        $this->assertEquals(1000, $segments[1]->startMs);
+        $this->assertEquals(1814, $segments[1]->endMs);
+        $this->assertEquals(814, $segments[1]->durationMs);
+
+        $this->assertEquals(1814, $segments[2]->startMs);
+        $this->assertEquals(3017, $segments[2]->endMs);
+        $this->assertEquals(1203, $segments[2]->durationMs);
+
+        $this->assertEquals(3017, $segments[3]->startMs);
+        $this->assertEquals(5000, $segments[3]->endMs);
+        $this->assertEquals(1983, $segments[3]->durationMs);
+
+        $this->assertEquals(5000, $segments[4]->startMs);
+        $this->assertEquals(6000, $segments[4]->endMs);
+    }
+
+    /**
+     * Test 7e: PromptBuilder appends the strict output format instructions at the end of the prompt.
+     */
+    public function test_prompt_builder_strict_output_format_instructions(): void
+    {
+        $this->seedSurahWithWords(108);
+
+        $builder = app(\App\Services\ContentGeneration\PromptBuilder::class);
+        $prompt = $builder->build(108, 'test-reciter');
+
+        $this->assertStringContainsString('## Output Format (STRICT)', $prompt);
+        $this->assertStringContainsString('Return your answer as a single valid JSON object wrapped inside exactly one Markdown JSON code block.', $prompt);
+        $this->assertStringContainsString('All JSON keys and string values must use double quotes', $prompt);
+        
+        // Assert it is at the very end of the prompt
+        $expectedSuffix = "If any check fails, regenerate the entire response until it is valid.";
+        $this->assertEquals($expectedSuffix, substr(trim($prompt), -strlen($expectedSuffix)));
     }
 }

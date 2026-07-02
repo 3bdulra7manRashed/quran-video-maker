@@ -49,6 +49,18 @@ class GeneratedContentWordAligner
                 $currentIndex++;
 
                 if ($currentMatch === $normSegmentClean) {
+                    // Consume subsequent database words that normalize to empty (like digits/ayah ornaments)
+                    while ($currentIndex < $wordCount) {
+                        $nextWord = $words[$currentIndex];
+                        $nextNorm = ContentNormalizer::normalizeForMatching($nextWord->uthmani_text);
+                        $nextClean = preg_replace('/\s+/u', '', $nextNorm);
+                        if ($nextClean === '') {
+                            $matchedWords[] = $nextWord;
+                            $currentIndex++;
+                        } else {
+                            break;
+                        }
+                    }
                     break;
                 }
 
