@@ -9,9 +9,11 @@ import DatasetStatusCard from '@/components/DatasetStatusCard';
 import DatasetActions from '@/components/DatasetActions';
 import RenderOptions, { RenderScope } from '@/components/RenderOptions';
 import GenerateVideoCard from '@/components/GenerateVideoCard';
+import { useT } from '@/hooks/useT';
 
 export default function ConsolePage() {
   const { api, apiUrl } = useApi();
+  const t = useT();
 
   const [reciters, setReciters] = useState<Reciter[]>([]);
   const [surahs, setSurahs] = useState<Surah[]>([]);
@@ -68,7 +70,7 @@ export default function ConsolePage() {
         setReciters(reciterList);
         setSurahs(surahList);
       } catch (err: any) {
-        setErrorMsg('Failed to connect to backend server. Make sure API is running.');
+        setErrorMsg(t('common.errorConnectBackend'));
         console.error(err);
       } finally {
         setLoadingPrereqs(false);
@@ -172,11 +174,10 @@ export default function ConsolePage() {
       {/* Title */}
       <div className="border-b border-zinc-900 pb-4">
         <h1 className="text-2xl font-extrabold text-zinc-150 flex items-center justify-between">
-          <span>Dataset & Render Console</span>
-          <span className="text-sm text-zinc-500 font-mono">لوحة تحكم رندر وبيانات القرآن</span>
+          <span>{t('render.pageTitle')}</span>
         </h1>
         <p className="text-xs text-zinc-500 mt-1">
-          Internal developer dashboard for checking dataset states, downloading assets, and previewing render configurations.
+          {t('render.pageDescription')}
         </p>
       </div>
 
@@ -187,7 +188,7 @@ export default function ConsolePage() {
             onClick={() => window.location.reload()} 
             className="bg-zinc-900 border border-zinc-800 px-2 py-1 rounded text-xs text-zinc-300 hover:text-zinc-100"
           >
-            Retry Connection
+            {t('common.retryConnection')}
           </button>
         </div>
       )}
@@ -195,14 +196,14 @@ export default function ConsolePage() {
       {loadingPrereqs ? (
         <div className="flex flex-col items-center justify-center min-h-[30vh]">
           <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-xs text-zinc-500 mt-3 font-mono">Connecting to API...</span>
+          <span className="text-xs text-zinc-500 mt-3 font-mono">{t('common.connectingToApi')}</span>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left panel: selection & config */}
           <div className="lg:col-span-7 flex flex-col gap-6">
             <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 flex flex-col gap-5 shadow-2xl">
-              <h3 className="font-semibold text-zinc-200 border-b border-zinc-900 pb-2">Target Selection</h3>
+              <h3 className="font-semibold text-zinc-200 border-b border-zinc-900 pb-2">{t('render.targetSelection')}</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <ReciterSelect
                   reciters={reciters}

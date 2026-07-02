@@ -3,9 +3,13 @@
 import React, { useEffect, useState } from 'react';
 import { useApi } from '@/context/ApiContext';
 import { RenderJobDetails } from '@/services/api';
+import { useLanguage } from '@/hooks/useLanguage';
+import { useT } from '@/hooks/useT';
 
 export default function JobsPage() {
   const { api } = useApi();
+  const { language } = useLanguage();
+  const t = useT();
 
   const [jobs, setJobs] = useState<RenderJobDetails[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,7 +26,7 @@ export default function JobsPage() {
       setErrorMsg(null);
     } catch (err) {
       console.error('Failed to load render jobs:', err);
-      setErrorMsg('Failed to load jobs from API.');
+      setErrorMsg(t('jobs.failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -35,7 +39,7 @@ export default function JobsPage() {
       await loadJobs();
     } catch (err: any) {
       console.error('Failed to cancel job:', err);
-      alert(err.message || 'Failed to cancel render job.');
+      alert(err.message || t('jobs.failedToCancel'));
     }
   };
 
@@ -52,12 +56,12 @@ export default function JobsPage() {
 
   const formatScope = (job: RenderJobDetails) => {
     if (job.from_ayah === null || job.to_ayah === null) {
-      return 'Full Surah (السورة كاملة)';
+      return t('jobs.fullSurah');
     }
     if (job.from_ayah === job.to_ayah) {
-      return `Ayah ${job.from_ayah} (الآية ${job.from_ayah})`;
+      return t('jobs.ayahLabel', { number: job.from_ayah });
     }
-    return `Ayahs ${job.from_ayah} → ${job.to_ayah} (الآيات ${job.from_ayah} - ${job.to_ayah})`;
+    return t('jobs.ayahsRange', { from: job.from_ayah, to: job.to_ayah });
   };
 
   const getStatusBadge = (status: string) => {
@@ -65,38 +69,38 @@ export default function JobsPage() {
       case 'completed':
         return (
           <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-            Completed (مكتمل)
+            {t('common.status.completed')}
           </span>
         );
       case 'failed':
         return (
           <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-red-500/10 text-red-400 border border-red-500/20">
-            Failed (فشل)
+            {t('common.status.failed')}
           </span>
         );
       case 'running':
         return (
           <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 animate-pulse">
-            Running (جاري العمل)
+            {t('common.status.running')}
           </span>
         );
       case 'cancelling':
         return (
           <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse">
-            Cancelling... (جاري الإلغاء)
+            {t('common.status.cancelling')}
           </span>
         );
       case 'cancelled':
         return (
           <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-zinc-800 text-zinc-500 border border-zinc-700/50">
-            Cancelled (ملغى)
+            {t('common.status.cancelled')}
           </span>
         );
       case 'queued':
       default:
         return (
           <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-zinc-800 text-zinc-400 border border-zinc-700">
-            Queued (في الانتظار)
+            {t('common.status.queued')}
           </span>
         );
     }
@@ -107,11 +111,10 @@ export default function JobsPage() {
       {/* Title */}
       <div className="border-b border-zinc-900 pb-4">
         <h1 className="text-2xl font-extrabold text-zinc-150 flex items-center justify-between">
-          <span>Render Jobs Queue</span>
-          <span className="text-sm text-zinc-500 font-mono">طابور مهام الرندر</span>
+          <span>{t('jobs.pageTitle')}</span>
         </h1>
         <p className="text-xs text-zinc-500 mt-1">
-          Monitor status of running video generation tasks in the queue and watch completed renders.
+          {t('jobs.pageDescription')}
         </p>
       </div>
 
@@ -124,16 +127,16 @@ export default function JobsPage() {
       {loading ? (
         <div className="flex flex-col items-center justify-center min-h-[30vh]">
           <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-xs text-zinc-500 mt-3 font-mono">Loading queue...</span>
+          <span className="text-xs text-zinc-500 mt-3 font-mono">{t('jobs.loadingQueue')}</span>
         </div>
       ) : jobs.length === 0 ? (
         <div className="border border-zinc-900 bg-zinc-950/40 rounded-2xl p-12 text-center flex flex-col items-center justify-center gap-3">
           <div className="w-10 h-10 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400">
             📭
           </div>
-          <h3 className="font-semibold text-zinc-350">No Render Jobs Pushed</h3>
+          <h3 className="font-semibold text-zinc-350">{t('jobs.noJobs')}</h3>
           <p className="text-xs text-zinc-500 max-w-sm">
-            Go back to the Console to select a Surah and Reciter and launch video generation.
+            {t('jobs.noJobsDescription')}
           </p>
         </div>
       ) : (
@@ -145,10 +148,10 @@ export default function JobsPage() {
             >
               {/* Glow Highlight */}
               {job.status === 'running' && (
-                <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 blur-2xl pointer-events-none rounded-full"></div>
+                <div className="absolute top-0 end-0 w-24 h-24 bg-blue-500/5 blur-2xl pointer-events-none rounded-full"></div>
               )}
               {job.status === 'completed' && (
-                <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 blur-2xl pointer-events-none rounded-full"></div>
+                <div className="absolute top-0 end-0 w-24 h-24 bg-emerald-500/5 blur-2xl pointer-events-none rounded-full"></div>
               )}
 
               {/* Upper Section */}
@@ -156,10 +159,10 @@ export default function JobsPage() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex flex-col">
                     <span className="text-sm font-extrabold text-zinc-200">
-                      Surah {job.surah} (سورة {job.surah})
+                      {t('jobs.surahLabel', { number: job.surah })}
                     </span>
                     <span className="text-xs text-zinc-500 font-mono mt-0.5">
-                      Reciter: {job.reciter_ar} ({job.reciter})
+                      {t('jobs.reciterLabel', { name: language === 'ar' ? job.reciter_ar : job.reciter })}
                     </span>
                   </div>
                   {getStatusBadge(job.status)}
@@ -167,33 +170,33 @@ export default function JobsPage() {
 
                 <div className="flex gap-2 text-2xs font-mono">
                   <div className="bg-zinc-900/65 border border-zinc-900/40 px-3 py-2 rounded-xl font-semibold flex-1 text-center text-zinc-350">
-                    Scope: {formatScope(job)}
+                    {t('jobs.scope')}: {formatScope(job)}
                   </div>
                   <div className={`px-3 py-2 rounded-xl font-bold flex-1 text-center border uppercase ${
                     job.layout === 'youtube'
                       ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
                       : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                   }`}>
-                    {job.layout === 'youtube' ? `YouTube (${job.max_lines ?? 1}L)` : 'Reels'}
+                    {job.layout === 'youtube' ? `${t('jobs.youtube')} (${job.max_lines ?? 1}L)` : t('jobs.reels')}
                   </div>
                 </div>
 
                 {/* Translation Info */}
                 <div className="bg-zinc-900/40 border border-zinc-900/30 p-2.5 rounded-xl text-2xs font-mono flex flex-col gap-1 text-zinc-400">
                   <div className="flex justify-between items-center">
-                    <span className="text-zinc-500">Translation:</span>
+                    <span className="text-zinc-500">{t('jobs.translation')}:</span>
                     {job.with_translation ? (
-                      <span className="text-emerald-400 font-bold">Enabled</span>
+                      <span className="text-emerald-400 font-bold">{t('common.enabled')}</span>
                     ) : (
-                      <span className="text-zinc-500">Disabled</span>
+                      <span className="text-zinc-500">{t('common.disabled')}</span>
                     )}
                   </div>
                   {job.with_translation && (
                     <div className="flex justify-between items-center border-t border-zinc-900/50 pt-1 mt-0.5">
-                      <span className="text-zinc-500">Source:</span>
+                      <span className="text-zinc-500">{t('jobs.source')}:</span>
                       <span className="text-zinc-300 font-semibold uppercase">
                         {job.translation_source === 'sahih_international'
-                          ? 'Sahih International'
+                          ? t('render.sahihInternational')
                           : job.translation_source || 'Unknown'}
                       </span>
                     </div>
@@ -204,7 +207,7 @@ export default function JobsPage() {
                 {(job.status === 'running' || job.status === 'queued' || job.status === 'completed' || job.status === 'cancelling') && (
                   <div className="flex flex-col gap-1.5 mt-1">
                     <div className="flex items-center justify-between text-2xs font-mono text-zinc-500">
-                      <span>Progress</span>
+                      <span>{t('jobs.progress')}</span>
                       <span>{job.progress}%</span>
                     </div>
                     <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden">
@@ -221,14 +224,14 @@ export default function JobsPage() {
                 {/* Error Banner */}
                 {job.status === 'failed' && (
                   <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-xl text-xs font-mono break-words">
-                    <strong>Error:</strong> {job.error}
+                    <strong>{t('jobs.error')}:</strong> {job.error}
                   </div>
                 )}
 
                 {/* Cancelled Banner */}
                 {job.status === 'cancelled' && (
                   <div className="bg-zinc-900/60 border border-zinc-800 text-zinc-500 p-3 rounded-xl text-xs font-mono">
-                    ℹ️ Render cancelled by user.
+                    ℹ️ {t('jobs.renderCancelledByUser')}
                   </div>
                 )}
               </div>
@@ -245,7 +248,7 @@ export default function JobsPage() {
                       onClick={() => handleCancel(job.uuid)}
                       className="bg-red-500/10 hover:bg-red-500/20 text-red-450 text-xs px-3 py-1.5 rounded-lg border border-red-500/30 transition-all font-semibold active:scale-95 cursor-pointer"
                     >
-                      Cancel Render
+                      {t('jobs.cancelRender')}
                     </button>
                   )}
 
@@ -254,7 +257,7 @@ export default function JobsPage() {
                       disabled
                       className="bg-amber-500/10 text-amber-450 text-xs px-3 py-1.5 rounded-lg border border-amber-500/20 opacity-70 cursor-not-allowed font-semibold"
                     >
-                      Cancelling...
+                      {t('jobs.cancellingButton')}
                     </button>
                   )}
 
@@ -264,26 +267,26 @@ export default function JobsPage() {
                         onClick={() => setActiveVideo({ filename: job.filename!, url: `${api.baseUrl}${job.url}` })}
                         className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs px-3 py-1.5 rounded-lg border border-emerald-500/30 transition-all font-semibold active:scale-95 cursor-pointer"
                       >
-                        Open Video
+                        {t('common.play')}
                       </button>
                       <a
                         href={`${api.baseUrl}${job.url}`}
                         download={job.filename}
                         className="bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-xs px-3 py-1.5 rounded-lg border border-zinc-800 transition-all font-semibold active:scale-95 text-center flex items-center justify-center"
                       >
-                        Download
+                        {t('common.download')}
                       </a>
                     </>
                   )}
 
-                  {/* Retry Option (Roadmap TODO Indicator) */}
+                  {/* Retry Option */}
                   {job.status === 'failed' && (
                     <button
                       disabled
                       className="bg-zinc-900 text-zinc-500 text-xs px-3 py-1.5 rounded-lg border border-zinc-800 opacity-55 cursor-not-allowed"
-                      title="Retry functionality is coming soon."
+                      title={t('jobs.retryComingSoon')}
                     >
-                      Retry (إعادة المحاولة)
+                      {t('jobs.retry')}
                     </button>
                   )}
                 </div>
@@ -320,7 +323,7 @@ export default function JobsPage() {
                 download={activeVideo.filename}
                 className="bg-emerald-500 text-black hover:bg-emerald-400 font-bold px-4 py-2 rounded-xl text-xs shadow-md transition-all active:scale-95"
               >
-                Download Video file
+                {t('jobs.downloadVideoFile')}
               </a>
             </div>
           </div>

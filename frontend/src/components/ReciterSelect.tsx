@@ -1,6 +1,7 @@
 'use client';
 
 import { Reciter } from '@/services/api';
+import { useT } from '@/hooks/useT';
 
 interface ReciterSelectProps {
   reciters: Reciter[];
@@ -10,11 +11,12 @@ interface ReciterSelectProps {
 }
 
 export default function ReciterSelect({ reciters, selectedSlug, onSelect, loading }: ReciterSelectProps) {
+  const t = useT();
+
   return (
     <div className="flex flex-col gap-2">
       <label className="text-sm font-semibold text-zinc-400 flex items-center justify-between">
-        <span>Reciter Selection</span>
-        <span className="text-xs text-zinc-500 font-normal">اختيار القارئ</span>
+        <span>{t('render.reciterSelection')}</span>
       </label>
 
       <div className="relative">
@@ -22,10 +24,10 @@ export default function ReciterSelect({ reciters, selectedSlug, onSelect, loadin
           value={selectedSlug}
           onChange={(e) => onSelect(e.target.value)}
           disabled={loading}
-          className="w-full bg-zinc-900 border border-zinc-800 text-zinc-200 px-4 py-3 rounded-xl appearance-none focus:outline-none focus:border-zinc-700 disabled:opacity-50 transition-all font-medium text-right dir-rtl"
+          className="w-full bg-zinc-900 border border-zinc-800 text-zinc-200 ps-4 pe-8 py-3 rounded-xl appearance-none focus:outline-none focus:border-zinc-700 disabled:opacity-50 transition-all font-medium text-start"
         >
           <option value="" className="text-zinc-500">
-            [ اختر القارئ / Select Reciter ]
+            {t('render.selectReciterPlaceholder')}
           </option>
           {reciters.map((r) => (
             <option key={r.slug} value={r.slug}>
@@ -33,7 +35,7 @@ export default function ReciterSelect({ reciters, selectedSlug, onSelect, loadin
             </option>
           ))}
         </select>
-        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-zinc-500">
+        <div className="absolute inset-y-0 end-3 flex items-center pointer-events-none text-zinc-500">
           ▼
         </div>
       </div>

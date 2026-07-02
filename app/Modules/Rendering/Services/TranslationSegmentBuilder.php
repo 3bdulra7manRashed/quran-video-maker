@@ -29,7 +29,11 @@ class TranslationSegmentBuilder
         $translationSegments = [];
 
         // 1. Load all translations for this Surah in a single query
-        $translationsMap = $this->provider->getAyahTranslations($surahNumber);
+        $rawTranslationsMap = $this->provider->getAyahTranslations($surahNumber);
+        $translationsMap = [];
+        foreach ($rawTranslationsMap as $ayahNumber => $text) {
+            $translationsMap[$ayahNumber] = TranslationTextCleaner::clean($text);
+        }
 
         // 2. Preload all ayahs and their spoken words for this Surah
         $ayahs = Ayah::where('surah_id', function ($q) use ($surahNumber) {
@@ -91,7 +95,7 @@ class TranslationSegmentBuilder
                     }
 
                     $ayahNumbers[] = $ayahNumber;
-                    $fullTranslationText = $translationsMap[$ayahNumber] ?? $this->provider->getAyahTranslation($surahNumber, $ayahNumber);
+                    $fullTranslationText = $translationsMap[$ayahNumber] ?? TranslationTextCleaner::clean($this->provider->getAyahTranslation($surahNumber, $ayahNumber));
 
                     $totalAyahWordCount = $totalAyahWordCountMap[$ayahRecord->id] ?? 0;
                     $segmentAyahWordCount = count($segAyahWords);
@@ -134,7 +138,7 @@ class TranslationSegmentBuilder
                     $ayah = $ayahsMap[$id] ?? null;
                     if ($ayah) {
                         $ayahNumbers[] = $ayah->ayah_number;
-                        $texts[] = $translationsMap[$ayah->ayah_number] ?? $this->provider->getAyahTranslation($surahNumber, $ayah->ayah_number);
+                        $texts[] = $translationsMap[$ayah->ayah_number] ?? TranslationTextCleaner::clean($this->provider->getAyahTranslation($surahNumber, $ayah->ayah_number));
                     }
                 }
                 sort($ayahNumbers);

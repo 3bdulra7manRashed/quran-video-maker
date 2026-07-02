@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
+import { useT } from '@/hooks/useT';
 
 interface DatasetActionsProps {
   onPrepare: () => Promise<void>;
@@ -17,6 +18,7 @@ export default function DatasetActions({
   disabled,
   refreshing,
 }: DatasetActionsProps) {
+  const t = useT();
   const audioInputRef = useRef<HTMLInputElement>(null);
   const timingsInputRef = useRef<HTMLInputElement>(null);
 
@@ -44,9 +46,9 @@ export default function DatasetActions({
     setLastAction('prepare');
     try {
       await onPrepare();
-      showMessage('Dataset prepared successfully.', 'success');
+      showMessage(t('render.prepareSuccess'), 'success');
     } catch (err: any) {
-      showMessage(err.message || 'Failed to prepare dataset.', 'error');
+      showMessage(err.message || t('render.prepareFailed'), 'error');
       setLastAction(null);
     } finally {
       setPreparing(false);
@@ -61,9 +63,9 @@ export default function DatasetActions({
     setLastAction('audio');
     try {
       await onUploadAudio(file);
-      showMessage('Audio uploaded successfully.', 'success');
+      showMessage(t('render.audioUploadSuccess'), 'success');
     } catch (err: any) {
-      showMessage(err.message || 'Failed to upload audio.', 'error');
+      showMessage(err.message || t('render.audioUploadFailed'), 'error');
       setLastAction(null);
     } finally {
       setUploadingAudio(false);
@@ -79,9 +81,9 @@ export default function DatasetActions({
     setLastAction('timings');
     try {
       await onUploadTimings(file);
-      showMessage('Manual timings imported successfully.', 'success');
+      showMessage(t('render.timingsUploadSuccess'), 'success');
     } catch (err: any) {
-      showMessage(err.message || 'Failed to upload timings.', 'error');
+      showMessage(err.message || t('render.timingsUploadFailed'), 'error');
       setLastAction(null);
     } finally {
       setUploadingTimings(false);
@@ -94,8 +96,7 @@ export default function DatasetActions({
   return (
     <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 flex flex-col gap-5 shadow-2xl">
       <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
-        <h3 className="font-semibold text-zinc-200">Dataset Actions</h3>
-        <span className="text-xs text-zinc-500 font-mono">إجراءات البيانات</span>
+        <h3 className="font-semibold text-zinc-200">{t('render.datasetActions')}</h3>
       </div>
 
       <div className="flex flex-col gap-3">
@@ -108,17 +109,17 @@ export default function DatasetActions({
           {preparing ? (
             <>
               <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
-              <span>Preparing...</span>
+              <span>{t('render.preparing')}</span>
             </>
           ) : refreshing && lastAction === 'prepare' ? (
             <>
               <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
-              <span>Refreshing...</span>
+              <span>{t('render.refreshing')}</span>
             </>
           ) : (
             <>
               <span>⚡</span>
-              <span>Prepare Dataset (تهيئة البيانات)</span>
+              <span>{t('render.prepareDataset')}</span>
             </>
           )}
         </button>
@@ -140,17 +141,17 @@ export default function DatasetActions({
             {uploadingAudio ? (
               <>
                 <div className="w-4 h-4 border-2 border-zinc-200 border-t-transparent rounded-full animate-spin"></div>
-                <span>Uploading Audio...</span>
+                <span>{t('render.uploadingAudio')}</span>
               </>
             ) : refreshing && lastAction === 'audio' ? (
               <>
                 <div className="w-4 h-4 border-2 border-zinc-200 border-t-transparent rounded-full animate-spin"></div>
-                <span>Refreshing...</span>
+                <span>{t('render.refreshing')}</span>
               </>
             ) : (
               <>
                 <span>🎵</span>
-                <span>Upload Audio (رفع الملف الصوتي)</span>
+                <span>{t('render.uploadAudio')}</span>
               </>
             )}
           </button>
@@ -173,17 +174,17 @@ export default function DatasetActions({
             {uploadingTimings ? (
               <>
                 <div className="w-4 h-4 border-2 border-zinc-200 border-t-transparent rounded-full animate-spin"></div>
-                <span>Uploading Timings...</span>
+                <span>{t('render.uploadingTimings')}</span>
               </>
             ) : refreshing && lastAction === 'timings' ? (
               <>
                 <div className="w-4 h-4 border-2 border-zinc-200 border-t-transparent rounded-full animate-spin"></div>
-                <span>Refreshing...</span>
+                <span>{t('render.refreshing')}</span>
               </>
             ) : (
               <>
                 <span>⏱️</span>
-                <span>Upload Timings (رفع ملف التوقيت)</span>
+                <span>{t('render.uploadTimings')}</span>
               </>
             )}
           </button>

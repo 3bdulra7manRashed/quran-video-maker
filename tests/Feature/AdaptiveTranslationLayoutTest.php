@@ -61,11 +61,11 @@ class AdaptiveTranslationLayoutTest extends TestCase
     public function test_constants_usage(): void
     {
         $this->assertEquals(1200, TranslationTextLayer::DEFAULT_WIDTH);
-        $this->assertEquals([1200, 1250, 1300], TranslationTextLayer::WIDTH_STEPS);
-        $this->assertEquals(54, TranslationTextLayer::DEFAULT_FONT_SIZE);
-        $this->assertEquals([54, 52, 50, 48, 46], TranslationTextLayer::FONT_STEPS);
+        $this->assertEquals([1200, 1250], TranslationTextLayer::WIDTH_STEPS);
+        $this->assertEquals(32, TranslationTextLayer::DEFAULT_FONT_SIZE);
+        $this->assertEquals([32, 30], TranslationTextLayer::FONT_STEPS);
         $this->assertEquals(2, TranslationTextLayer::MAX_TRANSLATION_LINES);
-        $this->assertEquals(46, TranslationTextLayer::MIN_FONT_SIZE);
+        $this->assertEquals(30, TranslationTextLayer::MIN_FONT_SIZE);
     }
 
     public function test_short_translation_renders_in_1_line(): void

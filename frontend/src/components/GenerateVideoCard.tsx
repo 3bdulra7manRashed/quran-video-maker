@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApi } from '@/context/ApiContext';
+import { useT } from '@/hooks/useT';
 
 interface GenerateVideoCardProps {
   surahNumber: number | '';
@@ -33,6 +34,7 @@ export default function GenerateVideoCard({
 }: GenerateVideoCardProps) {
   const { api } = useApi();
   const router = useRouter();
+  const t = useT();
 
   const [rendering, setRendering] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -66,7 +68,7 @@ export default function GenerateVideoCard({
       await api.startRender(params);
       router.push('/jobs');
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to trigger video generation.');
+      setErrorMsg(err.message || t('render.generateFailed'));
       console.error(err);
     } finally {
       setRendering(false);
@@ -75,11 +77,10 @@ export default function GenerateVideoCard({
 
   return (
     <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 flex flex-col gap-4 shadow-2xl relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-32 h-32 bg-emerald-500/5 blur-3xl pointer-events-none rounded-full"></div>
+      <div className="absolute top-0 start-0 w-32 h-32 bg-emerald-500/5 blur-3xl pointer-events-none rounded-full"></div>
 
       <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
-        <h3 className="font-semibold text-zinc-200 font-sans">Generate Video</h3>
-        <span className="text-xs text-zinc-500 font-mono">تصدير الفيديو</span>
+        <h3 className="font-semibold text-zinc-200 font-sans">{t('render.generateVideo')}</h3>
       </div>
 
       <div className="flex flex-col gap-2">
@@ -91,19 +92,19 @@ export default function GenerateVideoCard({
           {rendering ? (
             <>
               <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
-              <span>Queuing Job...</span>
+              <span>{t('render.queuingJob')}</span>
             </>
           ) : (
             <>
               <span>🎬</span>
-              <span>Generate Video (بدء التصدير)</span>
+              <span>{t('render.generateButton')}</span>
             </>
           )}
         </button>
 
         {!renderable && (
           <span className="text-[10px] text-amber-500 text-center font-mono mt-1">
-            ⚠️ Dataset is not renderable yet. Make sure audio and glyphs are available.
+            ⚠️ {t('render.datasetNotRenderable')}
           </span>
         )}
 
