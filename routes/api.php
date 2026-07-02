@@ -31,6 +31,7 @@ Route::delete('/videos/{filename}', [VideoLibraryController::class, 'destroy']);
 
 // Content Generation Pipeline API routes
 Route::get('/datasets/generate-prompt', [App\Http\Controllers\Api\ContentGenerationController::class, 'generatePrompt']);
+Route::post('/datasets/generate-mushaf-prompt', [App\Http\Controllers\Api\ContentGenerationController::class, 'generateMushafPrompt']);
 Route::post('/datasets/preview-import', [App\Http\Controllers\Api\ContentGenerationController::class, 'previewImport']);
 Route::post('/datasets/approve-import', [App\Http\Controllers\Api\ContentGenerationController::class, 'approveImport']);
 

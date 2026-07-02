@@ -16,6 +16,19 @@ class LineTimingResolver
         $this->wordTimingResolver = $wordTimingResolver;
     }
 
+    protected array $customTimings = [];
+
+    /**
+     * Inject custom line timings.
+     *
+     * @param array $customTimings
+     * @return void
+     */
+    public function setCustomTimings(array $customTimings): void
+    {
+        $this->customTimings = $customTimings;
+    }
+
     /**
      * Resolve line timings (line_number => start_ms) for a given surah/reciter.
      *
@@ -33,6 +46,31 @@ class LineTimingResolver
         float $totalDuration,
         array $lineGroups
     ): array {
+        // Case 0: Custom timing override
+        if (!empty($this->customTimings)) {
+            Log::info("[LineTimingResolver] Using custom injected line timings.");
+            $manualTimings = collect($this->customTimings);
+            $map = [];
+            foreach ($lineGroups as $idx => $group) {
+                $lineNumber = $idx + 1; // 1-indexed sequential line number in the Surah
+                
+                if (!empty($group)) {
+                    $firstWord = $group[0];
+                    $pageKey = $firstWord->page_number . ':' . $firstWord->line_number;
+                    
+                    if ($manualTimings->has($pageKey)) {
+                        $map[$lineNumber] = $manualTimings->get($pageKey)->start_ms;
+                    } else {
+                        // Fallback to 0 if missing for some reason
+                        $map[$lineNumber] = 0;
+                    }
+                } else {
+                    $map[$lineNumber] = 0;
+                }
+            }
+            return $map;
+        }
+
         // Case 1: Manual line timings
         $manualTimings = ReciterLineTiming::where('reciter_id', $reciter->id)
             ->where('surah_number', $surahNumber)

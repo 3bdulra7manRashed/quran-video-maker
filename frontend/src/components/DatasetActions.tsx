@@ -94,9 +94,9 @@ export default function DatasetActions({
   const isButtonDisabled = disabled || preparing || uploadingAudio || uploadingTimings || refreshing;
 
   return (
-    <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 flex flex-col gap-5 shadow-2xl">
-      <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
-        <h3 className="font-semibold text-zinc-200">{t('render.datasetActions')}</h3>
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col gap-4">
+      <div className="border-b border-slate-100 dark:border-slate-800/60 pb-2">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Dataset Actions</h3>
       </div>
 
       <div className="flex flex-col gap-3">
@@ -104,23 +104,14 @@ export default function DatasetActions({
         <button
           onClick={handlePrepare}
           disabled={isButtonDisabled}
-          className="w-full bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 active:scale-98 border border-emerald-500/30 font-semibold px-4 py-3 rounded-xl transition-all disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
+          className="w-full bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-semibold px-4 py-2.5 rounded-xl text-xs disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer"
         >
           {preparing ? (
-            <>
-              <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
-              <span>{t('render.preparing')}</span>
-            </>
+            <span>Preparing...</span>
           ) : refreshing && lastAction === 'prepare' ? (
-            <>
-              <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
-              <span>{t('render.refreshing')}</span>
-            </>
+            <span>Refreshing...</span>
           ) : (
-            <>
-              <span>⚡</span>
-              <span>{t('render.prepareDataset')}</span>
-            </>
+            <span>⚡ Prepare Dataset</span>
           )}
         </button>
 
@@ -136,23 +127,14 @@ export default function DatasetActions({
           <button
             onClick={() => audioInputRef.current?.click()}
             disabled={isButtonDisabled}
-            className="w-full bg-zinc-900 text-zinc-200 hover:bg-zinc-850 active:scale-98 border border-zinc-800 font-semibold px-4 py-3 rounded-xl transition-all disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 font-semibold px-4 py-2.5 rounded-xl text-xs disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer"
           >
             {uploadingAudio ? (
-              <>
-                <div className="w-4 h-4 border-2 border-zinc-200 border-t-transparent rounded-full animate-spin"></div>
-                <span>{t('render.uploadingAudio')}</span>
-              </>
+              <span>Uploading Audio...</span>
             ) : refreshing && lastAction === 'audio' ? (
-              <>
-                <div className="w-4 h-4 border-2 border-zinc-200 border-t-transparent rounded-full animate-spin"></div>
-                <span>{t('render.refreshing')}</span>
-              </>
+              <span>Refreshing...</span>
             ) : (
-              <>
-                <span>🎵</span>
-                <span>{t('render.uploadAudio')}</span>
-              </>
+              <span>🎵 Upload Audio (.mp3)</span>
             )}
           </button>
         </div>
@@ -169,23 +151,14 @@ export default function DatasetActions({
           <button
             onClick={() => timingsInputRef.current?.click()}
             disabled={isButtonDisabled}
-            className="w-full bg-zinc-900 text-zinc-200 hover:bg-zinc-850 active:scale-98 border border-zinc-800 font-semibold px-4 py-3 rounded-xl transition-all disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 font-semibold px-4 py-2.5 rounded-xl text-xs disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer"
           >
             {uploadingTimings ? (
-              <>
-                <div className="w-4 h-4 border-2 border-zinc-200 border-t-transparent rounded-full animate-spin"></div>
-                <span>{t('render.uploadingTimings')}</span>
-              </>
+              <span>Uploading Timings...</span>
             ) : refreshing && lastAction === 'timings' ? (
-              <>
-                <div className="w-4 h-4 border-2 border-zinc-200 border-t-transparent rounded-full animate-spin"></div>
-                <span>{t('render.refreshing')}</span>
-              </>
+              <span>Refreshing...</span>
             ) : (
-              <>
-                <span>⏱️</span>
-                <span>{t('render.uploadTimings')}</span>
-              </>
+              <span>⏱️ Upload Timings (.json)</span>
             )}
           </button>
         </div>
@@ -194,10 +167,10 @@ export default function DatasetActions({
       {/* Messages */}
       {message && (
         <div
-          className={`px-4 py-3 rounded-xl text-sm border font-mono animate-fade-in ${
+          className={`px-3 py-2 rounded-xl text-xs font-mono border ${
             message.type === 'success'
-              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-              : 'bg-red-500/10 text-red-400 border-red-500/20'
+              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900'
+              : 'bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-400 border-red-200 dark:border-red-900'
           }`}
         >
           {message.text}

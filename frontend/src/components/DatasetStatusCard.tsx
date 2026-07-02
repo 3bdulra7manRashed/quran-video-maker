@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { DatasetStatus } from '@/services/api';
 import { useT } from '@/hooks/useT';
 
@@ -13,10 +14,10 @@ export default function DatasetStatusCard({ status, loading }: DatasetStatusCard
 
   if (loading) {
     return (
-      <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 flex items-center justify-center min-h-[180px]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-xs text-zinc-500 font-mono">{t('render.loadingStatus')}</span>
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex items-center justify-center min-h-[180px]">
+        <div className="flex flex-col items-center gap-2">
+          <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full"></div>
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">Loading status...</span>
         </div>
       </div>
     );
@@ -24,9 +25,9 @@ export default function DatasetStatusCard({ status, loading }: DatasetStatusCard
 
   if (!status) {
     return (
-      <div className="bg-zinc-950 border border-zinc-900 border-dashed rounded-2xl p-6 flex items-center justify-center min-h-[180px] text-center">
-        <p className="text-sm text-zinc-500">
-          {t('render.selectPrompt')}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-dashed rounded-xl p-6 flex items-center justify-center min-h-[180px] text-center">
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          No reciter selected yet.
         </p>
       </div>
     );
@@ -36,77 +37,75 @@ export default function DatasetStatusCard({ status, loading }: DatasetStatusCard
     switch (mode) {
       case 'full':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-            {t('render.timingFull')} ({timed}/{total})
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900">
+            Full ({timed}/{total})
           </span>
         );
       case 'partial':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-            {t('render.timingPartial')} ({timed}/{total})
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 border border-amber-200 dark:border-amber-900">
+            Partial ({timed}/{total})
           </span>
         );
       case 'fallback':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-            {t('render.timingFallback')}
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-cyan-50 text-cyan-700 dark:bg-cyan-950/20 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-900">
+            Proportional Fallback
           </span>
         );
       case 'none':
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/20">
-            {t('render.timingNone')}
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-400 border border-red-200 dark:border-red-900">
+            None
           </span>
         );
     }
   };
 
   return (
-    <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 flex flex-col gap-5 shadow-2xl relative overflow-hidden">
-      <div className="absolute top-0 end-0 w-32 h-32 bg-emerald-500/5 blur-3xl pointer-events-none rounded-full"></div>
-      
-      <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
-        <h3 className="font-semibold text-zinc-200">{t('render.datasetStatus')}</h3>
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col gap-4">
+      <div className="border-b border-slate-100 dark:border-slate-800/60 pb-2">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Dataset Status</h3>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         {/* Glyphs */}
-        <div className="bg-zinc-900/40 border border-zinc-900/60 rounded-xl p-3 flex items-center justify-between">
-          <span className="text-sm text-zinc-400 font-medium">{t('render.glyphs')}</span>
+        <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl p-3 flex items-center justify-between">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Glyphs</span>
           {status.glyphs ? (
-            <span className="text-emerald-500 text-lg">✅</span>
+            <span className="text-emerald-500 text-sm font-bold">Available</span>
           ) : (
-            <span className="text-red-500 text-lg">❌</span>
+            <span className="text-red-500 text-sm font-bold">Missing</span>
           )}
         </div>
 
         {/* Audio */}
-        <div className="bg-zinc-900/40 border border-zinc-900/60 rounded-xl p-3 flex items-center justify-between">
-          <span className="text-sm text-zinc-400 font-medium">{t('render.audio')}</span>
+        <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl p-3 flex items-center justify-between">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Audio</span>
           {status.audio ? (
-            <span className="text-emerald-500 text-lg">✅</span>
+            <span className="text-emerald-500 text-sm font-bold">Available</span>
           ) : (
-            <span className="text-red-500 text-lg">❌</span>
+            <span className="text-red-500 text-sm font-bold">Missing</span>
           )}
         </div>
 
         {/* Timings */}
-        <div className="bg-zinc-900/40 border border-zinc-900/60 rounded-xl p-3 col-span-2 flex items-center justify-between">
-          <span className="text-sm text-zinc-400 font-medium">{t('render.timings')}</span>
+        <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl p-3 col-span-2 flex items-center justify-between">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Timings</span>
           {renderTimingMode(status.timings.mode, status.timings.timedWords, status.timings.totalWords)}
         </div>
 
         {/* Renderable */}
-        <div className="bg-zinc-900/40 border border-zinc-900/60 rounded-xl p-4 col-span-2 flex items-center justify-between border-t-2 border-t-zinc-800">
-          <span className="text-sm text-zinc-300 font-bold">{t('render.readyToRender')}</span>
+        <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl p-3 col-span-2 flex items-center justify-between">
+          <span className="text-sm text-slate-800 dark:text-slate-250 font-bold">Ready to Render</span>
           {status.renderable ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500 text-black shadow-[0_0_12px_rgba(16,185,129,0.3)]">
-              {t('render.ready')} ✅
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-bold bg-emerald-600 text-white">
+              Ready
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-zinc-850 text-zinc-400 border border-zinc-850">
-              {t('render.notReady')} ❌
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-bold bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+              Not Ready
             </span>
           )}
         </div>

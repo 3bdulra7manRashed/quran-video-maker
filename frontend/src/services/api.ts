@@ -167,6 +167,8 @@ export class ApiService {
     max_lines?: number;
     with_translation?: boolean;
     translation_source?: string;
+    use_generated_content?: boolean;
+    custom_json?: string;
   }): Promise<{ uuid: string; status: string }> {
     const res = await fetch(`${this.baseUrl}/api/renders`, {
       method: 'POST',
@@ -239,6 +241,28 @@ export class ApiService {
     if (params.to_ayah) query.append('to_ayah', String(params.to_ayah));
 
     const res = await fetch(`${this.baseUrl}/api/datasets/generate-prompt?${query}`);
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Failed to generate prompt');
+    }
+    return res.json();
+  }
+
+  async generateMushafPrompt(params: {
+    surah: number;
+    from_ayah?: number | null;
+    to_ayah?: number | null;
+    start_page: number;
+    start_line: number;
+    markers: string;
+  }): Promise<{ prompt: string }> {
+    const res = await fetch(`${this.baseUrl}/api/datasets/generate-mushaf-prompt`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    });
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
       throw new Error(errData.error || 'Failed to generate prompt');

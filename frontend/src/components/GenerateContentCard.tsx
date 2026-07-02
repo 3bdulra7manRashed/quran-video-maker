@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useApi } from '@/context/ApiContext';
 import { useT } from '@/hooks/useT';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface GenerateContentCardProps {
   surahNumber: number | '';
@@ -25,6 +26,8 @@ export default function GenerateContentCard({
 }: GenerateContentCardProps) {
   const { api } = useApi();
   const t = useT();
+  const { language } = useLanguage();
+  const isAr = language === 'ar';
 
   const [prompt, setPrompt] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
@@ -49,7 +52,6 @@ export default function GenerateContentCard({
     return null;
   }
 
-  // Resolve scope constraints for backend
   const getAyahParams = () => {
     let from_ayah: number | null = null;
     let to_ayah: number | null = null;
@@ -165,43 +167,38 @@ export default function GenerateContentCard({
   };
 
   return (
-    <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 flex flex-col gap-5 shadow-2xl relative overflow-hidden transition-all duration-300">
-      <div className="absolute top-0 end-0 w-32 h-32 bg-indigo-500/5 blur-3xl pointer-events-none rounded-full"></div>
-
-      <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
-        <h3 className="font-semibold text-zinc-200 font-sans flex items-center gap-2">
-          <span>🧠</span>
-          <span>{t('common.contentPipeline.title')}</span>
-          <span className="text-[9px] bg-zinc-800 text-zinc-400 border border-zinc-700 px-2 py-0.5 rounded-full font-mono uppercase tracking-wider">
-            Reels Layout v1.0
-          </span>
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col gap-4 font-sans">
+      <div>
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          {isAr ? 'أدوات الذكاء الاصطناعي — منشئ ريلز' : 'AI Tools — Reels Generator'}
         </h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-sans">
+          {isAr ? 'توليد المطالبات واستخدام مسارات العمل المدعومة بالذكاء الاصطناعي.' : 'Generate prompts and use AI-assisted workflows.'}
+        </p>
       </div>
 
       {/* STEP 1: PROMPT GENERATION */}
       <div className="flex flex-col gap-2">
-        <div className="flex justify-between items-center">
-          <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-            1. {t('common.contentPipeline.generatePrompt')}
-          </label>
-        </div>
+        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+          {isAr ? '1. توليد مطالبات الأجزاء' : '1. Generate Segment Prompt'}
+        </label>
         
         <div className="flex gap-2">
           <button
             type="button"
             onClick={handleGeneratePrompt}
-            className="flex-1 bg-zinc-900 hover:bg-zinc-850 text-zinc-200 border border-zinc-800 text-xs font-semibold py-2.5 px-4 rounded-xl transition-all duration-200 active:scale-98 cursor-pointer text-center"
+            className="flex-1 bg-slate-900 dark:bg-slate-100 hover:bg-slate-850 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-semibold py-2 px-4 rounded-xl text-xs cursor-pointer text-center"
           >
-            💬 Generate Segment Prompt
+            {isAr ? 'توليد المخطط' : 'Generate prompt'}
           </button>
           
           {prompt && (
             <button
               type="button"
               onClick={handleCopyPrompt}
-              className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs font-bold py-2.5 px-4 rounded-xl transition-all duration-200 active:scale-98 cursor-pointer"
+              className="bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-xl text-xs cursor-pointer"
             >
-              {copied ? `✅ ${t('common.contentPipeline.copied')}` : `📋 ${t('common.contentPipeline.copyPrompt')}`}
+              {copied ? (isAr ? 'تم النسخ' : 'Copied') : (isAr ? 'نسخ المخطط' : 'Copy prompt')}
             </button>
           )}
         </div>
@@ -210,25 +207,25 @@ export default function GenerateContentCard({
           <textarea
             readOnly
             value={prompt}
-            className="w-full h-32 bg-zinc-900/50 border border-zinc-900 rounded-xl p-3 text-[10px] font-mono text-zinc-400 focus:outline-none focus:border-zinc-800 resize-none mt-2"
+            className="w-full h-32 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-[10px] font-mono text-slate-700 dark:text-slate-400 focus:outline-none resize-none mt-2"
           />
         )}
       </div>
 
       {/* STEP 2: METADATA & PASTE JSON */}
-      <div className="flex flex-col gap-3 border-t border-zinc-900 pt-4">
-        <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-          2. Paste Generated Segment JSON
+      <div className="flex flex-col gap-3 border-t border-slate-100 dark:border-slate-800/60 pt-4">
+        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+          {isAr ? '2. لصق كود JSON للأجزاء المولد' : '2. Paste Generated Segment JSON'}
         </label>
 
         {/* METADATA INPUTS */}
         <div className="grid grid-cols-3 gap-2">
           <div className="flex flex-col gap-1">
-            <span className="text-[10px] text-zinc-500 font-medium">{t('common.contentPipeline.generatorType')}</span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{isAr ? 'النوع' : 'Type'}</span>
             <select
               value={generatorType}
               onChange={(e) => setGeneratorType(e.target.value)}
-              className="bg-zinc-900 border border-zinc-850 text-zinc-300 rounded-lg p-1.5 text-xs focus:outline-none focus:border-zinc-800"
+              className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 rounded-lg p-1.5 text-xs focus:outline-none focus:border-slate-450 dark:focus:border-slate-700"
             >
               <option value="gemini">Gemini</option>
               <option value="openai">OpenAI</option>
@@ -238,24 +235,24 @@ export default function GenerateContentCard({
           </div>
 
           <div className="flex flex-col gap-1">
-            <span className="text-[10px] text-zinc-500 font-medium">Model</span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{isAr ? 'النموذج' : 'Model'}</span>
             <input
               type="text"
               value={generatorModel}
               onChange={(e) => setGeneratorModel(e.target.value)}
               placeholder="gemini-2.5-pro"
-              className="bg-zinc-900 border border-zinc-850 text-zinc-300 rounded-lg p-1.5 text-xs focus:outline-none focus:border-zinc-800 font-mono"
+              className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 rounded-lg p-1.5 text-xs focus:outline-none focus:border-slate-450 dark:focus:border-slate-700 font-mono"
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <span className="text-[10px] text-zinc-500 font-medium">Latency (ms)</span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{isAr ? 'الاستجابة (ملي ثانية)' : 'Latency (ms)'}</span>
             <input
               type="number"
               value={latencyMs}
               onChange={(e) => setLatencyMs(e.target.value)}
               placeholder="e.g. 1500"
-              className="bg-zinc-900 border border-zinc-850 text-zinc-300 rounded-lg p-1.5 text-xs focus:outline-none focus:border-zinc-800 font-mono"
+              className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 rounded-lg p-1.5 text-xs focus:outline-none focus:border-slate-450 dark:focus:border-slate-700 font-mono"
             />
           </div>
         </div>
@@ -264,63 +261,55 @@ export default function GenerateContentCard({
           value={jsonInput}
           onChange={(e) => {
             setJsonInput(e.target.value);
-            setIsValid(null); // Reset validation state on change
+            setIsValid(null);
             setIsRepaired(false);
           }}
-          placeholder={t('common.contentPipeline.pasteJsonPlaceholder')}
-          className="w-full h-32 bg-zinc-900/30 border border-zinc-900 focus:border-zinc-800 rounded-xl p-3 text-xs font-mono text-zinc-300 focus:outline-none resize-y"
+          placeholder={isAr ? 'الصق استجابة JSON المستلمة من الذكاء الاصطناعي مباشرة هنا...' : 'Paste the JSON returned by the AI directly here...'}
+          className="w-full h-32 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 rounded-xl p-3 text-xs font-mono focus:outline-none focus:border-slate-450 dark:focus:border-slate-700 resize-y"
         />
 
         <button
           type="button"
           onClick={handleValidate}
           disabled={validating || !jsonInput.trim()}
-          className="w-full bg-zinc-900 hover:bg-zinc-850 text-zinc-200 border border-zinc-800 text-xs font-semibold py-2.5 px-4 rounded-xl transition-all duration-200 active:scale-98 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer text-center"
+          className="w-full bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-semibold py-2.5 px-4 rounded-xl text-xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer text-center"
         >
           {validating ? (
-            <div className="flex items-center justify-center gap-2">
-              <div className="w-3.5 h-3.5 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin"></div>
-              <span>{t('common.contentPipeline.validating')}</span>
-            </div>
+            <span>{isAr ? 'جاري التحقق...' : 'Validating...'}</span>
           ) : (
-            '🔍 Validate & Preview Segments'
+            isAr ? 'التحقق ومعاينة الأجزاء' : 'Validate & Preview Segments'
           )}
         </button>
       </div>
 
       {/* STEP 3: ERRORS, WARNINGS & PREVIEW */}
       {(errors.length > 0 || warnings.length > 0 || segments.length > 0 || isValid !== null) && (
-        <div className="flex flex-col gap-3 border-t border-zinc-900 pt-4 max-h-[360px] overflow-y-auto pr-1">
+        <div className="flex flex-col gap-3 border-t border-slate-100 dark:border-slate-800/60 pt-4 max-h-[360px] overflow-y-auto pr-1">
           {/* VALIDATION STATUS BANNER */}
           {isValid !== null && (
             <div className={`p-3 rounded-xl border text-xs font-medium flex items-center gap-2 ${
               isValid 
-                ? 'bg-emerald-500/5 border-emerald-500/25 text-emerald-400' 
-                : 'bg-red-500/5 border-red-500/25 text-red-400'
+                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900' 
+                : 'bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-400 border-red-200 dark:border-red-900'
             }`}>
-              <span>{isValid ? '✅ JSON is Valid & Matches Official Scriptures Verbatim' : '❌ Validation Errors Found'}</span>
+              <span>{isValid ? (isAr ? '✅ كود JSON صالح ويتطابق تمامًا مع النص القرآني' : '✅ JSON is Valid & Matches Official Scriptures Verbatim') : (isAr ? '❌ تم العثور على أخطاء أثناء التحقق' : '❌ Validation Errors Found')}</span>
             </div>
           )}
 
           {/* REPAIRED WARNING BANNER */}
           {isRepaired && (
-            <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 p-3 rounded-xl flex flex-col gap-1">
-              <span className="text-xs font-bold flex items-center gap-1">
-                <span>⚠️</span> <span>Warning</span>
-              </span>
+            <div className="bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 border border-amber-200 dark:border-amber-900 p-3 rounded-xl flex flex-col gap-1 text-xs">
+              <span className="font-bold">{isAr ? '⚠️ تنبيه' : '⚠️ Warning'}</span>
               <p className="text-[11px] leading-relaxed">
-                AI response contained malformed quotation marks.<br />
-                The JSON was repaired automatically before validation.
+                {isAr ? 'تحتوي استجابة الذكاء الاصطناعي على علامات اقتباس غير صالحة. تم إصلاح كود JSON تلقائيًا قبل التحقق.' : 'AI response contained malformed quotation marks. The JSON was repaired automatically before validation.'}
               </p>
             </div>
           )}
 
           {/* ERRORS PANEL */}
           {errors.length > 0 && (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-xl flex flex-col gap-1">
-              <span className="text-xs font-bold flex items-center gap-1">
-                <span>⚠️</span> <span>{t('common.contentPipeline.errorsFound')} ({errors.length})</span>
-              </span>
+            <div className="bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-400 border border-red-200 dark:border-red-900 p-3 rounded-xl flex flex-col gap-1 text-xs">
+              <span className="font-bold">⚠️ {t('common.contentPipeline.errorsFound')} ({errors.length})</span>
               <ul className="list-disc list-inside text-[10px] font-mono leading-relaxed mt-1">
                 {errors.map((err, i) => (
                   <li key={i}>{err}</li>
@@ -331,10 +320,8 @@ export default function GenerateContentCard({
 
           {/* WARNINGS PANEL */}
           {warnings.length > 0 && (
-            <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 p-3 rounded-xl flex flex-col gap-1">
-              <span className="text-xs font-bold flex items-center gap-1">
-                <span>⚠️</span> <span>{t('common.contentPipeline.warningsFound')} ({warnings.length})</span>
-              </span>
+            <div className="bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 border border-amber-200 dark:border-amber-900 p-3 rounded-xl flex flex-col gap-1 text-xs">
+              <span className="font-bold">⚠️ {t('common.contentPipeline.warningsFound')} ({warnings.length})</span>
               <ul className="list-disc list-inside text-[10px] font-mono leading-relaxed mt-1">
                 {warnings.map((warn, i) => (
                   <li key={i}>{warn}</li>
@@ -346,30 +333,32 @@ export default function GenerateContentCard({
           {/* PREVIEW TABLE */}
           {segments.length > 0 && (
             <div className="flex flex-col gap-2">
-              <span className="text-xs font-bold text-zinc-400">Preview Segment List</span>
-              <div className="border border-zinc-900 rounded-xl overflow-hidden text-xs">
+              <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                {isAr ? 'معاينة قائمة الأجزاء' : 'Preview Segment List'}
+              </span>
+              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden text-xs bg-white dark:bg-slate-900">
                 <table className="w-full text-start border-collapse">
                   <thead>
-                    <tr className="bg-zinc-900/60 text-zinc-400 border-b border-zinc-900 text-[10px] font-semibold uppercase tracking-wider">
-                      <th className="p-2 border-e border-zinc-900 text-center w-12">#</th>
-                      <th className="p-2 border-e border-zinc-900 text-end">Arabic Text</th>
-                      <th className="p-2 border-e border-zinc-900">Translation</th>
-                      <th className="p-2">Tafsir</th>
+                    <tr className="bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 text-[10px] font-semibold uppercase tracking-wider">
+                      <th className="p-2 border-e border-slate-200 dark:border-slate-800 text-center w-12">#</th>
+                      <th className="p-2 border-e border-slate-200 dark:border-slate-800 text-end">{isAr ? 'النص العربي' : 'Arabic Text'}</th>
+                      <th className="p-2 border-e border-slate-200 dark:border-slate-800">{isAr ? 'الترجمة' : 'Translation'}</th>
+                      <th className="p-2">{isAr ? 'التفسير' : 'Tafsir'}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {segments.map((seg) => (
-                      <tr key={seg.order} className="border-b border-zinc-900 last:border-0 hover:bg-zinc-900/20">
-                        <td className="p-2 border-e border-zinc-900 text-center font-mono font-bold text-zinc-500">
+                      <tr key={seg.order} className="border-b border-slate-200 dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-950/50">
+                        <td className="p-2 border-e border-slate-200 dark:border-slate-800 text-center font-mono font-bold text-slate-400 dark:text-slate-500">
                           {seg.order}
                         </td>
-                        <td className="p-2 border-e border-zinc-900 text-end font-sans font-semibold text-emerald-400 text-sm dir-rtl">
+                        <td className="p-2 border-e border-slate-200 dark:border-slate-800 text-end font-sans font-semibold text-emerald-600 dark:text-emerald-400 text-sm dir-rtl">
                           {seg.arabic}
                         </td>
-                        <td className="p-2 border-e border-zinc-900 text-zinc-300 leading-relaxed text-[11px]">
+                        <td className="p-2 border-e border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 leading-relaxed text-[11px]">
                           {seg.translation}
                         </td>
-                        <td className="p-2 text-zinc-400 leading-relaxed text-[11px]">
+                        <td className="p-2 text-slate-500 dark:text-slate-450 leading-relaxed text-[11px]">
                           {seg.tafsir}
                         </td>
                       </tr>
@@ -384,20 +373,17 @@ export default function GenerateContentCard({
 
       {/* STEP 4: APPROVAL */}
       {isValid === true && (
-        <div className="flex flex-col gap-3 border-t border-zinc-900 pt-4">
+        <div className="flex flex-col gap-3 border-t border-slate-100 dark:border-slate-800/60 pt-4">
           <button
             type="button"
             onClick={handleApprove}
             disabled={saving}
-            className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:bg-emerald-500 text-black font-bold py-3 px-4 rounded-xl shadow-[0_0_12px_rgba(16,185,129,0.25)] hover:shadow-[0_0_20px_rgba(16,185,129,0.45)] transition-all duration-200 active:scale-98 cursor-pointer text-center text-xs"
+            className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs cursor-pointer text-center"
           >
             {saving ? (
-              <div className="flex items-center justify-center gap-2">
-                <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
-                <span>{t('common.contentPipeline.saving')}</span>
-              </div>
+              <span>{isAr ? 'جاري الحفظ...' : 'Saving...'}</span>
             ) : (
-              `✅ ${t('common.contentPipeline.approveSave')}`
+              isAr ? 'حفظ المحتوى المعتمد' : 'Save Approved Content'
             )}
           </button>
         </div>
@@ -405,13 +391,13 @@ export default function GenerateContentCard({
 
       {/* FEEDBACK TOAST MESSAGES */}
       {statusMessage && (
-        <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-3 rounded-xl text-xs font-semibold leading-relaxed">
+        <div className="bg-emerald-50 text-emerald-750 dark:bg-emerald-950/20 dark:text-emerald-400 border border-emerald-250 dark:border-emerald-900 p-3 rounded-xl text-xs font-semibold leading-relaxed mt-3">
           {statusMessage}
         </div>
       )}
 
       {errorMessage && (
-        <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-xl text-xs font-mono leading-relaxed">
+        <div className="bg-red-50 text-red-750 dark:bg-red-950/20 dark:text-red-400 border border-red-250 dark:border-red-900 p-3 rounded-xl text-xs font-mono leading-relaxed mt-3">
           {errorMessage}
         </div>
       )}

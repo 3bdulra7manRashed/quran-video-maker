@@ -51,6 +51,36 @@ class ContentGenerationController extends Controller
     }
 
     /**
+     * Generate Mushaf line timing prompt text.
+     */
+    public function generateMushafPrompt(Request $request, \App\Services\ContentGeneration\MushafLineTimingPromptBuilder $mushafBuilder)
+    {
+        $request->validate([
+            'surah' => 'required|integer',
+            'from_ayah' => 'nullable|integer',
+            'to_ayah' => 'nullable|integer',
+            'start_page' => 'required|integer',
+            'start_line' => 'required|integer',
+            'markers' => 'required|string',
+        ]);
+
+        $surahNumber = (int)$request->input('surah');
+        $fromAyah = $request->input('from_ayah') ? (int)$request->input('from_ayah') : null;
+        $toAyah = $request->input('to_ayah') ? (int)$request->input('to_ayah') : null;
+        $startPage = (int)$request->input('start_page');
+        $startLine = (int)$request->input('start_line');
+        $markers = $request->input('markers');
+
+        try {
+            $prompt = $mushafBuilder->build($surahNumber, $fromAyah, $toAyah, $startPage, $startLine, $markers);
+            return response()->json(['prompt' => $prompt]);
+        } catch (\Exception $e) {
+            Log::error('Mushaf prompt generation failed: ' . $e->getMessage());
+            return response()->json(['error' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
      * Validate and preview JSON payload.
      */
     public function previewImport(Request $request)

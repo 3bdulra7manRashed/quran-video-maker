@@ -103,6 +103,68 @@ class RenderPipeline
             throw new RuntimeException("Reciter '{$reciterSlug}' not found in database.");
         }
 
+        // Detect and inject custom JSON timing/segment payload if present
+        if ($renderJob) {
+            $tempFile = storage_path('app/temp/custom_render_' . $renderJob->uuid . '.json');
+            if (file_exists($tempFile)) {
+                $customJsonStr = file_get_contents($tempFile);
+                $customJson = json_decode($customJsonStr, true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    // 1. If it contains segments (Reels generated content)
+                    if (isset($customJson['segments'])) {
+                        $useGeneratedContent = true;
+                        
+                        $mockResolver = new class($customJson['segments'], $reciter, $surahNumber) extends \App\Services\ContentGeneration\ApprovedContentResolver {
+                            protected array $segments;
+                            protected $reciter;
+                            protected int $surahNumber;
+                            public function __construct(array $segments, $reciter, int $surahNumber) {
+                                $this->segments = $segments;
+                                $this->reciter = $reciter;
+                                $this->surahNumber = $surahNumber;
+                            }
+                            public function resolve(int $reciterId, int $surahNumber, ?int $fromAyah = null, ?int $toAyah = null, string $layout = 'reels'): ?\Illuminate\Support\Collection {
+                                $collection = collect();
+                                foreach ($this->segments as $seg) {
+                                    $record = new \App\Modules\Quran\Models\ReelsGeneratedContent();
+                                    $record->reciter_id = $reciterId;
+                                    $record->surah_number = $this->surahNumber;
+                                    $record->segment_order = (int)$seg['order'];
+                                    $record->arabic = $seg['arabic'];
+                                    $record->translation = $seg['translation'];
+                                    $record->tafsir = $seg['tafsir'];
+                                    $collection->push($record);
+                                }
+                                return $collection;
+                            }
+                        };
+                        app()->instance(\App\Services\ContentGeneration\ApprovedContentResolver::class, $mockResolver);
+                    }
+                    
+                    // 2. If it contains lines (Mushaf Line Timings)
+                    if (isset($customJson['lines'])) {
+                        $customLineTimings = [];
+                        foreach ($customJson['lines'] as $line) {
+                            $timing = new \App\Modules\Quran\Models\ReciterLineTiming();
+                            $timing->page_number = (int)$line['page_number'];
+                            $timing->line_number = (int)$line['line_number'];
+                            $timing->start_ms = (int)$line['start'];
+                            $customLineTimings[$timing->page_number . ':' . $timing->line_number] = $timing;
+                        }
+                        $lineTimingResolver = app(LineTimingResolver::class);
+                        $lineTimingResolver->setCustomTimings($customLineTimings);
+                    }
+
+                    // 3. If it contains words (Manual Word Timings)
+                    if (isset($customJson['words'])) {
+                        $wordTimingResolver = app(WordTimingResolver::class);
+                        $wordTimingResolver->setCustomTimings($customJson['words']);
+                    }
+                }
+                @unlink($tempFile);
+            }
+        }
+
         // Validate range against resolved coverage
         $coverage = $this->coverageResolver->resolve($reciter->id, $surahNumber);
         if ($coverage !== null) {

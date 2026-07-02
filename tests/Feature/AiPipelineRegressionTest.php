@@ -680,8 +680,104 @@ class AiPipelineRegressionTest extends TestCase
         $this->assertStringContainsString('Return your answer as a single valid JSON object wrapped inside exactly one Markdown JSON code block.', $prompt);
         $this->assertStringContainsString('All JSON keys and string values must use double quotes', $prompt);
         
-        // Assert it is at the very end of the prompt
         $expectedSuffix = "If any check fails, regenerate the entire response until it is valid.";
         $this->assertEquals($expectedSuffix, substr(trim($prompt), -strlen($expectedSuffix)));
+    }
+
+    /**
+     * Test 7f: MushafLineTimingPromptBuilder builds correct prompt.
+     */
+    public function test_mushaf_line_timing_prompt_builder(): void
+    {
+        $builder = new \App\Services\ContentGeneration\MushafLineTimingPromptBuilder();
+        $prompt = $builder->build(
+            76,
+            1,
+            4,
+            578,
+            12,
+            "0:00.000\n0:12.034\n0:27.177\n0:36.596"
+        );
+
+        $this->assertStringContainsString('Surah: 76', $prompt);
+        $this->assertStringContainsString('From Ayah: 1', $prompt);
+        $this->assertStringContainsString('To Ayah: 4', $prompt);
+        $this->assertStringContainsString('Start Page: 578', $prompt);
+        $this->assertStringContainsString('Start Line: 12', $prompt);
+        $this->assertStringContainsString("0:00.000\n0:12.034\n0:27.177\n0:36.596", $prompt);
+        $this->assertStringContainsString('"type": "mushaf_lines"', $prompt);
+        $this->assertStringContainsString('Mapping Rules', $prompt);
+    }
+
+    /**
+     * Test 7g: POST /api/datasets/generate-mushaf-prompt returns generated prompt.
+     */
+    public function test_generate_mushaf_prompt_api_endpoint(): void
+    {
+        $response = $this->postJson('/api/datasets/generate-mushaf-prompt', [
+            'surah' => 76,
+            'from_ayah' => 1,
+            'to_ayah' => 4,
+            'start_page' => 578,
+            'start_line' => 12,
+            'markers' => "0:00.000\n0:12.034\n0:27.177\n0:36.596"
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure(['prompt']);
+        $prompt = $response->json('prompt');
+        $this->assertStringContainsString('Surah: 76', $prompt);
+        $this->assertStringContainsString("0:00.000\n0:12.034\n0:27.177\n0:36.596", $prompt);
+    }
+
+    /**
+     * Test 7h: POST /api/renders with custom_json overrides approved content resolver.
+     */
+    public function test_render_with_custom_json_override(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+
+        $reciter = Reciter::create([
+            'slug' => 'test-reciter-custom-json',
+            'name_english' => 'Test Reciter Custom',
+            'name_arabic' => 'القارئ التجريبي المخصص',
+        ]);
+        $surah = Surah::create([
+            'number' => 77,
+            'name_english' => 'Al-Mursalat',
+            'name_simple' => 'Al-Mursalat',
+            'name_arabic' => 'المرسلات',
+            'verses_count' => 50,
+            'start_page' => 580,
+            'end_page' => 581,
+        ]);
+
+        $customJson = json_encode([
+            'segments' => [
+                [
+                    'order' => 1,
+                    'arabic' => 'بسم الله',
+                    'translation' => 'In the name of Allah',
+                    'tafsir' => 'Tafsir text',
+                ]
+            ]
+        ]);
+
+        $response = $this->postJson('/api/renders', [
+            'reciter' => $reciter->slug,
+            'surah' => $surah->number,
+            'scope' => 'full',
+            'custom_json' => $customJson,
+        ]);
+
+        $response->assertStatus(200);
+        $uuid = $response->json('uuid');
+        $this->assertNotEmpty($uuid);
+
+        $tempFile = storage_path('app/temp/custom_render_' . $uuid . '.json');
+        $this->assertFileExists($tempFile);
+        $this->assertEquals($customJson, file_get_contents($tempFile));
+
+        @unlink($tempFile);
     }
 }

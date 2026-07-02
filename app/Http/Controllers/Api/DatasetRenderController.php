@@ -32,6 +32,7 @@ class DatasetRenderController
             'with_translation'   => 'sometimes|boolean',
             'translation_source' => 'sometimes|string',
             'use_generated_content' => 'sometimes|boolean',
+            'custom_json'        => 'sometimes|string|nullable',
         ]);
 
         if ($validator->fails()) {
@@ -73,6 +74,7 @@ class DatasetRenderController
         $withTranslation = (bool) $request->input('with_translation', false);
         $translationSource = $withTranslation ? $request->input('translation_source', 'sahih_international') : null;
         $useGeneratedContent = (bool) $request->input('use_generated_content', false);
+        $customJson = $request->input('custom_json');
 
         // Create the RenderJob model record
         $renderJob = RenderJob::create([
@@ -86,8 +88,17 @@ class DatasetRenderController
             'progress'           => 0,
             'with_translation'   => $withTranslation,
             'translation_source' => $translationSource,
-            'use_generated_content' => $useGeneratedContent,
+            'use_generated_content' => $useGeneratedContent || ($customJson !== null && trim($customJson) !== ''),
         ]);
+
+        if ($customJson !== null && trim($customJson) !== '') {
+            $tempDir = storage_path('app/temp');
+            if (!file_exists($tempDir)) {
+                mkdir($tempDir, 0755, true);
+            }
+            $tempFile = $tempDir . DIRECTORY_SEPARATOR . 'custom_render_' . $renderJob->uuid . '.json';
+            file_put_contents($tempFile, $customJson);
+        }
 
         // Dispatch GenerateVideoJob to queue
         GenerateVideoJob::dispatch($renderJob);

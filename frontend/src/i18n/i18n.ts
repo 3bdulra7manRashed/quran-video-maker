@@ -139,6 +139,8 @@ type RenderKeys =
   | 'twoLinesPerScreen'
   | 'includeTranslation'
   | 'includeTranslationDesc'
+  | 'useGeneratedContent'
+  | 'useGeneratedContentDesc'
   | 'translationSourceLabel'
   | 'sahihInternational'
   | 'generateVideo'

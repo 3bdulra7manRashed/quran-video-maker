@@ -2,20 +2,9 @@
 
 import React from 'react';
 import { useT } from '@/hooks/useT';
-
-export type RenderScope = 'full' | 'single' | 'range';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface RenderOptionsProps {
-  scope: RenderScope;
-  onScopeChange: (scope: RenderScope) => void;
-  ayahNumber: number;
-  onAyahNumberChange: (num: number) => void;
-  fromAyah: number;
-  onFromAyahChange: (num: number) => void;
-  toAyah: number;
-  onToAyahChange: (num: number) => void;
-  maxAyahs: number;
-  disabled: boolean;
   layout: string;
   onLayoutChange: (layout: string) => void;
   maxLines: number;
@@ -26,19 +15,10 @@ interface RenderOptionsProps {
   onTranslationSourceChange: (source: string) => void;
   useGeneratedContent: boolean;
   onUseGeneratedContentChange: (val: boolean) => void;
+  disabled: boolean;
 }
 
 export default function RenderOptions({
-  scope,
-  onScopeChange,
-  ayahNumber,
-  onAyahNumberChange,
-  fromAyah,
-  onFromAyahChange,
-  toAyah,
-  onToAyahChange,
-  maxAyahs,
-  disabled,
   layout,
   onLayoutChange,
   maxLines,
@@ -49,174 +29,104 @@ export default function RenderOptions({
   onTranslationSourceChange,
   useGeneratedContent,
   onUseGeneratedContentChange,
+  disabled,
 }: RenderOptionsProps) {
   const t = useT();
+  const { language } = useLanguage();
+  const isAr = language === 'ar';
 
   return (
-    <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 flex flex-col gap-5 shadow-2xl">
-      <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
-        <h3 className="font-semibold text-zinc-200">{t('render.renderOptions')}</h3>
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col gap-4">
+      <div>
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          {isAr ? 'تخطيط الفيديو' : 'Layout Selection'}
+        </h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-sans">
+          {isAr ? 'اختر طريقة عرض النص القرآني على الشاشة.' : 'Choose how the Quran text will be displayed.'}
+        </p>
       </div>
 
       <div className="flex flex-col gap-4">
-        {/* Scope Selector */}
-        <div className="grid grid-cols-3 gap-2 bg-zinc-900/50 p-1 rounded-xl border border-zinc-900">
+        {/* Layout Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <button
             type="button"
             disabled={disabled}
-            onClick={() => onScopeChange('full')}
-            className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
-              scope === 'full'
-                ? 'bg-zinc-800 text-zinc-100 shadow'
-                : 'text-zinc-500 hover:text-zinc-350'
+            onClick={() => onLayoutChange('reels')}
+            className={`p-4 rounded-xl border text-left flex flex-col gap-1 cursor-pointer transition-none ${
+              layout === 'reels'
+                ? 'border-emerald-500 dark:border-emerald-400 bg-emerald-50/10 dark:bg-emerald-950/20'
+                : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700'
             }`}
           >
-            {t('render.scopeFull')}
+            <span className="font-semibold text-slate-900 dark:text-slate-100">
+              {isAr ? '📱 ريلز' : '📱 Reels'}
+            </span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              {isAr ? 'فيديوهات رأسية قصيرة مخصصة لمنصات التواصل الاجتماعي.' : 'Short vertical videos optimized for social platforms.'}
+            </span>
           </button>
+          
           <button
             type="button"
             disabled={disabled}
-            onClick={() => onScopeChange('single')}
-            className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
-              scope === 'single'
-                ? 'bg-zinc-800 text-zinc-100 shadow'
-                : 'text-zinc-500 hover:text-zinc-350'
+            onClick={() => onLayoutChange('youtube')}
+            className={`p-4 rounded-xl border text-left flex flex-col gap-1 cursor-pointer transition-none ${
+              layout === 'youtube'
+                ? 'border-emerald-500 dark:border-emerald-400 bg-emerald-50/10 dark:bg-emerald-950/20'
+                : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700'
             }`}
           >
-            {t('render.scopeSingle')}
-          </button>
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => onScopeChange('range')}
-            className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
-              scope === 'range'
-                ? 'bg-zinc-800 text-zinc-100 shadow'
-                : 'text-zinc-500 hover:text-zinc-350'
-            }`}
-          >
-            {t('render.scopeRange')}
+            <span className="font-semibold text-slate-900 dark:text-slate-100">
+              {isAr ? '▶️ يوتيوب' : '▶️ YouTube'}
+            </span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              {isAr ? 'عرض صفحة المصحف كاملة والتلاوات الطويلة.' : 'Full Mushaf and long-form recitations.'}
+            </span>
           </button>
         </div>
 
-        {/* Conditional Inputs */}
-        {scope === 'single' && (
-          <div className="flex flex-col gap-2">
-            <label className="text-xs text-zinc-500 font-mono">{t('render.ayahNumberLabel', { max: maxAyahs })}</label>
-            <input
-              type="number"
-              min={1}
-              max={maxAyahs}
-              disabled={disabled}
-              value={ayahNumber}
-              onChange={(e) => onAyahNumberChange(Math.max(1, Math.min(maxAyahs, Number(e.target.value))))}
-              className="w-full bg-zinc-900 border border-zinc-800 text-zinc-200 px-3 py-2 rounded-xl focus:outline-none focus:border-zinc-700 transition-colors font-mono"
-            />
-          </div>
-        )}
-
-        {scope === 'range' && (
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-2">
-              <label className="text-xs text-zinc-500 font-mono">{t('render.fromLabel')}</label>
-              <input
-                type="number"
-                min={1}
-                max={toAyah}
-                disabled={disabled}
-                value={fromAyah}
-                onChange={(e) => onFromAyahChange(Math.max(1, Math.min(toAyah, Number(e.target.value))))}
-                className="w-full bg-zinc-900 border border-zinc-800 text-zinc-200 px-3 py-2 rounded-xl focus:outline-none focus:border-zinc-700 transition-colors font-mono"
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-xs text-zinc-500 font-mono">{t('render.toLabel', { max: maxAyahs })}</label>
-              <input
-                type="number"
-                min={fromAyah}
-                max={maxAyahs}
-                disabled={disabled}
-                value={toAyah}
-                onChange={(e) => onToAyahChange(Math.max(fromAyah, Math.min(maxAyahs, Number(e.target.value))))}
-                className="w-full bg-zinc-900 border border-zinc-800 text-zinc-200 px-3 py-2 rounded-xl focus:outline-none focus:border-zinc-700 transition-colors font-mono"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Layout & Style Selection */}
-        <div className="border-t border-zinc-900 pt-4 flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <label className="text-xs text-zinc-500 font-mono">{t('render.videoLayout')}</label>
-            <div className="grid grid-cols-2 gap-2 bg-zinc-900/50 p-1 rounded-xl border border-zinc-900">
+        {/* Max lines (YouTube only) */}
+        {layout === 'youtube' && (
+          <div className="flex flex-col gap-1.5 border-t border-slate-100 dark:border-slate-800/60 pt-4">
+            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t('render.maxLinesLabel')}</label>
+            <div className="grid grid-cols-2 gap-2 bg-slate-50 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
               <button
                 type="button"
                 disabled={disabled}
-                onClick={() => onLayoutChange('reels')}
-                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
-                  layout === 'reels'
-                    ? 'bg-zinc-800 text-zinc-100 shadow'
-                    : 'text-zinc-500 hover:text-zinc-350'
+                onClick={() => onMaxLinesChange(1)}
+                className={`py-2 px-3 rounded-lg text-xs font-semibold ${
+                  maxLines === 1
+                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
                 }`}
               >
-                {t('render.layoutReels')}
+                {t('render.oneLinePerScreen')}
               </button>
               <button
                 type="button"
                 disabled={disabled}
-                onClick={() => onLayoutChange('youtube')}
-                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
-                  layout === 'youtube'
-                    ? 'bg-zinc-800 text-zinc-100 shadow'
-                    : 'text-zinc-500 hover:text-zinc-350'
+                onClick={() => onMaxLinesChange(2)}
+                className={`py-2 px-3 rounded-lg text-xs font-semibold ${
+                  maxLines === 2
+                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
                 }`}
               >
-                {t('render.layoutYoutube')}
+                {t('render.twoLinesPerScreen')}
               </button>
             </div>
           </div>
-
-          {layout === 'youtube' && (
-            <div className="flex flex-col gap-2">
-              <label className="text-xs text-zinc-500 font-mono">{t('render.maxLinesLabel')}</label>
-              <div className="grid grid-cols-2 gap-2 bg-zinc-900/50 p-1 rounded-xl border border-zinc-900">
-                <button
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => onMaxLinesChange(1)}
-                  className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
-                    maxLines === 1
-                      ? 'bg-zinc-800 text-zinc-100 shadow'
-                      : 'text-zinc-500 hover:text-zinc-350'
-                  }`}
-                >
-                  {t('render.oneLinePerScreen')}
-                </button>
-                <button
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => onMaxLinesChange(2)}
-                  className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
-                    maxLines === 2
-                      ? 'bg-zinc-800 text-zinc-100 shadow'
-                      : 'text-zinc-500 hover:text-zinc-350'
-                  }`}
-                >
-                  {t('render.twoLinesPerScreen')}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+        )}
 
         {/* Translation Settings */}
-        <div className="border-t border-zinc-900 pt-4 flex flex-col gap-4">
+        <div className="border-t border-slate-100 dark:border-slate-800/60 pt-4 flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <div className="flex flex-col">
-              <label htmlFor="withTranslation" className="text-xs text-zinc-300 font-semibold cursor-pointer">
+              <label htmlFor="withTranslation" className="text-xs text-slate-700 dark:text-slate-350 font-semibold cursor-pointer">
                 {t('render.includeTranslation')}
               </label>
-              <span className="text-[10px] text-zinc-500 font-mono">{t('render.includeTranslationDesc')}</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">{t('render.includeTranslationDesc')}</span>
             </div>
             <input
               id="withTranslation"
@@ -224,13 +134,13 @@ export default function RenderOptions({
               disabled={disabled}
               checked={withTranslation}
               onChange={(e) => onWithTranslationChange(e.target.checked)}
-              className="w-4 h-4 accent-emerald-500 rounded bg-zinc-900 border-zinc-800 focus:ring-emerald-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-4 h-4 accent-emerald-600 rounded bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 cursor-pointer disabled:opacity-40"
             />
           </div>
 
           {withTranslation && (
-            <div className="flex flex-col gap-2">
-              <label htmlFor="translationSource" className="text-xs text-zinc-500 font-mono">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="translationSource" className="text-xs text-slate-500 dark:text-slate-400">
                 {t('render.translationSourceLabel')}
               </label>
               <select
@@ -238,7 +148,7 @@ export default function RenderOptions({
                 disabled={disabled}
                 value={translationSource}
                 onChange={(e) => onTranslationSourceChange(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 text-zinc-200 px-3 py-2 rounded-xl focus:outline-none focus:border-zinc-700 transition-colors font-sans text-xs cursor-pointer"
+                className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-xl focus:outline-none focus:border-slate-450 dark:focus:border-slate-700 font-sans text-xs cursor-pointer"
               >
                 <option value="sahih_international">{t('render.sahihInternational')}</option>
               </select>
@@ -246,24 +156,22 @@ export default function RenderOptions({
           )}
         </div>
 
-        {/* Force Generated Content Settings */}
-        <div className="border-t border-zinc-900 pt-4 flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col">
-              <label htmlFor="useGeneratedContent" className="text-xs text-zinc-300 font-semibold cursor-pointer">
-                {t('render.useGeneratedContent')}
-              </label>
-              <span className="text-[10px] text-zinc-500 font-mono">{t('render.useGeneratedContentDesc')}</span>
-            </div>
-            <input
-              id="useGeneratedContent"
-              type="checkbox"
-              disabled={disabled}
-              checked={useGeneratedContent}
-              onChange={(e) => onUseGeneratedContentChange(e.target.checked)}
-              className="w-4 h-4 accent-emerald-500 rounded bg-zinc-900 border-zinc-800 focus:ring-emerald-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-            />
+        {/* Force Pre-generated Content Settings */}
+        <div className="border-t border-slate-100 dark:border-slate-800/60 pt-4 flex items-center justify-between">
+          <div className="flex flex-col">
+            <label htmlFor="useGeneratedContent" className="text-xs text-slate-700 dark:text-slate-350 font-semibold cursor-pointer">
+              {t('render.useGeneratedContent')}
+            </label>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400">{t('render.useGeneratedContentDesc')}</span>
           </div>
+          <input
+            id="useGeneratedContent"
+            type="checkbox"
+            disabled={disabled}
+            checked={useGeneratedContent}
+            onChange={(e) => onUseGeneratedContentChange(e.target.checked)}
+            className="w-4 h-4 accent-emerald-600 rounded bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 cursor-pointer disabled:opacity-40"
+          />
         </div>
       </div>
     </div>
