@@ -66,7 +66,27 @@ type CommonKeys =
   | 'videos.deleteFailed'
   | 'videos.formatFullSurah'
   | 'videos.formatAyah'
-  | 'videos.formatAyahs';
+  | 'videos.formatAyahs'
+  | 'contentPipeline.title'
+  | 'contentPipeline.generatePrompt'
+  | 'contentPipeline.copyPrompt'
+  | 'contentPipeline.copied'
+  | 'contentPipeline.pasteJsonPlaceholder'
+  | 'contentPipeline.generatorType'
+  | 'contentPipeline.generatorModel'
+  | 'contentPipeline.latencyMs'
+  | 'contentPipeline.validatePreview'
+  | 'contentPipeline.approveSave'
+  | 'contentPipeline.segment'
+  | 'contentPipeline.arabic'
+  | 'contentPipeline.translation'
+  | 'contentPipeline.tafsir'
+  | 'contentPipeline.validating'
+  | 'contentPipeline.saving'
+  | 'contentPipeline.saveSuccess'
+  | 'contentPipeline.errorsFound'
+  | 'contentPipeline.warningsFound'
+  | 'contentPipeline.invalidJson';
 
 type JobsKeys =
   | 'pageTitle'

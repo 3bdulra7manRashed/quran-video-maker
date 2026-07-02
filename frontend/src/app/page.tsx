@@ -9,6 +9,7 @@ import DatasetStatusCard from '@/components/DatasetStatusCard';
 import DatasetActions from '@/components/DatasetActions';
 import RenderOptions, { RenderScope } from '@/components/RenderOptions';
 import GenerateVideoCard from '@/components/GenerateVideoCard';
+import GenerateContentCard from '@/components/GenerateContentCard';
 import { useT } from '@/hooks/useT';
 
 export default function ConsolePage() {
@@ -253,6 +254,16 @@ export default function ConsolePage() {
               maxLines={maxLines}
               withTranslation={withTranslation}
               translationSource={translationSource}
+            />
+
+            <GenerateContentCard
+              surahNumber={selectedSurah}
+              reciterSlug={selectedReciter}
+              scope={scope}
+              ayahNumber={ayahNumber}
+              fromAyah={fromAyah}
+              toAyah={toAyah}
+              layout={layout}
             />
           </div>
 

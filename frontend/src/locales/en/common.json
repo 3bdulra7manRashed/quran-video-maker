@@ -60,5 +60,27 @@
     "formatFullSurah": "Full Surah",
     "formatAyah": "Ayah {{number}}",
     "formatAyahs": "Ayahs {{from}} - {{to}}"
+  },
+  "contentPipeline": {
+    "title": "AI Segment Generator",
+    "generatePrompt": "Generate AI Prompt",
+    "copyPrompt": "Copy Prompt",
+    "copied": "Copied!",
+    "pasteJsonPlaceholder": "Paste the generated AI JSON response here...",
+    "generatorType": "Generator Type",
+    "generatorModel": "Generator Model (e.g. gemini-2.5-pro)",
+    "latencyMs": "Latency (optional ms)",
+    "validatePreview": "Validate & Preview",
+    "approveSave": "Approve & Save Content",
+    "segment": "Segment",
+    "arabic": "Arabic Text",
+    "translation": "Translation",
+    "tafsir": "Tafsir",
+    "validating": "Validating...",
+    "saving": "Saving...",
+    "saveSuccess": "Content approved and saved successfully (Version {{version}}).",
+    "errorsFound": "Errors Found",
+    "warningsFound": "Warnings Found",
+    "invalidJson": "Invalid JSON format"
   }
 }

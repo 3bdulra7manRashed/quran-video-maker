@@ -60,5 +60,27 @@
     "formatFullSurah": "السورة كاملة",
     "formatAyah": "الآية {{number}}",
     "formatAyahs": "الآيات {{from}} - {{to}}"
+  },
+  "contentPipeline": {
+    "title": "مُولّد مقاطع الذكاء الاصطناعي",
+    "generatePrompt": "توليد نص السؤال",
+    "copyPrompt": "نسخ السؤال",
+    "copied": "تم النسخ!",
+    "pasteJsonPlaceholder": "الصق استجابة JSON للذكاء الاصطناعي هنا...",
+    "generatorType": "نوع المولد",
+    "generatorModel": "طراز المولد (مثال: gemini-2.5-pro)",
+    "latencyMs": "زمن الاستجابة (اختياري بالملي ثانية)",
+    "validatePreview": "التحقق والمعاينة",
+    "approveSave": "اعتماد وحفظ المحتوى",
+    "segment": "مقطع",
+    "arabic": "النص القرآني",
+    "translation": "الترجمة الإنجليزية",
+    "tafsir": "التفسير العربي",
+    "validating": "جاري التحقق...",
+    "saving": "جاري الحفظ...",
+    "saveSuccess": "تم اعتماد وحفظ المحتوى بنجاح (الإصدار {{version}}).",
+    "errorsFound": "الأخطاء المكتشفة",
+    "warningsFound": "التنبيهات المكتشفة",
+    "invalidJson": "تنسيق JSON غير صالح"
   }
 }

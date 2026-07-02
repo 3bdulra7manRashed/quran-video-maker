@@ -145,7 +145,7 @@ class RenderPipeline
         }
         $ayahIds = $ayahQuery->pluck('id');
 
-        $words = Word::whereIn('ayah_id', $ayahIds)
+        $words = Word::with('ayah')->whereIn('ayah_id', $ayahIds)
             ->orderBy('page_number')
             ->orderBy('line_number')
             ->orderBy('ayah_id')
@@ -234,7 +234,26 @@ class RenderPipeline
         $this->cancellationGuard->ensureNotCancelled($renderJob);
 
         // 6. Segment the words
-        $segments = $this->segmentationService->segment($words, $totalDuration, $layout, $maxLines, $reciter, $surahNumber);
+        $resolver = app(\App\Services\ContentGeneration\ApprovedContentResolver::class);
+        $approvedSegmentsData = $resolver->resolve($reciter->id, $surahNumber, $fromAyah, $toAyah, $layout);
+
+        $hasApprovedGeneratedContent = false;
+        $alignedRanges = [];
+        if ($approvedSegmentsData !== null) {
+            $hasApprovedGeneratedContent = true;
+        }
+
+        if ($hasApprovedGeneratedContent) {
+            $aligner = app(\App\Services\ContentGeneration\GeneratedContentWordAligner::class);
+            $segmentBuilder = app(\App\Services\ContentGeneration\ApprovedSegmentBuilder::class);
+            
+            $alignedRanges = $aligner->align($approvedSegmentsData, $words);
+            $segments = $segmentBuilder->build($alignedRanges);
+            Log::info("[RenderPipeline] Loaded " . count($segments) . " segments from approved generated content.");
+        } else {
+            $segments = $this->segmentationService->segment($words, $totalDuration, $layout, $maxLines, $reciter, $surahNumber);
+        }
+
         if (empty($segments)) {
             throw new RuntimeException("Segmentation service returned no segments for Surah {$surahNumber}.");
         }
@@ -242,9 +261,13 @@ class RenderPipeline
         // Build Translation Layer if requested
         $translationLayer = null;
         if ($withTranslation) {
-            $translationSegments = $this->translationSegmentBuilder->build($segments, $surahNumber);
+            if ($hasApprovedGeneratedContent) {
+                $approvedTranslationBuilder = app(\App\Services\ContentGeneration\ApprovedTranslationSegmentBuilder::class);
+                $translationSegments = $approvedTranslationBuilder->build($approvedSegmentsData, $alignedRanges, $surahNumber);
+            } else {
+                $translationSegments = $this->translationSegmentBuilder->build($segments, $surahNumber);
+            }
             $translationLayer = new \App\Modules\Rendering\Layers\TranslationTextLayer($translationSegments);
-            // Verify instantiation by logging the segments count
             Log::info("[RenderPipeline] Instantiated TranslationTextLayer with " . count($translationSegments) . " segments.");
         }
 

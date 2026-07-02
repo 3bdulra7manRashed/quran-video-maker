@@ -224,4 +224,77 @@ export class ApiService {
     }
     return res.json();
   }
+
+  async generatePrompt(params: {
+    reciter: string;
+    surah: number;
+    from_ayah?: number | null;
+    to_ayah?: number | null;
+  }): Promise<{ prompt: string }> {
+    const query = new URLSearchParams({
+      reciter: params.reciter,
+      surah: String(params.surah),
+    });
+    if (params.from_ayah) query.append('from_ayah', String(params.from_ayah));
+    if (params.to_ayah) query.append('to_ayah', String(params.to_ayah));
+
+    const res = await fetch(`${this.baseUrl}/api/datasets/generate-prompt?${query}`);
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Failed to generate prompt');
+    }
+    return res.json();
+  }
+
+  async previewImport(params: {
+    json: string;
+    surah: number;
+    from_ayah?: number | null;
+    to_ayah?: number | null;
+  }): Promise<{
+    isValid: boolean;
+    errors: string[];
+    warnings: string[];
+    segments?: Array<{ order: number; arabic: string; translation: string; tafsir: string }>;
+  }> {
+    const res = await fetch(`${this.baseUrl}/api/datasets/preview-import`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Failed to validate JSON');
+    }
+    return res.json();
+  }
+
+  async approveImport(params: {
+    json: string;
+    reciter: string;
+    surah: number;
+    from_ayah?: number | null;
+    to_ayah?: number | null;
+    generator_type: string;
+    generator_model?: string;
+    generator_latency_ms?: number | null;
+    prompt_version?: string;
+    prompt_hash?: string;
+  }): Promise<{ success: boolean; version: number }> {
+    const res = await fetch(`${this.baseUrl}/api/datasets/approve-import`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Failed to save approved content');
+    }
+    return res.json();
+  }
 }
+
