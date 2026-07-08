@@ -25,7 +25,7 @@ class QuranComDatasetProvider implements DatasetProvider
         ],
         'ali-jaber' => [
             'quran_com_reciter_id' => 158,
-            'audio_base_url' => 'https://download.quranicaudio.com/quran/abdullaah_alee_jaabir/',
+            'audio_base_url' => 'https://download.quranicaudio.com/quran/ali_jaber/',
         ],
     ];
 
@@ -86,7 +86,23 @@ class QuranComDatasetProvider implements DatasetProvider
         }
 
         $destFile = $destDir . "/surah_{$surahNumber}.json";
-        file_put_contents($destFile, json_encode(['verses' => $allVerses], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+        // Route through Dataset Pipeline
+        $pipeline = app(\App\Modules\Dataset\Services\DatasetPipeline::class);
+        $dataset = ['verses' => $allVerses];
+        
+        $metadata = new \App\Modules\Dataset\Validation\DatasetMetadata(
+            'quran_com',
+            'v4',
+            now()->toIso8601String(),
+            now()->toIso8601String(),
+            'glyphs',
+            $surahNumber
+        );
+
+        $cleanDataset = $pipeline->process($surahNumber, $dataset, $metadata);
+
+        file_put_contents($destFile, json_encode($cleanDataset, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
     }
 
     /**

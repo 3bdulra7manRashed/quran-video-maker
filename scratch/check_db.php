@@ -1,31 +1,17 @@
 <?php
 
-use App\Modules\Quran\Models\Reciter;
-use App\Modules\Quran\Models\Surah;
-use App\Modules\Quran\Models\ReelsGeneratedContent;
-use App\Modules\Quran\Models\Word;
-use App\Modules\Quran\Models\ReciterWordTiming;
+require __DIR__ . '/../vendor/autoload.php';
+$app = require_once __DIR__ . '/../bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
-$reciterCount = Reciter::count();
-$surahCount = Surah::count();
-$generatedCount = ReelsGeneratedContent::count();
-$approvedCount = ReelsGeneratedContent::where('approval_status', \App\Enums\ContentApprovalStatus::APPROVED)->count();
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
-echo "Reciters: $reciterCount\n";
-echo "Surahs: $surahCount\n";
-echo "Generated Contents: $generatedCount\n";
-echo "Approved Contents: $approvedCount\n";
+$columns = Schema::getColumnListing('reciters');
+echo "Columns: " . implode(', ', $columns) . "\n";
 
-if ($reciterCount > 0) {
-    echo "\nReciters:\n";
-    foreach (Reciter::all() as $r) {
-        echo " - ID: {$r->id}, Slug: {$r->slug}, Name: {$r->name_english}\n";
-    }
-}
-
-if ($approvedCount > 0) {
-    echo "\nApproved Content Samples:\n";
-    foreach (ReelsGeneratedContent::where('approval_status', \App\Enums\ContentApprovalStatus::APPROVED)->take(5)->get() as $c) {
-        echo " - ID: {$c->id}, Reciter ID: {$c->reciter_id}, Surah: {$c->surah_number}, Range: {$c->start_ayah}-{$c->end_ayah}, Layout: {$c->layout_type->value}, Order: {$c->segment_order}, Arabic: {$c->arabic}\n";
-    }
+$reciters = DB::table('reciters')->get();
+echo "Total reciters in DB: " . $reciters->count() . "\n";
+foreach ($reciters as $r) {
+    echo json_encode($r, JSON_UNESCAPED_UNICODE) . "\n";
 }

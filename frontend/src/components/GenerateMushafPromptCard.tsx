@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { useApi } from '@/context/ApiContext';
-import { useT } from '@/hooks/useT';
 import { useLanguage } from '@/hooks/useLanguage';
 
 interface GenerateMushafPromptCardProps {
@@ -23,13 +22,8 @@ export default function GenerateMushafPromptCard({
   layout,
 }: GenerateMushafPromptCardProps) {
   const { api } = useApi();
-  const t = useT();
   const { language } = useLanguage();
   const isAr = language === 'ar';
-
-  if (layout !== 'youtube' || surahNumber === '') {
-    return null;
-  }
 
   const [startPage, setStartPage] = useState<string>('');
   const [startLine, setStartLine] = useState<string>('');
@@ -39,6 +33,10 @@ export default function GenerateMushafPromptCard({
   const [generating, setGenerating] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  if (layout !== 'youtube' || surahNumber === '') {
+    return null;
+  }
 
   const getAyahParams = () => {
     let from_ayah: number | null = null;
@@ -84,8 +82,9 @@ export default function GenerateMushafPromptCard({
         markers,
       });
       setPrompt(res.prompt);
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to generate prompt');
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      setErrorMessage(error.message || 'Failed to generate prompt');
     } finally {
       setGenerating(false);
     }

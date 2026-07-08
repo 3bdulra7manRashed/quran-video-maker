@@ -30,6 +30,18 @@ class AppServiceProvider extends ServiceProvider
             \App\Modules\Rendering\Contracts\TranslationProviderInterface::class,
             \App\Modules\Rendering\Providers\SahihInternationalTranslationProvider::class
         );
+
+        // Dataset Validation & Normalization Pipeline
+        $this->app->bind(
+            \App\Modules\Dataset\Validation\DatasetValidatorInterface::class,
+            \App\Modules\Dataset\Validation\GlyphDatasetValidator::class
+        );
+
+        $this->app->singleton(\App\Modules\Dataset\Validation\GlyphCorrectionRegistry::class, function ($app) {
+            $registry = new \App\Modules\Dataset\Validation\GlyphCorrectionRegistry();
+            $registry->register($app->make(\App\Modules\Dataset\Validation\Rules\PageWrapCorrectionRule::class));
+            return $registry;
+        });
     }
 
     /**
