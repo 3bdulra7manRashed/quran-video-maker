@@ -160,6 +160,149 @@ class ImportManualTimingsService
     }
 
     /**
+     * Import manual segment timings, mapping segments to database words.
+     *
+     * @param array $data Decoded JSON segment timings data.
+     * @param int $reciterId Target reciter database ID.
+     * @return array Standardized report.
+     */
+    public function importSegments(array $data, int $reciterId): array
+    {
+        $surahNumber = $data['surah'] ?? null;
+        $jsonSegments = $data['segments'] ?? [];
+
+        if (!$surahNumber || empty($jsonSegments)) {
+            throw new \InvalidArgumentException("JSON data must contain 'surah' and a non-empty 'segments' array.");
+        }
+
+        // Fetch reciter
+        $reciter = \App\Modules\Quran\Models\Reciter::find($reciterId);
+        if (!$reciter) {
+            throw new \InvalidArgumentException("Reciter ID {$reciterId} not found.");
+        }
+
+        // Fetch approved segments from reels_generated_content
+        $approvedSegments = \App\Modules\Quran\Models\ReelsGeneratedContent::where('reciter_id', $reciterId)
+            ->where('surah_number', $surahNumber)
+            ->orderBy('segment_order')
+            ->get();
+
+        if ($approvedSegments->isEmpty()) {
+            throw new \RuntimeException("No approved segment definitions found for this Surah. Please generate and approve segments first.");
+        }
+
+        // Fetch Surah & Words
+        $surah = Surah::where('number', $surahNumber)->first();
+        if (!$surah) {
+            throw new \InvalidArgumentException("Surah {$surahNumber} not found.");
+        }
+
+        $ayahIds = $surah->ayahs()->pluck('id');
+        $words = Word::with('ayah')->whereIn('ayah_id', $ayahIds)
+            ->orderBy('page_number')
+            ->orderBy('line_number')
+            ->orderBy('ayah_id')
+            ->orderBy('word_index')
+            ->get();
+
+        // Align segments with database words
+        $aligner = app(\App\Services\ContentGeneration\GeneratedContentWordAligner::class);
+        $alignedRanges = $aligner->align($approvedSegments, $words);
+
+        // Map uploaded segment start times
+        $uploadedMap = [];
+        foreach ($jsonSegments as $item) {
+            $uploadedMap[(int)$item['segment_order']] = (int)$item['start'];
+        }
+
+        // Fetch total audio file duration to calculate bounds for the last segment
+        $audioFile = \App\Modules\Quran\Models\AudioFile::where('reciter_id', $reciterId)
+            ->where('surah_number', $surahNumber)
+            ->first();
+        $totalDurationMs = $audioFile ? (int)$audioFile->duration_ms : null;
+
+        $upsertData = [];
+        $totalTimedWords = 0;
+
+        DB::beginTransaction();
+        try {
+            foreach ($alignedRanges as $range) {
+                $order = $range['segmentOrder'];
+                $rangeWords = $range['words'];
+                $spokenWords = [];
+                foreach ($rangeWords as $w) {
+                    if ($w->char_type === 'word') {
+                        $spokenWords[] = $w;
+                    }
+                }
+
+                $wordCount = count($spokenWords);
+                if ($wordCount === 0) {
+                    continue;
+                }
+
+                // Retrieve segment start/end
+                $startMs = $uploadedMap[$order] ?? 0;
+                $nextStart = $uploadedMap[$order + 1] ?? null;
+                $endMs = $nextStart !== null ? $nextStart : ($totalDurationMs !== null ? $totalDurationMs : ($startMs + 5000));
+
+                if ($endMs < $startMs) {
+                    $endMs = $startMs;
+                }
+
+                $segmentDuration = $endMs - $startMs;
+                $wordDuration = $segmentDuration / $wordCount;
+
+                foreach ($spokenWords as $j => $word) {
+                    $wStart = (int)round($startMs + ($j * $wordDuration));
+                    $wEnd = (int)round($startMs + (($j + 1) * $wordDuration));
+
+                    $upsertData[] = [
+                        'reciter_id' => $reciterId,
+                        'word_id' => $word->id,
+                        'start_ms' => $wStart,
+                        'end_ms' => $wEnd,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                    $totalTimedWords++;
+                }
+            }
+
+            if (!empty($upsertData)) {
+                ReciterWordTiming::upsert(
+                    $upsertData,
+                    ['reciter_id', 'word_id'],
+                    ['start_ms', 'end_ms', 'updated_at']
+                );
+            }
+
+            // Store coverage metadata
+            $fromAyah = $data['from_ayah'] ?? null;
+            $toAyah = $data['to_ayah'] ?? null;
+
+            \App\Modules\Quran\Models\DatasetMetadata::updateOrCreate([
+                'reciter_id' => $reciterId,
+                'surah_number' => $surahNumber,
+            ], [
+                'from_ayah' => $fromAyah ? (int)$fromAyah : null,
+                'to_ayah' => $toAyah ? (int)$toAyah : null,
+            ]);
+
+            DB::commit();
+
+            return [
+                'success' => true,
+                'timedWords' => $totalTimedWords,
+            ];
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error("[ImportManualTimingsService] Segment timings import database update failed: " . $e->getMessage());
+            throw new RuntimeException("Segment timings database update failed: " . $e->getMessage(), 0, $e);
+        }
+    }
+
+    /**
      * Text normalization helper (mirrors the original logic).
      */
     public function normalizeText(string $str): string

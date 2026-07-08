@@ -318,9 +318,13 @@ class RenderPipeline
                 $reelsValidator = app(\App\Services\ContentGeneration\ReelsSegmentValidator::class);
                 $reelsValidator->validate($alignedRanges);
 
-                $segments = $segmentBuilder->build($alignedRanges, $audioEndMs);
+                // Build the SegmentTimeline before building the segments
+                $timelineResolver = app(\App\Modules\Rendering\Services\SegmentTimelineResolver::class);
+                $timeline = $timelineResolver->resolve($alignedRanges, $audioEndMs);
+
+                $segments = $segmentBuilder->build($alignedRanges, $timeline);
                 $hasApprovedGeneratedContent = true;
-                Log::info("[RenderPipeline] Loaded " . count($segments) . " segments from approved generated content.");
+                Log::info("[RenderPipeline] Loaded " . count($segments) . " segments from approved generated content using SegmentTimeline.");
             } else {
                 Log::info('RENDER SOURCE', [
                     'source' => 'default',

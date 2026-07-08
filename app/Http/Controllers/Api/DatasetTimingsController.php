@@ -120,6 +120,12 @@ class DatasetTimingsController
                     ], 422);
                 }
             }
+        } else if (isset($data['type']) && $data['type'] === 'segment_timings') {
+            if (!isset($data['surah']) || !isset($data['segments']) || !is_array($data['segments'])) {
+                return response()->json([
+                    'error' => 'JSON segment timings file must contain: surah and segments array.',
+                ], 422);
+            }
         } else {
             if (!isset($data['surah']) || !isset($data['from_ayah']) || !isset($data['to_ayah']) || !isset($data['words'])) {
                 return response()->json([
@@ -134,6 +140,12 @@ class DatasetTimingsController
                 return response()->json([
                     'success' => true,
                     'timedLines' => $report['timedLines'],
+                ]);
+            } else if (isset($data['type']) && $data['type'] === 'segment_timings') {
+                $report = $manualImporter->importSegments($data, $reciter->id);
+                return response()->json([
+                    'success' => true,
+                    'timedWords' => $report['timedWords'],
                 ]);
             } else {
                 $report = $manualImporter->import($data, $reciter->id);

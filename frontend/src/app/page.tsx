@@ -9,9 +9,18 @@ import DatasetStatusCard from '@/components/DatasetStatusCard';
 import DatasetActions from '@/components/DatasetActions';
 import RenderOptions from '@/components/RenderOptions';
 import GenerateVideoCard from '@/components/GenerateVideoCard';
-import GenerateContentCard from '@/components/GenerateContentCard';
-import GenerateMushafPromptCard from '@/components/GenerateMushafPromptCard';
-import JSONInputCard from '@/components/JSONInputCard';
+import AITaskCard from '@/components/AITaskCard';
+import { LAYOUTS } from '@/config/layouts';
+import { AI_TASKS } from '@/config/aiTasks';
+import {
+  generateSegmentationPrompt,
+  verifySegmentationJson,
+  approveSegmentationJson,
+  generateSegmentTimingPrompt,
+  importSegmentTimingJson,
+  generateLineTimingPrompt,
+  importLineTimingJson,
+} from '@/services/ai';
 import { useT } from '@/hooks/useT';
 import { useLanguage } from '@/hooks/useLanguage';
 
@@ -33,10 +42,6 @@ export default function ConsolePage() {
   const [loadingStatus, setLoadingStatus] = useState(false);
   const [loadingPrereqs, setLoadingPrereqs] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  const [jsonFile, setJsonFile] = useState<File | null>(null);
-  const [jsonFileContent, setJsonFileContent] = useState<string>('');
-  const [pastedJson, setPastedJson] = useState<string>('');
 
   // Polling ref to clear interval safely on selection change or unmount
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -60,12 +65,65 @@ export default function ConsolePage() {
   const [layout, setLayout] = useState<string>('reels');
   const [maxLines, setMaxLines] = useState<number>(1);
 
-  // Translation states
+  // Translation & Tafsir states
   const [withTranslation, setWithTranslation] = useState<boolean>(false);
   const [translationSource, setTranslationSource] = useState<string>('sahih_international');
+  const [withTafsir, setWithTafsir] = useState<boolean>(false);
+
+  // Guide accordion state
+  const [guideOpen, setGuideOpen] = useState<boolean>(false);
 
   // AI content states
   const [useGeneratedContent, setUseGeneratedContent] = useState<boolean>(false);
+
+  // ===================================================
+  // AI TASK 1: SEGMENTATION STATES
+  // ===================================================
+  const [segPrompt, setSegPrompt] = useState<string>('');
+  const [segJsonInput, setSegJsonInput] = useState<string>('');
+  const [segCopied, setSegCopied] = useState<boolean>(false);
+  const [segGenerating, setSegGenerating] = useState<boolean>(false);
+  const [segValidating, setSegValidating] = useState<boolean>(false);
+  const [segSuccessMsg, setSegSuccessMsg] = useState<string | null>(null);
+  const [segErrors, setSegErrors] = useState<string[]>([]);
+  const [segWarnings, setSegWarnings] = useState<string[]>([]);
+  const [segErrorMsg, setSegErrorMsg] = useState<string | null>(null);
+  const [segPreview, setSegPreview] = useState<any[] | undefined>(undefined);
+  const [segRepaired, setSegRepaired] = useState<boolean>(false);
+  const [segSaving, setSegSaving] = useState<boolean>(false);
+  const [segGenType, setSegGenType] = useState<string>('gemini');
+  const [segGenModel, setSegGenModel] = useState<string>('gemini-2.5-pro');
+  const [segLatencyMs, setSegLatencyMs] = useState<string>('');
+
+  // ===================================================
+  // AI TASK 2: SEGMENT TIMINGS STATES
+  // ===================================================
+  const [segTimMarkers, setSegTimMarkers] = useState<string>('');
+  const [segTimPrompt, setSegTimPrompt] = useState<string>('');
+  const [segTimJsonInput, setSegTimJsonInput] = useState<string>('');
+  const [segTimCopied, setSegTimCopied] = useState<boolean>(false);
+  const [segTimGenerating, setSegTimGenerating] = useState<boolean>(false);
+  const [segTimValidating, setSegTimValidating] = useState<boolean>(false);
+  const [segTimSuccessMsg, setSegTimSuccessMsg] = useState<string | null>(null);
+  const [segTimErrors, setSegTimErrors] = useState<string[]>([]);
+  const [segTimWarnings, setSegTimWarnings] = useState<string[]>([]);
+  const [segTimErrorMsg, setSegTimErrorMsg] = useState<string | null>(null);
+
+  // ===================================================
+  // AI TASK 3: LINE TIMINGS STATES
+  // ===================================================
+  const [lineTimStartPage, setLineTimStartPage] = useState<string>('');
+  const [lineTimStartLine, setLineTimStartLine] = useState<string>('');
+  const [lineTimMarkers, setLineTimMarkers] = useState<string>('');
+  const [lineTimPrompt, setLineTimPrompt] = useState<string>('');
+  const [lineTimJsonInput, setLineTimJsonInput] = useState<string>('');
+  const [lineTimCopied, setLineTimCopied] = useState<boolean>(false);
+  const [lineTimGenerating, setLineTimGenerating] = useState<boolean>(false);
+  const [lineTimValidating, setLineTimValidating] = useState<boolean>(false);
+  const [lineTimSuccessMsg, setLineTimSuccessMsg] = useState<string | null>(null);
+  const [lineTimErrors, setLineTimErrors] = useState<string[]>([]);
+  const [lineTimWarnings, setLineTimWarnings] = useState<string[]>([]);
+  const [lineTimErrorMsg, setLineTimErrorMsg] = useState<string | null>(null);
 
   // Get max ayahs for current selection
   const maxAyahs = selectedSurah !== '' 
@@ -106,6 +164,29 @@ export default function ConsolePage() {
     } else {
       setStatus(null);
     }
+
+    // Reset task states on selection change
+    setSegPrompt('');
+    setSegJsonInput('');
+    setSegPreview(undefined);
+    setSegErrors([]);
+    setSegWarnings([]);
+    setSegSuccessMsg(null);
+    setSegErrorMsg(null);
+
+    setSegTimPrompt('');
+    setSegTimJsonInput('');
+    setSegTimErrors([]);
+    setSegTimWarnings([]);
+    setSegTimSuccessMsg(null);
+    setSegTimErrorMsg(null);
+
+    setLineTimPrompt('');
+    setLineTimJsonInput('');
+    setLineTimErrors([]);
+    setLineTimWarnings([]);
+    setLineTimSuccessMsg(null);
+    setLineTimErrorMsg(null);
   }, [selectedReciter, selectedSurah]);
 
   // Sync range limits when Surah changes
@@ -173,16 +254,270 @@ export default function ConsolePage() {
   const handleUploadAudio = async (file: File) => {
     if (!selectedReciter || selectedSurah === '') return;
     await api.uploadAudio(selectedReciter, selectedSurah, file);
-    // Refresh status
     await loadDatasetStatus();
   };
 
   const handleUploadTimings = async (file: File) => {
     if (!selectedReciter) return;
     await api.uploadTimings(selectedReciter, file);
-    // Refresh status
     await loadDatasetStatus();
   };
+
+  // ===================================================
+  // TASK CALLBAK OPERATORS (SEGMENTATION)
+  // ===================================================
+  const runGenerateSegPrompt = async () => {
+    if (selectedSurah === '') return;
+    setSegGenerating(true);
+    setSegErrorMsg(null);
+    try {
+      const prompt = await generateSegmentationPrompt(api, {
+        surahNumber: Number(selectedSurah),
+        reciterSlug: selectedReciter,
+        scope,
+        ayahNumber,
+        fromAyah,
+        toAyah,
+      });
+      setSegPrompt(prompt);
+    } catch (err: any) {
+      setSegErrorMsg(err.message || 'Failed to generate prompt');
+    } finally {
+      setSegGenerating(false);
+    }
+  };
+
+  const runValidateSegJson = async () => {
+    if (selectedSurah === '') return;
+    setSegValidating(true);
+    setSegErrorMsg(null);
+    setSegSuccessMsg(null);
+    setSegErrors([]);
+    setSegWarnings([]);
+    setSegPreview(undefined);
+    setSegRepaired(false);
+
+    try {
+      JSON.parse(segJsonInput);
+    } catch (e: any) {
+      setSegErrorMsg(isAr ? `خطأ في صياغة JSON: ${e.message}` : `JSON syntax error: ${e.message}`);
+      setSegValidating(false);
+      return;
+    }
+
+    try {
+      const res = await verifySegmentationJson(
+        api,
+        {
+          surahNumber: Number(selectedSurah),
+          reciterSlug: selectedReciter,
+          scope,
+          ayahNumber,
+          fromAyah,
+          toAyah,
+        },
+        segJsonInput
+      );
+      setSegErrors(res.errors);
+      setSegWarnings(res.warnings);
+      if (res.repairedJson) {
+        setSegRepaired(true);
+        setSegJsonInput(res.repairedJson);
+      }
+      if (res.isValid) {
+        setSegSuccessMsg(isAr ? 'كود JSON صالح ومطابق للمواصفات!' : 'JSON is valid!');
+        setSegPreview(res.segments);
+      } else {
+        setSegErrorMsg(t('common.contentPipeline.invalidJson'));
+      }
+    } catch (err: any) {
+      setSegErrorMsg(err.message || 'Validation failed');
+    } finally {
+      setSegValidating(false);
+    }
+  };
+
+  const runApproveSegJson = async () => {
+    if (selectedSurah === '') return;
+    setSegSaving(true);
+    setSegErrorMsg(null);
+    try {
+      await approveSegmentationJson(
+        api,
+        {
+          surahNumber: Number(selectedSurah),
+          reciterSlug: selectedReciter,
+          scope,
+          ayahNumber,
+          fromAyah,
+          toAyah,
+        },
+        segJsonInput,
+        segGenType,
+        segGenModel,
+        segLatencyMs ? Number(segLatencyMs) : undefined
+      );
+      setSegSuccessMsg(isAr ? 'تم حفظ وتأكيد المقاطع البصرية بنجاح!' : 'Segments approved and saved successfully!');
+      setSegPreview(undefined);
+      await loadDatasetStatus();
+    } catch (err: any) {
+      setSegErrorMsg(err.message || 'Failed to save approved JSON');
+    } finally {
+      setSegSaving(false);
+    }
+  };
+
+  const copySegPrompt = () => {
+    navigator.clipboard.writeText(segPrompt);
+    setSegCopied(true);
+    setTimeout(() => setSegCopied(false), 2000);
+  };
+
+  // ===================================================
+  // TASK CALLBAK OPERATORS (SEGMENT TIMINGS)
+  // ===================================================
+  const runGenerateSegTimPrompt = async () => {
+    if (selectedSurah === '') return;
+    setSegTimGenerating(true);
+    setSegTimErrorMsg(null);
+    try {
+      const prompt = await generateSegmentTimingPrompt(api, {
+        surahNumber: Number(selectedSurah),
+        reciterSlug: selectedReciter,
+        scope,
+        ayahNumber,
+        fromAyah,
+        toAyah,
+        markers: segTimMarkers,
+      });
+      setSegTimPrompt(prompt);
+    } catch (err: any) {
+      setSegTimErrorMsg(err.message || 'Failed to generate prompt');
+    } finally {
+      setSegTimGenerating(false);
+    }
+  };
+
+  const runImportSegTimJson = async () => {
+    if (selectedSurah === '') return;
+    setSegTimValidating(true);
+    setSegTimErrorMsg(null);
+    setSegTimSuccessMsg(null);
+    setSegTimErrors([]);
+    setSegTimWarnings([]);
+
+    try {
+      JSON.parse(segTimJsonInput);
+    } catch (e: any) {
+      setSegTimErrorMsg(isAr ? `خطأ في صياغة JSON: ${e.message}` : `JSON syntax error: ${e.message}`);
+      setSegTimValidating(false);
+      return;
+    }
+
+    try {
+      const res = await importSegmentTimingJson(
+        api,
+        {
+          surahNumber: Number(selectedSurah),
+          reciterSlug: selectedReciter,
+          scope,
+          ayahNumber,
+          fromAyah,
+          toAyah,
+        },
+        segTimJsonInput
+      );
+      if (res.success) {
+        setSegTimSuccessMsg(isAr ? 'تم استيراد توقيت المقاطع بنجاح!' : 'Segment timings imported successfully!');
+        await loadDatasetStatus();
+      }
+    } catch (err: any) {
+      setSegTimErrorMsg(err.message || 'Failed to import segment timings JSON');
+    } finally {
+      setSegTimValidating(false);
+    }
+  };
+
+  const copySegTimPrompt = () => {
+    navigator.clipboard.writeText(segTimPrompt);
+    setSegTimCopied(true);
+    setTimeout(() => setSegTimCopied(false), 2000);
+  };
+
+  // ===================================================
+  // TASK CALLBAK OPERATORS (LINE TIMINGS)
+  // ===================================================
+  const runGenerateLineTimPrompt = async () => {
+    if (selectedSurah === '') return;
+    setLineTimGenerating(true);
+    setLineTimErrorMsg(null);
+    try {
+      const prompt = await generateLineTimingPrompt(api, {
+        surahNumber: Number(selectedSurah),
+        reciterSlug: selectedReciter,
+        scope,
+        ayahNumber,
+        fromAyah,
+        toAyah,
+        markers: lineTimMarkers,
+        startPage: lineTimStartPage ? Number(lineTimStartPage) : undefined,
+        startLine: lineTimStartLine ? Number(lineTimStartLine) : undefined,
+      });
+      setLineTimPrompt(prompt);
+    } catch (err: any) {
+      setLineTimErrorMsg(err.message || 'Failed to generate prompt');
+    } finally {
+      setLineTimGenerating(false);
+    }
+  };
+
+  const runImportLineTimJson = async () => {
+    if (selectedSurah === '') return;
+    setLineTimValidating(true);
+    setLineTimErrorMsg(null);
+    setLineTimSuccessMsg(null);
+    setLineTimErrors([]);
+    setLineTimWarnings([]);
+
+    try {
+      JSON.parse(lineTimJsonInput);
+    } catch (e: any) {
+      setLineTimErrorMsg(isAr ? `خطأ في صياغة JSON: ${e.message}` : `JSON syntax error: ${e.message}`);
+      setLineTimValidating(false);
+      return;
+    }
+
+    try {
+      const res = await importLineTimingJson(
+        api,
+        {
+          surahNumber: Number(selectedSurah),
+          reciterSlug: selectedReciter,
+          scope,
+          ayahNumber,
+          fromAyah,
+          toAyah,
+        },
+        lineTimJsonInput
+      );
+      if (res.success) {
+        setLineTimSuccessMsg(isAr ? 'تم استيراد توقيت السطور بنجاح!' : 'Line timings imported successfully!');
+        await loadDatasetStatus();
+      }
+    } catch (err: any) {
+      setLineTimErrorMsg(err.message || 'Failed to import line timings JSON');
+    } finally {
+      setLineTimValidating(false);
+    }
+  };
+
+  const copyLineTimPrompt = () => {
+    navigator.clipboard.writeText(lineTimPrompt);
+    setLineTimCopied(true);
+    setTimeout(() => setLineTimCopied(false), 2000);
+  };
+
+  const currentLayoutConfig = LAYOUTS[layout];
 
   return (
     <div className="flex flex-col gap-6">
@@ -196,18 +531,25 @@ export default function ConsolePage() {
         </p>
       </div>
 
-      {/* Onboarding Guide Card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 text-xs flex flex-col gap-2">
-        <h4 className="font-semibold text-slate-900 dark:text-slate-100">
-          {isAr ? 'طريقة العمل' : 'How it works'}
-        </h4>
-        <ol className="list-decimal list-inside space-y-1 text-slate-500 dark:text-slate-400">
-          <li>{isAr ? 'اختر القارئ' : 'Select a reciter'}</li>
-          <li>{isAr ? 'اختر التخطيط' : 'Select a layout'}</li>
-          <li>{isAr ? 'اختر السورة ومدى الآيات' : 'Choose Surah and Ayahs'}</li>
-          <li>{isAr ? 'اختياري: ولد أو الصق ملف JSON' : 'Optionally generate or paste JSON'}</li>
-          <li>{isAr ? 'اضغط على تصدير الفيديو' : 'Click Render Video'}</li>
-        </ol>
+      {/* Collapsible Accordion Guide */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 text-xs flex flex-col gap-2 transition-all">
+        <button
+          onClick={() => setGuideOpen(!guideOpen)}
+          suppressHydrationWarning
+          className="flex items-center justify-between w-full font-semibold text-slate-900 dark:text-slate-100 focus:outline-none cursor-pointer"
+        >
+          <span>{isAr ? '📖 طريقة العمل' : '📖 How it works'}</span>
+          <span className="text-slate-450 dark:text-slate-500">{guideOpen ? '▲' : '▼'}</span>
+        </button>
+        {guideOpen && (
+          <ol className="list-decimal list-inside space-y-1 text-slate-500 dark:text-slate-400 mt-2 border-t border-slate-100 dark:border-slate-800/60 pt-2">
+            <li>{isAr ? 'اختر القارئ' : 'Select a reciter'}</li>
+            <li>{isAr ? 'اختر التخطيط' : 'Select a layout'}</li>
+            <li>{isAr ? 'اختر السورة ومدى الآيات' : 'Choose Surah and Ayahs'}</li>
+            <li>{isAr ? 'اختياري: ولد أو الصق ملف JSON' : 'Optionally generate or paste JSON'}</li>
+            <li>{isAr ? 'اضغط على تصدير الفيديو' : 'Click Render Video'}</li>
+          </ol>
+        )}
       </div>
 
       {errorMsg && (
@@ -232,22 +574,129 @@ export default function ConsolePage() {
           {/* Left panel: selection & config */}
           <div className="lg:col-span-7 flex flex-col gap-6">
             
-            {/* Audio Source Card */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col gap-4">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                  {isAr ? 'المصدر الصوتي' : 'Audio Source'}
-                </h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-sans">
-                  {isAr ? 'اختر القارئ الذي سيتم استخدام صوته وتوقيتاته.' : 'Choose the reciter whose audio and timings will be used.'}
-                </p>
+            {/* Required Selections Grid: Reciter & Surah */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
+              <div className="flex flex-col gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    {isAr ? 'القارئ' : 'Reciter'}
+                  </h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-sans">
+                    {isAr ? 'اختر القارئ للمصدر الصوتي والتوقيت.' : 'Choose the reciter for audio and timings.'}
+                  </p>
+                </div>
+                <ReciterSelect
+                  reciters={reciters}
+                  selectedSlug={selectedReciter}
+                  onSelect={setSelectedReciter}
+                  loading={loadingStatus}
+                />
               </div>
-              <ReciterSelect
-                reciters={reciters}
-                selectedSlug={selectedReciter}
-                onSelect={setSelectedReciter}
-                loading={loadingStatus}
-              />
+
+              <div className="flex flex-col gap-4 border-t md:border-t-0 md:border-l border-slate-100 dark:border-slate-800/60 pt-4 md:pt-0 md:pl-6 rtl:md:pl-0 rtl:md:pr-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    {isAr ? 'اختيار القرآن' : 'Quran Selection'}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-sans">
+                    {isAr ? 'اختر السورة ومدى الآيات لتصدير الفيديو.' : 'Select the Surah and Ayah range.'}
+                  </p>
+                </div>
+                
+                <div className="flex flex-col gap-4">
+                  <SurahSelect
+                    surahs={surahs}
+                    selectedNumber={selectedSurah}
+                    onSelect={setSelectedSurah}
+                    loading={loadingStatus}
+                  />
+
+                  {selectedSurah !== '' && (
+                    <div className="flex flex-col gap-3 border-t border-slate-100 dark:border-slate-800/60 pt-4">
+                      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                        {isAr ? 'اختر النطاق' : 'Select Scope'}
+                      </label>
+                      <div className="grid grid-cols-3 gap-2 bg-slate-50 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => setScope('full')}
+                          className={`py-1.5 px-3 rounded-lg text-xs font-semibold ${
+                            scope === 'full'
+                              ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700'
+                              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                          }`}
+                        >
+                          {t('render.scopeFull')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setScope('single')}
+                          className={`py-1.5 px-3 rounded-lg text-xs font-semibold ${
+                            scope === 'single'
+                              ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700'
+                              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                          }`}
+                        >
+                          {t('render.scopeSingle')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setScope('range')}
+                          className={`py-1.5 px-3 rounded-lg text-xs font-semibold ${
+                            scope === 'range'
+                              ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700'
+                              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                          }`}
+                        >
+                          {t('render.scopeRange')}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Conditional Inputs */}
+                  {selectedSurah !== '' && scope === 'single' && (
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t('render.ayahNumberLabel', { max: maxAyahs })}</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={maxAyahs}
+                        value={ayahNumber}
+                        onChange={(e) => setAyahNumber(Math.max(1, Math.min(maxAyahs, Number(e.target.value))))}
+                        className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 px-3 py-1.5 rounded-xl focus:outline-none focus:border-slate-450 dark:focus:border-slate-700 text-sm font-mono"
+                      />
+                    </div>
+                  )}
+
+                  {selectedSurah !== '' && scope === 'range' && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t('render.fromLabel')}</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={toAyah}
+                          value={fromAyah}
+                          onChange={(e) => setFromAyah(Math.max(1, Math.min(toAyah, Number(e.target.value))))}
+                          className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 px-3 py-1.5 rounded-xl focus:outline-none focus:border-slate-450 dark:focus:border-slate-700 text-sm font-mono"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t('render.toLabel', { max: maxAyahs })}</label>
+                        <input
+                          type="number"
+                          min={fromAyah}
+                          max={maxAyahs}
+                          value={toAyah}
+                          onChange={(e) => setToAyah(Math.max(fromAyah, Math.min(maxAyahs, Number(e.target.value))))}
+                          className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 px-3 py-1.5 rounded-xl focus:outline-none focus:border-slate-450 dark:focus:border-slate-700 text-sm font-mono"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Layout Selection Card */}
@@ -261,182 +710,163 @@ export default function ConsolePage() {
               onWithTranslationChange={setWithTranslation}
               translationSource={translationSource}
               onTranslationSourceChange={setTranslationSource}
+              withTafsir={withTafsir}
+              onWithTafsirChange={setWithTafsir}
               useGeneratedContent={useGeneratedContent}
               onUseGeneratedContentChange={setUseGeneratedContent}
             />
 
-            {/* Quran Selection Card */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col gap-4">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                  {isAr ? 'اختيار القرآن' : 'Quran Selection'}
-                </h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-sans">
-                  {isAr ? 'اختر السورة ومدى الآيات لتصدير الفيديو.' : 'Select the Surah and Ayah range to render.'}
-                </p>
-              </div>
-              
-              <div className="flex flex-col gap-4">
-                <SurahSelect
-                  surahs={surahs}
-                  selectedNumber={selectedSurah}
-                  onSelect={setSelectedSurah}
-                  loading={loadingStatus}
-                />
+            {/* PROGRESSIVE DISCLOSURE: Render AI Operations Dynamically from Config */}
+            {selectedReciter && selectedSurah !== '' && currentLayoutConfig?.availableAiTasks.map((taskId) => {
+              const task = AI_TASKS[taskId];
+              if (!task) return null;
 
-                {selectedSurah !== '' && (
-                  <div className="flex flex-col gap-3 border-t border-slate-100 dark:border-slate-800/60 pt-4">
-                    <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                      {isAr ? 'اختر النطاق' : 'Select Scope'}
-                    </label>
-                    <div className="grid grid-cols-3 gap-2 bg-slate-50 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
-                      <button
-                        type="button"
-                        onClick={() => setScope('full')}
-                        className={`py-2 px-3 rounded-lg text-xs font-semibold ${
-                          scope === 'full'
-                            ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700'
-                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-                        }`}
-                      >
-                        {t('render.scopeFull')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setScope('single')}
-                        className={`py-2 px-3 rounded-lg text-xs font-semibold ${
-                          scope === 'single'
-                            ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700'
-                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-                        }`}
-                      >
-                        {t('render.scopeSingle')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setScope('range')}
-                        className={`py-2 px-3 rounded-lg text-xs font-semibold ${
-                          scope === 'range'
-                            ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700'
-                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-                        }`}
-                      >
-                        {t('render.scopeRange')}
-                      </button>
-                    </div>
-                  </div>
-                )}
+              if (task.id === 'segmentation') {
+                return (
+                  <AITaskCard
+                    key={task.id}
+                    title={isAr ? task.titleAr : task.titleEn}
+                    description={isAr ? task.descriptionAr : task.descriptionEn}
+                    icon={task.icon}
+                    requiresMarkers={task.requiresMarkers}
+                    requiresMushafLineInfo={task.requiresMushafLineInfo}
+                    startPage=""
+                    startLine=""
+                    markers=""
+                    generatingPrompt={segGenerating}
+                    generatedPrompt={segPrompt}
+                    isCopied={segCopied}
+                    onGeneratePrompt={runGenerateSegPrompt}
+                    onCopyPrompt={copySegPrompt}
+                    jsonInput={segJsonInput}
+                    onJsonInputChange={setSegJsonInput}
+                    isValidating={segValidating}
+                    onValidateJson={runValidateSegJson}
+                    validationSuccessMessage={segSuccessMsg}
+                    validationErrors={segErrors}
+                    validationWarnings={segWarnings}
+                    errorMessage={segErrorMsg}
+                    isSegmentation={true}
+                    segmentsPreview={segPreview}
+                    isRepaired={segRepaired}
+                    saving={segSaving}
+                    generatorType={segGenType}
+                    generatorModel={segGenModel}
+                    latencyMs={segLatencyMs}
+                    onGeneratorTypeChange={setSegGenType}
+                    onGeneratorModelChange={setSegGenModel}
+                    onLatencyMsChange={setSegLatencyMs}
+                    onApproveJson={runApproveSegJson}
+                  />
+                );
+              }
 
-                {/* Conditional Inputs */}
-                {selectedSurah !== '' && scope === 'single' && (
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t('render.ayahNumberLabel', { max: maxAyahs })}</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={maxAyahs}
-                      value={ayahNumber}
-                      onChange={(e) => setAyahNumber(Math.max(1, Math.min(maxAyahs, Number(e.target.value))))}
-                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-xl focus:outline-none focus:border-slate-450 dark:focus:border-slate-700 text-sm font-mono"
-                    />
-                  </div>
-                )}
+              if (task.id === 'segment_timing') {
+                return (
+                  <AITaskCard
+                    key={task.id}
+                    title={isAr ? task.titleAr : task.titleEn}
+                    description={isAr ? task.descriptionAr : task.descriptionEn}
+                    icon={task.icon}
+                    requiresMarkers={task.requiresMarkers}
+                    requiresMushafLineInfo={task.requiresMushafLineInfo}
+                    startPage=""
+                    startLine=""
+                    markers={segTimMarkers}
+                    onMarkersChange={setSegTimMarkers}
+                    generatingPrompt={segTimGenerating}
+                    generatedPrompt={segTimPrompt}
+                    isCopied={segTimCopied}
+                    onGeneratePrompt={runGenerateSegTimPrompt}
+                    onCopyPrompt={copySegTimPrompt}
+                    jsonInput={segTimJsonInput}
+                    onJsonInputChange={setSegTimJsonInput}
+                    isValidating={segTimValidating}
+                    onValidateJson={runImportSegTimJson}
+                    validationSuccessMessage={segTimSuccessMsg}
+                    validationErrors={segTimErrors}
+                    validationWarnings={segTimWarnings}
+                    errorMessage={segTimErrorMsg}
+                    isSegmentation={false}
+                  />
+                );
+              }
 
-                {selectedSurah !== '' && scope === 'range' && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t('render.fromLabel')}</label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={toAyah}
-                        value={fromAyah}
-                        onChange={(e) => setFromAyah(Math.max(1, Math.min(toAyah, Number(e.target.value))))}
-                        className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-xl focus:outline-none focus:border-slate-450 dark:focus:border-slate-700 text-sm font-mono"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t('render.toLabel', { max: maxAyahs })}</label>
-                      <input
-                        type="number"
-                        min={fromAyah}
-                        max={maxAyahs}
-                        value={toAyah}
-                        onChange={(e) => setToAyah(Math.max(fromAyah, Math.min(maxAyahs, Number(e.target.value))))}
-                        className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-xl focus:outline-none focus:border-slate-450 dark:focus:border-slate-700 text-sm font-mono"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+              if (task.id === 'line_timing') {
+                return (
+                  <AITaskCard
+                    key={task.id}
+                    title={isAr ? task.titleAr : task.titleEn}
+                    description={isAr ? task.descriptionAr : task.descriptionEn}
+                    icon={task.icon}
+                    requiresMarkers={task.requiresMarkers}
+                    requiresMushafLineInfo={task.requiresMushafLineInfo}
+                    startPage={lineTimStartPage}
+                    startLine={lineTimStartLine}
+                    markers={lineTimMarkers}
+                    onStartPageChange={setLineTimStartPage}
+                    onStartLineChange={setLineTimStartLine}
+                    onMarkersChange={setLineTimMarkers}
+                    generatingPrompt={lineTimGenerating}
+                    generatedPrompt={lineTimPrompt}
+                    isCopied={lineTimCopied}
+                    onGeneratePrompt={runGenerateLineTimPrompt}
+                    onCopyPrompt={copyLineTimPrompt}
+                    jsonInput={lineTimJsonInput}
+                    onJsonInputChange={setLineTimJsonInput}
+                    isValidating={lineTimValidating}
+                    onValidateJson={runImportLineTimJson}
+                    validationSuccessMessage={lineTimSuccessMsg}
+                    validationErrors={lineTimErrors}
+                    validationWarnings={lineTimWarnings}
+                    errorMessage={lineTimErrorMsg}
+                    isSegmentation={false}
+                  />
+                );
+              }
 
-            {/* AI Tools prompts */}
-            <GenerateContentCard
-              surahNumber={selectedSurah}
-              reciterSlug={selectedReciter}
-              scope={scope}
-              ayahNumber={ayahNumber}
-              fromAyah={fromAyah}
-              toAyah={toAyah}
-              layout={layout}
-            />
+              return null;
+            })}
 
-            <GenerateMushafPromptCard
-              surahNumber={selectedSurah}
-              scope={scope}
-              ayahNumber={ayahNumber}
-              fromAyah={fromAyah}
-              toAyah={toAyah}
-              layout={layout}
-            />
-
-            {/* JSON Input Card */}
-            {selectedSurah !== '' && selectedReciter && (
-              <JSONInputCard
-                jsonFile={jsonFile}
-                onFileChange={(file, content) => {
-                  setJsonFile(file);
-                  setJsonFileContent(content);
-                }}
-                pastedJson={pastedJson}
-                onPastedJsonChange={setPastedJson}
+            {/* Render Video Card (Always visible at the bottom when selection is active) */}
+            {selectedReciter && selectedSurah !== '' && (
+              <GenerateVideoCard
+                surahNumber={selectedSurah}
+                reciterSlug={selectedReciter}
+                scope={scope}
+                ayahNumber={ayahNumber}
+                fromAyah={fromAyah}
+                toAyah={toAyah}
+                status={status}
+                layout={layout}
+                maxLines={maxLines}
+                withTranslation={withTranslation}
+                translationSource={translationSource}
+                withTafsir={withTafsir}
+                useGeneratedContent={useGeneratedContent}
+                customJsonPayload={undefined}
               />
             )}
-
-            {/* Render Video Card */}
-            <GenerateVideoCard
-              surahNumber={selectedSurah}
-              reciterSlug={selectedReciter}
-              scope={scope}
-              ayahNumber={ayahNumber}
-              fromAyah={fromAyah}
-              toAyah={toAyah}
-              renderable={status?.renderable ?? false}
-              layout={layout}
-              maxLines={maxLines}
-              withTranslation={withTranslation}
-              translationSource={translationSource}
-              useGeneratedContent={useGeneratedContent}
-              customJsonPayload={jsonFileContent || pastedJson || undefined}
-            />
           </div>
 
           {/* Right panel: status & actions */}
-          <div className="lg:col-span-5 flex flex-col gap-6">
-            <DatasetStatusCard
-              status={status}
-              loading={loadingStatus}
-            />
+          {selectedReciter && selectedSurah !== '' && (
+            <div className="lg:col-span-5 flex flex-col gap-6">
+              <DatasetStatusCard
+                status={status}
+                loading={loadingStatus}
+              />
 
-            <DatasetActions
-              onPrepare={handlePrepare}
-              onUploadAudio={handleUploadAudio}
-              onUploadTimings={handleUploadTimings}
-              disabled={selectedSurah === '' || !selectedReciter}
-              refreshing={loadingStatus}
-            />
-          </div>
+              <DatasetActions
+                onPrepare={handlePrepare}
+                onUploadAudio={handleUploadAudio}
+                onUploadTimings={handleUploadTimings}
+                disabled={false}
+                refreshing={loadingStatus}
+                status={status}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

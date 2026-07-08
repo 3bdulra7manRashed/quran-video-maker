@@ -262,4 +262,32 @@ class ContentGenerationController extends Controller
             return response()->json(['error' => 'Failed to save generated content to database: ' . $e->getMessage()], 500);
         }
     }
+
+    /**
+     * Generate Segment timing prompt text.
+     */
+    public function generateSegmentTimingPrompt(Request $request, \App\Services\ContentGeneration\SegmentTimingPromptBuilder $segmentTimingBuilder)
+    {
+        $request->validate([
+            'surah' => 'required|integer',
+            'reciter' => 'required|string',
+            'from_ayah' => 'nullable|integer',
+            'to_ayah' => 'nullable|integer',
+            'markers' => 'required|string',
+        ]);
+
+        $surahNumber = (int)$request->input('surah');
+        $reciterSlug = $request->input('reciter');
+        $fromAyah = $request->input('from_ayah') ? (int)$request->input('from_ayah') : null;
+        $toAyah = $request->input('to_ayah') ? (int)$request->input('to_ayah') : null;
+        $markers = $request->input('markers');
+
+        try {
+            $prompt = $segmentTimingBuilder->build($surahNumber, $reciterSlug, $fromAyah, $toAyah, $markers);
+            return response()->json(['prompt' => $prompt]);
+        } catch (\Exception $e) {
+            Log::error('Segment timing prompt generation failed: ' . $e->getMessage());
+            return response()->json(['error' => $e->getMessage()], 400);
+        }
+    }
 }

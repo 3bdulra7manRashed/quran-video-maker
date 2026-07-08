@@ -3,6 +3,7 @@ import { useRouter } from 'next/navigation';
 import { useApi } from '@/context/ApiContext';
 import { useT } from '@/hooks/useT';
 import { useLanguage } from '@/hooks/useLanguage';
+import { DatasetStatus } from '@/services/api';
 
 interface GenerateVideoCardProps {
   surahNumber: number | '';
@@ -11,11 +12,12 @@ interface GenerateVideoCardProps {
   ayahNumber: number;
   fromAyah: number;
   toAyah: number;
-  renderable: boolean;
+  status: DatasetStatus | null;
   layout: string;
   maxLines: number;
   withTranslation: boolean;
   translationSource: string;
+  withTafsir: boolean;
   useGeneratedContent: boolean;
   customJsonPayload?: string;
 }
@@ -27,11 +29,12 @@ export default function GenerateVideoCard({
   ayahNumber,
   fromAyah,
   toAyah,
-  renderable,
+  status,
   layout,
   maxLines,
   withTranslation,
   translationSource,
+  withTafsir,
   useGeneratedContent,
   customJsonPayload,
 }: GenerateVideoCardProps) {
@@ -48,7 +51,18 @@ export default function GenerateVideoCard({
     return null;
   }
 
+  // Calculate prerequisites
+  const isPrepared = status?.glyphs ?? false;
+  const isAudioUploaded = status?.audio ?? false;
+  const isWordTimingsImported = (status?.timings?.mode === 'full' || (status?.timings?.timedWords ?? 0) > 0);
+  const isLineTimingsImported = status?.timings?.mode === 'partial' || (status?.timings?.mode === 'full' && (status?.timings?.timedWords ?? 0) > 0);
+
+  const isTimingsReady = layout === 'reels' ? isWordTimingsImported : isLineTimingsImported;
+  const allPrereqsMet = isPrepared && isAudioUploaded && isTimingsReady;
+
   const handleGenerate = async () => {
+    if (!allPrereqsMet) return;
+    
     setRendering(true);
     setErrorMsg(null);
 
@@ -60,6 +74,7 @@ export default function GenerateVideoCard({
       max_lines: maxLines,
       with_translation: withTranslation,
       translation_source: translationSource,
+      with_tafsir: withTafsir,
       use_generated_content: useGeneratedContent,
       custom_json: customJsonPayload || undefined,
     };
@@ -83,7 +98,7 @@ export default function GenerateVideoCard({
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col gap-4">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col gap-4 font-sans">
       <div>
         <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
           {isAr ? 'تصدير الفيديو' : 'Render Video'}
@@ -93,10 +108,71 @@ export default function GenerateVideoCard({
         </p>
       </div>
 
+      {/* Prerequisites Checklist */}
+      <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex flex-col gap-2">
+        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+          {isAr ? 'متطلبات التصدير' : 'Export Prerequisites'}
+        </h4>
+
+        {/* Prepared Check */}
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-slate-700 dark:text-slate-350">
+            {isAr ? 'تجهيز بيانات السورة' : 'Dataset prepared'}
+          </span>
+          {isPrepared ? (
+            <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+              ✓ {isAr ? 'جاهز' : 'Prepared'}
+            </span>
+          ) : (
+            <span className="text-red-500 font-semibold flex items-center gap-1">
+              ✗ {isAr ? 'غير جاهز' : 'Not prepared'}
+            </span>
+          )}
+        </div>
+
+        {/* Audio Check */}
+        <div className="flex items-center justify-between text-xs border-t border-slate-100 dark:border-slate-900/60 pt-2">
+          <span className="text-slate-700 dark:text-slate-350">
+            {isAr ? 'رفع الملف الصوتي' : 'Audio uploaded'}
+          </span>
+          {isAudioUploaded ? (
+            <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+              ✓ {isAr ? 'مرفوع' : 'Uploaded'}
+            </span>
+          ) : (
+            <span className="text-red-500 font-semibold flex items-center gap-1">
+              ✗ {isAr ? 'غير مرفوع' : 'Not uploaded'}
+            </span>
+          )}
+        </div>
+
+        {/* Timings Check */}
+        <div className="flex items-center justify-between text-xs border-t border-slate-100 dark:border-slate-900/60 pt-2">
+          <span className="text-slate-700 dark:text-slate-350">
+            {layout === 'reels' 
+              ? (isAr ? 'استيراد توقيت المقاطع' : 'Segment Timings imported')
+              : (isAr ? 'استيراد توقيت السطور' : 'Line Timings imported')
+            }
+          </span>
+          {isTimingsReady ? (
+            <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+              ✓ {isAr ? 'مستورد' : 'Imported'}
+            </span>
+          ) : (
+            <span className="text-red-500 font-semibold flex items-center gap-1">
+              ✗ {layout === 'reels' 
+                ? (isAr ? 'غير مستورد' : 'Segment Timings not imported')
+                : (isAr ? 'غير مستورد' : 'Line Timings not imported')
+              }
+            </span>
+          )}
+        </div>
+      </div>
+
       <div className="flex flex-col gap-2">
         <button
           onClick={handleGenerate}
-          disabled={!renderable || rendering}
+          disabled={!allPrereqsMet || rendering}
           className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:bg-emerald-700/20 disabled:text-emerald-500/50 disabled:cursor-not-allowed text-white font-bold px-4 py-3 rounded-xl transition-none flex items-center justify-center gap-2 cursor-pointer text-sm"
         >
           {rendering ? (
@@ -106,9 +182,9 @@ export default function GenerateVideoCard({
           )}
         </button>
 
-        {!renderable && (
+        {!allPrereqsMet && (
           <span className="text-[10px] text-amber-600 dark:text-amber-400 text-center font-mono mt-1">
-            ⚠️ {t('render.datasetNotRenderable')}
+            ⚠️ {isAr ? 'برجاء استيفاء جميع المتطلبات لتفعيل زر التصدير.' : 'Please satisfy all prerequisites to enable video export.'}
           </span>
         )}
 

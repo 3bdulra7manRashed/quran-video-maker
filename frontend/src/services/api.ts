@@ -270,6 +270,27 @@ export class ApiService {
     return res.json();
   }
 
+  async generateSegmentTimingPrompt(params: {
+    surah: number;
+    reciter: string;
+    from_ayah?: number | null;
+    to_ayah?: number | null;
+    markers: string;
+  }): Promise<{ prompt: string }> {
+    const res = await fetch(`${this.baseUrl}/api/datasets/generate-segment-timing-prompt`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Failed to generate prompt');
+    }
+    return res.json();
+  }
+
   async previewImport(params: {
     json: string;
     surah: number;

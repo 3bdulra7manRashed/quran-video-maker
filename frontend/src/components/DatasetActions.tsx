@@ -3,12 +3,15 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useT } from '@/hooks/useT';
 
+import { DatasetStatus } from '@/services/api';
+
 interface DatasetActionsProps {
   onPrepare: () => Promise<void>;
   onUploadAudio: (file: File) => Promise<void>;
   onUploadTimings: (file: File) => Promise<void>;
   disabled: boolean;
   refreshing: boolean;
+  status: DatasetStatus | null;
 }
 
 export default function DatasetActions({
@@ -17,6 +20,7 @@ export default function DatasetActions({
   onUploadTimings,
   disabled,
   refreshing,
+  status,
 }: DatasetActionsProps) {
   const t = useT();
   const audioInputRef = useRef<HTMLInputElement>(null);
@@ -116,52 +120,56 @@ export default function DatasetActions({
         </button>
 
         {/* Upload Audio */}
-        <div className="w-full">
-          <input
-            type="file"
-            accept=".mp3"
-            ref={audioInputRef}
-            onChange={handleAudioChange}
-            className="hidden"
-          />
-          <button
-            onClick={() => audioInputRef.current?.click()}
-            disabled={isButtonDisabled}
-            className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 font-semibold px-4 py-2.5 rounded-xl text-xs disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer"
-          >
-            {uploadingAudio ? (
-              <span>Uploading Audio...</span>
-            ) : refreshing && lastAction === 'audio' ? (
-              <span>Refreshing...</span>
-            ) : (
-              <span>🎵 Upload Audio (.mp3)</span>
-            )}
-          </button>
-        </div>
+        {status?.glyphs === true && (
+          <div className="w-full">
+            <input
+              type="file"
+              accept=".mp3"
+              ref={audioInputRef}
+              onChange={handleAudioChange}
+              className="hidden"
+            />
+            <button
+              onClick={() => audioInputRef.current?.click()}
+              disabled={isButtonDisabled}
+              className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 font-semibold px-4 py-2.5 rounded-xl text-xs disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {uploadingAudio ? (
+                <span>Uploading Audio...</span>
+              ) : refreshing && lastAction === 'audio' ? (
+                <span>Refreshing...</span>
+              ) : (
+                <span>🎵 Upload Audio (.mp3)</span>
+              )}
+            </button>
+          </div>
+        )}
 
         {/* Upload Timings */}
-        <div className="w-full">
-          <input
-            type="file"
-            accept=".json"
-            ref={timingsInputRef}
-            onChange={handleTimingsChange}
-            className="hidden"
-          />
-          <button
-            onClick={() => timingsInputRef.current?.click()}
-            disabled={isButtonDisabled}
-            className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 font-semibold px-4 py-2.5 rounded-xl text-xs disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer"
-          >
-            {uploadingTimings ? (
-              <span>Uploading Timings...</span>
-            ) : refreshing && lastAction === 'timings' ? (
-              <span>Refreshing...</span>
-            ) : (
-              <span>⏱️ Upload Timings (.json)</span>
-            )}
-          </button>
-        </div>
+        {status?.audio === true && (
+          <div className="w-full">
+            <input
+              type="file"
+              accept=".json"
+              ref={timingsInputRef}
+              onChange={handleTimingsChange}
+              className="hidden"
+            />
+            <button
+              onClick={() => timingsInputRef.current?.click()}
+              disabled={isButtonDisabled}
+              className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 font-semibold px-4 py-2.5 rounded-xl text-xs disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {uploadingTimings ? (
+                <span>Uploading Timings...</span>
+              ) : refreshing && lastAction === 'timings' ? (
+                <span>Refreshing...</span>
+              ) : (
+                <span>⏱️ Upload Timings (.json)</span>
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Messages */}

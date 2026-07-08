@@ -56,6 +56,7 @@ export default function Navigation({ apiUrl, onApiUrlChange }: NavigationProps) 
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value as any)}
+            suppressHydrationWarning
             className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 px-2.5 py-1.5 rounded-lg text-xs font-sans focus:outline-none focus:border-slate-400 dark:focus:border-slate-650 cursor-pointer"
           >
             <option value="ar">{t('settings.arabic')}</option>
@@ -69,6 +70,7 @@ export default function Navigation({ apiUrl, onApiUrlChange }: NavigationProps) 
             type="text"
             value={apiUrl}
             onChange={(e) => onApiUrlChange(e.target.value)}
+            suppressHydrationWarning
             className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 px-3 py-1.5 rounded-lg text-xs font-mono focus:outline-none focus:border-slate-400 dark:focus:border-slate-650 w-full sm:w-64"
             placeholder="http://localhost:8000"
           />
