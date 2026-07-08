@@ -100,9 +100,17 @@ class QuranComDatasetProvider implements DatasetProvider
             $surahNumber
         );
 
-        $cleanDataset = $pipeline->process($surahNumber, $dataset, $metadata);
+        $result = $pipeline->process($surahNumber, $dataset, $metadata);
 
-        file_put_contents($destFile, json_encode($cleanDataset, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        file_put_contents($destFile, json_encode($result->dataset, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+        // Write metadata to separate file
+        $metaDir = $destDir . '/metadata';
+        if (!file_exists($metaDir)) {
+            mkdir($metaDir, 0755, true);
+        }
+        $metaFile = $metaDir . "/surah_{$surahNumber}.metadata.json";
+        file_put_contents($metaFile, json_encode($result->metadata->toArray(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
     }
 
     /**

@@ -26,10 +26,10 @@ class DatasetPipeline
      * @param int $surahNumber
      * @param array $dataset
      * @param \App\Modules\Dataset\Validation\DatasetMetadata|null $metadata
-     * @return array The processed (and potentially corrected) dataset.
+     * @return DatasetPipelineResult The processed dataset and metadata.
      * @throws \RuntimeException If validation fails even after normalization.
      */
-    public function process(int $surahNumber, array $dataset, ?\App\Modules\Dataset\Validation\DatasetMetadata $metadata = null): array
+    public function process(int $surahNumber, array $dataset, ?\App\Modules\Dataset\Validation\DatasetMetadata $metadata = null): DatasetPipelineResult
     {
         Log::info("[DatasetPipeline] Processing dataset for Surah {$surahNumber}...");
 
@@ -103,9 +103,6 @@ class DatasetPipeline
         $integrityHash = hash('sha256', json_encode($dataset['verses'], JSON_UNESCAPED_UNICODE));
         $metadata = $metadata->withIntegrityHash($integrityHash);
 
-        // Store metadata alongside the dataset verses
-        $dataset['metadata'] = $metadata->toArray();
-
-        return $dataset;
+        return new DatasetPipelineResult($dataset, $metadata);
     }
 }

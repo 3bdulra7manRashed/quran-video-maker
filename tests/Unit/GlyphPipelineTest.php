@@ -157,12 +157,12 @@ class GlyphPipelineTest extends TestCase
         );
 
         // Pass 1: Should apply corrections and succeed
-        $cleanedDataset1 = $pipeline->process(55, $dataset, $metadata);
+        $cleanedResult1 = $pipeline->process(55, $dataset, $metadata);
 
         // Pass 2: Should find it clean, apply 0 corrections, and succeed with identical dataset
-        $cleanedDataset2 = $pipeline->process(55, $cleanedDataset1, $metadata);
+        $cleanedResult2 = $pipeline->process(55, $cleanedResult1->dataset, $metadata);
 
-        $this->assertEquals($cleanedDataset1, $cleanedDataset2);
+        $this->assertEquals($cleanedResult1->dataset, $cleanedResult2->dataset);
     }
 
     public function test_pipeline_throws_exception_if_unresolvable_errors(): void
@@ -288,27 +288,27 @@ class GlyphPipelineTest extends TestCase
         $output = $pipeline->process(55, $dataset, $metadata);
 
         // Verification of canonical values
-        $this->assertArrayHasKey('metadata', $output);
-        $this->assertArrayHasKey('verses', $output);
+        $this->assertArrayHasKey('verses', $output->dataset);
+        $this->assertArrayNotHasKey('metadata', $output->dataset); // Must NOT be embedded
 
         // Verify metadata fields
-        $this->assertEquals('quran_com', $output['metadata']['provider']);
-        $this->assertEquals('v4', $output['metadata']['provider_version']);
-        $this->assertEquals('glyphs', $output['metadata']['dataset_type']);
-        $this->assertEquals(55, $output['metadata']['surah_number']);
+        $this->assertEquals('quran_com', $output->metadata->provider);
+        $this->assertEquals('v4', $output->metadata->providerVersion);
+        $this->assertEquals('glyphs', $output->metadata->datasetType);
+        $this->assertEquals(55, $output->metadata->surahNumber);
         
         // Integrity hash must be computed
-        $this->assertNotNull($output['metadata']['integrity_hash']);
-        $this->assertEquals(64, strlen($output['metadata']['integrity_hash'])); // SHA-256 is 64 hex chars
+        $this->assertNotNull($output->metadata->integrityHash);
+        $this->assertEquals(64, strlen($output->metadata->integrityHash)); // SHA-256 is 64 hex chars
 
         // Verify expected corrected pages
-        $this->assertEquals(532, $output['verses'][1]['page_number']);
-        $this->assertEquals(532, $output['verses'][1]['words'][0]['page_number']);
-        $this->assertEquals(532, $output['verses'][2]['page_number']);
-        $this->assertEquals(532, $output['verses'][2]['words'][0]['page_number']);
+        $this->assertEquals(532, $output->dataset['verses'][1]['page_number']);
+        $this->assertEquals(532, $output->dataset['verses'][1]['words'][0]['page_number']);
+        $this->assertEquals(532, $output->dataset['verses'][2]['page_number']);
+        $this->assertEquals(532, $output->dataset['verses'][2]['words'][0]['page_number']);
 
         // Verify idempotency of the computed hash
-        $expectedHash = hash('sha256', json_encode($output['verses'], JSON_UNESCAPED_UNICODE));
-        $this->assertEquals($expectedHash, $output['metadata']['integrity_hash']);
+        $expectedHash = hash('sha256', json_encode($output->dataset['verses'], JSON_UNESCAPED_UNICODE));
+        $this->assertEquals($expectedHash, $output->metadata->integrityHash);
     }
 }
