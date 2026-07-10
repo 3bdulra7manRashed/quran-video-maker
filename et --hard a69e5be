@@ -1,0 +1,27 @@
+[33m2414ac8[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m)[m HEAD@{0}: reset: moving to HEAD~1
+[33ma69e5be[m HEAD@{1}: commit: feat: implement AI-driven content generation pipeline with prompt builders and API service integration
+[33m2414ac8[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m)[m HEAD@{2}: commit: feat: implement dataset pipeline and Quran.com provider for downloading and processing glyphs and audio data
+[33m1e8fee2[m HEAD@{3}: commit: feat: implement dataset validation and normalization pipeline with Quran.com provider and page-wrap correction rules
+[33m4218bd2[m[33m ([m[1;31morigin/main[m[33m)[m HEAD@{4}: commit: feat: implement Mushaf line timing prompt generation service and UI components
+[33mcfabd7e[m HEAD@{5}: commit: feat: implement AI rendering pipeline with approved content segmentation and word alignment services
+[33mb2b699e[m HEAD@{6}: commit: feat: implement AI-generated content pipeline with alignment, validation, and repair services
+[33mb10a3a8[m HEAD@{7}: commit: feat: implement AI-driven content generation pipeline with segment alignment, validation, and storage support
+[33mcdd535c[m HEAD@{8}: commit: feat: implement frontend UI and backend services for dataset management and video rendering preparation
+[33m366f1ec[m HEAD@{9}: commit: feat: implement adaptive YouTube Mushaf layout with dynamic translation text rendering and line-clamping logic.
+[33m3fb801a[m HEAD@{10}: commit: feat: implement video render job management with translation support and cancellation functionality
+[33m69b049e[m HEAD@{11}: commit: feat: implement TranslationTextLayer and add job management UI with layout strategies
+[33mcee5313[m HEAD@{12}: commit: feat: implement manual timing import services, dataset metadata tracking, and line timing resolution logic
+[33m5b79376[m HEAD@{13}: commit: feat: implement render job management, reciter source categorization, and line timing database support
+[33m1ee63d5[m HEAD@{14}: commit: feat: implement video duration tracking using ffprobe and add API endpoints to manage video library files.
+[33mc63a5b0[m HEAD@{15}: commit: feat: implement console page for dataset management and add DatasetActions component
+[33mc7dc369[m HEAD@{16}: commit: building frontend
+[33mbab2119[m HEAD@{17}: commit: feat: implement reciter word timings system including model, migration, import commands, and dataset status evaluation.
+[33m0a2eaf5[m HEAD@{18}: commit: feat: implement video rendering pipeline and CLI command for automated Quran reel generation
+[33mb76ecc9[m HEAD@{19}: commit: feat: implement video rendering pipeline with command-line interface and composition services
+[33m1dc6b90[m HEAD@{20}: commit: feat: implement core rendering pipeline, layout strategy, and frame generation services for Quran video creation
+[33mc82dbf5[m HEAD@{21}: commit: feat: implement core video rendering pipeline, audio metadata importer, and segment rendering services
+[33m4a3e49d[m HEAD@{22}: commit: feat: implement segmentation and rendering pipeline for vertical reel layouts
+[33m1ad99e5[m HEAD@{23}: commit: feat: implement frame layout pagination, timing synchronization, and PNG rendering pipeline
+[33m03dfd17[m HEAD@{24}: commit: feat: initialize project structure with rendering modules, Quranic assets, and Filament UI components
+[33m7631277[m HEAD@{25}: Branch: renamed refs/heads/master to refs/heads/main
+[33m7631277[m HEAD@{27}: commit (initial): first commit

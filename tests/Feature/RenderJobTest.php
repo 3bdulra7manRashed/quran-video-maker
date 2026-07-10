@@ -219,17 +219,17 @@ class RenderJobTest extends TestCase
         $this->assertEquals('Indeed, We have granted you, [O Muhammad], al-Kawthar.', $translation);
     }
 
-    public function test_repository_falls_back_to_word_fragments_when_missing(): void
+    public function test_repository_does_not_fall_back_to_literal_when_missing(): void
     {
         $repo = app(\App\Modules\Rendering\Contracts\TranslationRepositoryInterface::class);
 
-        // Delete the database record for 108:2 to trigger fallback
+        // Delete the database record for 108:2
         \App\Modules\Quran\Models\AyahTranslation::where('source', 'sahih_international')
             ->where('surah_number', 108)
             ->where('ayah_number', 2)
             ->delete();
 
-        // Create dummy ayah and word fragments in test DB
+        // Create dummy ayah and word fragments in test DB with literal translations
         $ayah = \App\Modules\Quran\Models\Ayah::create([
             'surah_id' => $this->surah->id,
             'verse_key' => '108:2',
@@ -270,8 +270,8 @@ class RenderJobTest extends TestCase
         // Get translation
         $translation = $repo->getAyahTranslation(108, 2, 'sahih_international');
         
-        // Assert it fell back to word fragment compilation
-        $this->assertEquals('So pray to your Lord and sacrifice', $translation);
+        // Assert it does NOT fall back to literal word fragments and returns empty string
+        $this->assertEquals('', $translation);
     }
 
     public function test_repository_strips_html_tags_and_footnotes(): void

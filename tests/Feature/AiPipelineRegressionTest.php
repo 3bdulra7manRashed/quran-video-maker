@@ -685,6 +685,49 @@ class AiPipelineRegressionTest extends TestCase
     }
 
     /**
+     * Test 7i: PromptBuilder only uses Sahih International, leaves missing ones empty, and never falls back to literal.
+     */
+    public function test_prompt_builder_only_uses_sahih_international_without_literal_fallback(): void
+    {
+        $this->seedSurahWithWords(108);
+
+        // 1. Seed Sahih International for Ayah 1 and 3, leaving Ayah 2 missing
+        \App\Modules\Quran\Models\AyahTranslation::updateOrCreate(
+            ['source' => 'sahih_international', 'surah_number' => 108, 'ayah_number' => 1],
+            ['text' => 'Indeed, We have granted you, [O Muhammad], al-Kawthar.']
+        );
+        \App\Modules\Quran\Models\AyahTranslation::updateOrCreate(
+            ['source' => 'sahih_international', 'surah_number' => 108, 'ayah_number' => 3],
+            ['text' => 'Indeed, your enemy is the one cut off.']
+        );
+
+        // Ensure Ayah 2 translation is missing from AyahTranslation
+        \App\Modules\Quran\Models\AyahTranslation::where('source', 'sahih_international')
+            ->where('surah_number', 108)
+            ->where('ayah_number', 2)
+            ->delete();
+
+        // 2. Set word-level literal translation (translation_en) on words of Ayah 2
+        // to verify that PromptBuilder completely ignores it
+        \App\Modules\Quran\Models\Word::whereHas('ayah', function ($q) {
+            $q->where('surah_id', $this->surah->id)->where('ayah_number', 2);
+        })->update(['translation_en' => 'literal_translation_text']);
+
+        $builder = app(\App\Services\ContentGeneration\PromptBuilder::class);
+        $prompt = $builder->build(108, 'test-reciter');
+
+        // 3. Verify Sahih International is populated
+        $this->assertStringContainsString('1: Indeed, We have granted you, [O Muhammad], al-Kawthar.', $prompt);
+        $this->assertStringContainsString('3: Indeed, your enemy is the one cut off.', $prompt);
+
+        // 4. Verify missing Sahih International for Ayah 2 is left empty
+        $this->assertStringContainsString("2: \n", $prompt);
+
+        // 5. Verify Literal Translation is NOT substituted or included anywhere in the prompt
+        $this->assertStringNotContainsString('literal_translation_text', $prompt);
+    }
+
+    /**
      * Test 7f: MushafLineTimingPromptBuilder builds correct prompt.
      */
     public function test_mushaf_line_timing_prompt_builder(): void

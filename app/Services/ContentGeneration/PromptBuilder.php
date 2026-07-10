@@ -78,9 +78,13 @@ class PromptBuilder
         if ($toAyah !== null) {
             $translations->where('ayah_number', '<=', $toAyah);
         }
+        $translationsMap = $translations->get()->keyBy('ayah_number');
+
         $translationLines = [];
-        foreach ($translations->orderBy('ayah_number')->get() as $t) {
-            $translationLines[] = "{$t->ayah_number}: {$t->text}";
+        foreach ($ayahs as $ayah) {
+            $t = $translationsMap[$ayah->ayah_number] ?? null;
+            $text = $t ? $t->text : '';
+            $translationLines[] = "{$ayah->ayah_number}: {$text}";
         }
         $translationText = implode("\n", $translationLines);
 
@@ -167,7 +171,8 @@ Rules:
 - All JSON keys and string values must use double quotes (`"`).
 - Escape all quotation marks inside strings correctly using `\"`.
 - Do not include trailing commas.
-- Preserve all provided Arabic, translation, and tafsir text exactly as given.
+- Preserve all provided Arabic, Sahih International translation, and tafsir text exactly as given.
+- The Sahih International translation must be preserved verbatim and only split proportionally according to the Arabic segmentation.
 - Do not rewrite, paraphrase, invent, summarize, or modify any text.
 - The response must be valid JSON that can be parsed directly.
 

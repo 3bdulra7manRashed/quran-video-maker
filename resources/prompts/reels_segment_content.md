@@ -20,8 +20,8 @@ Layout Constraints:
 {{layout_constraints}}
 
 AI Instructions:
-1. You MUST NOT rewrite, paraphrase, summarize, interpret, invent, translate, or modify any provided Arabic text, translation, or tafsir.
-2. You MUST preserve the official text verbatim across the segments.
+1. You MUST NOT rewrite, paraphrase, summarize, interpret, invent, translate, or modify any provided Arabic text, Sahih International translation, or tafsir.
+2. You MUST preserve the official text verbatim across the segments. Specifically, you must preserve the provided Sahih International translation verbatim and only split it proportionally according to the Arabic segmentation.
 3. Determine natural segment boundaries for the Arabic text.
 4. Split the English translation and Tafsir according to each Arabic segment's meaning so that they align contextually.
 5. Return a valid JSON response matching the schema below.
@@ -73,7 +73,7 @@ Correct:
 "translation": "\"Indeed, I am overpowered, so help.\""
 
 Do NOT modify, rewrite, paraphrase, summarize, interpret, or invent any text.
-Copy the provided Arabic, translation, and tafsir verbatim.
+Copy the provided Arabic, Sahih International translation, and tafsir verbatim.
 
 Your only task is:
 1. Determine natural segment boundaries.

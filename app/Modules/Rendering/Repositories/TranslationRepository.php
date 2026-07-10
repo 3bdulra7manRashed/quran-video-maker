@@ -22,7 +22,7 @@ class TranslationRepository implements TranslationRepositoryInterface
             return $this->cleanTranslationText($row->text);
         }
 
-        return $this->fallbackTranslation($surahNumber, $ayahNumber);
+        return '';
     }
 
     /**
@@ -34,33 +34,9 @@ class TranslationRepository implements TranslationRepositoryInterface
             ->where('surah_number', $surahNumber)
             ->get();
 
-        if ($rows->isNotEmpty()) {
-            $result = [];
-            foreach ($rows as $row) {
-                $result[$row->ayah_number] = $this->cleanTranslationText($row->text);
-            }
-            return $result;
-        }
-
-        // Optimized bulk fallback to avoid N+1 queries
-        $words = Word::whereHas('ayah', function ($q) use ($surahNumber) {
-            $q->where('surah_id', function ($sub) use ($surahNumber) {
-                $sub->select('id')->from('surahs')->where('number', $surahNumber);
-            });
-        })
-        ->where('char_type', 'word')
-        ->with('ayah')
-        ->get()
-        ->groupBy('ayah.ayah_number');
-
         $result = [];
-        foreach ($words as $ayahNumber => $ayahWords) {
-            $sortedWords = $ayahWords->sortBy('word_index');
-            $fragments = [];
-            foreach ($sortedWords as $w) {
-                $fragments[] = trim($w->translation_en);
-            }
-            $result[$ayahNumber] = implode(' ', array_filter($fragments));
+        foreach ($rows as $row) {
+            $result[$row->ayah_number] = $this->cleanTranslationText($row->text);
         }
 
         return $result;
