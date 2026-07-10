@@ -76,6 +76,21 @@ class DatasetRenderController
         $useGeneratedContent = (bool) $request->input('use_generated_content', false);
         $customJson = $request->input('custom_json');
 
+        if ($withTranslation) {
+            $jsonPath = 'storage/app/quran/translations/sahih_international.json';
+            if (!file_exists(storage_path('app/quran/translations/sahih_international.json'))) {
+                return response()->json([
+                    'error' => "Missing translation dataset:\n{$jsonPath}"
+                ], 422);
+            }
+            $exists = \App\Modules\Quran\Models\AyahTranslation::where('source', 'sahih_international')->exists();
+            if (!$exists) {
+                return response()->json([
+                    'error' => "Official Sahih International translations have not been imported.\n\nRun:\n\nphp artisan import:verse-translations"
+                ], 422);
+            }
+        }
+
         // Create the RenderJob model record
         $renderJob = RenderJob::create([
             'status'             => 'pending',

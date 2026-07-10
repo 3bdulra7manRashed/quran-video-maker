@@ -23,6 +23,13 @@ export interface DatasetStatus {
     totalWords: number;
   };
   renderable: boolean;
+  approved_segments?: Array<{ order: number; arabic: string; translation: string; tafsir: string }>;
+  translations?: {
+    json_exists: boolean;
+    table_populated: boolean;
+    ready: boolean;
+    error: string | null;
+  };
 }
 
 export interface PrepareResponse {

@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { useLanguage } from '@/hooks/useLanguage';
+import SegmentTimingRecorder from './SegmentTimingRecorder';
 
 interface AITaskCardProps {
   title: string;
@@ -47,6 +48,17 @@ interface AITaskCardProps {
   onGeneratorModelChange?: (val: string) => void;
   onLatencyMsChange?: (val: string) => void;
   onApproveJson?: () => void;
+
+  // Timing Recorder custom props
+  isSegmentTiming?: boolean;
+  surahNumber?: number;
+  reciterSlug?: string;
+  scope?: 'full' | 'single' | 'range';
+  ayahNumber?: number | null;
+  fromAyah?: number | null;
+  toAyah?: number | null;
+  approvedSegments?: Array<{ order: number; arabic: string; translation: string; tafsir: string }>;
+  onManualTimingsComplete?: (json: string) => Promise<void>;
 }
 
 export default function AITaskCard({
@@ -89,10 +101,21 @@ export default function AITaskCard({
   onGeneratorModelChange,
   onLatencyMsChange,
   onApproveJson,
+
+  isSegmentTiming,
+  surahNumber,
+  reciterSlug,
+  scope,
+  ayahNumber,
+  fromAyah,
+  toAyah,
+  approvedSegments,
+  onManualTimingsComplete,
 }: AITaskCardProps) {
   const { language } = useLanguage();
   const isAr = language === 'ar';
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isRecording, setIsRecording] = useState<boolean>(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -103,6 +126,71 @@ export default function AITaskCard({
     };
     reader.readAsText(file);
   };
+
+  if (isSegmentTiming) {
+    if (isRecording) {
+      return (
+        <SegmentTimingRecorder
+          surahNumber={surahNumber!}
+          reciterSlug={reciterSlug!}
+          scope={scope!}
+          ayahNumber={ayahNumber ?? null}
+          fromAyah={fromAyah ?? null}
+          toAyah={toAyah ?? null}
+          approvedSegments={approvedSegments || []}
+          onRecordingComplete={async (json) => {
+            await onManualTimingsComplete?.(json);
+            setIsRecording(false);
+          }}
+          onCancel={() => setIsRecording(false)}
+        />
+      );
+    }
+
+    return (
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col gap-4 font-sans">
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <span>{icon}</span>
+            <span>{title}</span>
+          </h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-sans">
+            {description}
+          </p>
+        </div>
+
+        {approvedSegments && approvedSegments.length > 0 ? (
+          <div className="flex flex-col gap-3 border-t border-slate-100 dark:border-slate-800/60 pt-4">
+            <button
+              type="button"
+              onClick={() => setIsRecording(true)}
+              className="w-full bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-semibold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer"
+            >
+              🎙️ Open Segment Timing Recorder
+            </button>
+
+            {validationSuccessMessage && (
+              <div className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 border border-emerald-250 dark:border-emerald-900 p-3 rounded-xl text-xs font-semibold font-mono">
+                {validationSuccessMessage}
+              </div>
+            )}
+            {errorMessage && (
+              <div className="bg-red-50 text-red-750 dark:bg-red-950/20 dark:text-red-400 border border-red-200 dark:border-red-900/50 p-3 rounded-xl text-xs font-semibold">
+                {errorMessage}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="border-t border-slate-100 dark:border-slate-800/60 pt-4 flex flex-col gap-3">
+            <div className="bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50 p-4 rounded-xl text-xs flex flex-col gap-2 font-mono">
+              <span className="font-bold">⚠️ Warning:</span>
+              <span>No approved segment definitions found. Please generate and approve segments first.</span>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col gap-4 font-sans">

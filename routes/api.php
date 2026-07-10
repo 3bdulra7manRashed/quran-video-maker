@@ -14,6 +14,7 @@ Route::get('/reciters', [ReciterController::class, 'index']);
 Route::get('/surahs', [SurahController::class, 'index']);
 Route::get('/datasets/status', [DatasetStatusController::class, 'status']);
 Route::post('/datasets/prepare', [DatasetPrepareController::class, 'prepare']);
+Route::get('/datasets/audio/stream', [DatasetAudioController::class, 'stream']);
 Route::post('/datasets/audio', [DatasetAudioController::class, 'upload']);
 Route::post('/datasets/timings', [DatasetTimingsController::class, 'upload']);
 

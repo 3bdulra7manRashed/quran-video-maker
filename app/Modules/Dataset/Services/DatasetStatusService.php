@@ -44,6 +44,24 @@ class DatasetStatusService
             $coverage = $this->coverageResolver->resolve($reciter->id, $surahNumber);
         }
 
+        $approvedSegments = [];
+        if ($reciter) {
+            $approvedSegments = \App\Modules\Quran\Models\ReelsGeneratedContent::where('reciter_id', $reciter->id)
+                ->where('surah_number', $surahNumber)
+                ->where('approval_status', \App\Enums\ContentApprovalStatus::APPROVED)
+                ->orderBy('segment_order')
+                ->get()
+                ->map(fn($seg) => [
+                    'order' => $seg->segment_order,
+                    'arabic' => $seg->arabic,
+                    'translation' => $seg->translation,
+                    'tafsir' => $seg->tafsir,
+                ])
+                ->all();
+        }
+
+        $translationsStatus = $this->evaluateTranslations();
+
         return [
             'reciter' => $reciterSlug,
             'surah' => $surahNumber,
@@ -52,6 +70,8 @@ class DatasetStatusService
             'timings' => $timings,
             'renderable' => $renderable,
             'coverage' => $coverage,
+            'approved_segments' => $approvedSegments,
+            'translations' => $translationsStatus,
         ];
     }
 
@@ -191,6 +211,33 @@ class DatasetStatusService
             'mode' => 'partial',
             'timedWords' => $timedSpoken,
             'totalWords' => $totalSpoken,
+        ];
+    }
+
+    /**
+     * Evaluate translations readiness.
+     */
+    protected function evaluateTranslations(): array
+    {
+        $jsonPath = 'storage/app/quran/translations/sahih_international.json';
+        $jsonExists = file_exists(storage_path('app/quran/translations/sahih_international.json'));
+        
+        $tablePopulated = \App\Modules\Quran\Models\AyahTranslation::where('source', 'sahih_international')->exists();
+        
+        $ready = $jsonExists && $tablePopulated;
+        
+        $error = null;
+        if (!$jsonExists) {
+            $error = "Missing translation dataset:\n{$jsonPath}";
+        } elseif (!$tablePopulated) {
+            $error = "Official Sahih International translations have not been imported.\n\nRun:\n\nphp artisan import:verse-translations";
+        }
+        
+        return [
+            'json_exists' => $jsonExists,
+            'table_populated' => $tablePopulated,
+            'ready' => $ready,
+            'error' => $error,
         ];
     }
 }

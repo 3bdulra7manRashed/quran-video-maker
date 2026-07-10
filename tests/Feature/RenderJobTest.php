@@ -38,25 +38,40 @@ class RenderJobTest extends TestCase
 
     public function test_can_create_render_job_with_translation(): void
     {
-        $payload = [
-            'reciter' => 'test-reciter',
-            'surah' => 108,
-            'scope' => 'full',
-            'layout' => 'reels',
-            'with_translation' => true,
-            'translation_source' => 'sahih_international',
-        ];
+        // Seed translation record
+        \App\Modules\Quran\Models\AyahTranslation::updateOrCreate(
+            ['source' => 'sahih_international', 'surah_number' => 108, 'ayah_number' => 1],
+            ['text' => 'Translation 1']
+        );
 
-        $response = $this->postJson('/api/renders', $payload);
+        // Ensure JSON file exists
+        $jsonPath = storage_path('app/quran/translations/sahih_international.json');
+        @mkdir(dirname($jsonPath), 0777, true);
+        file_put_contents($jsonPath, '[]');
 
-        $response->assertStatus(200);
-        $response->assertJsonStructure(['uuid', 'status']);
+        try {
+            $payload = [
+                'reciter' => 'test-reciter',
+                'surah' => 108,
+                'scope' => 'full',
+                'layout' => 'reels',
+                'with_translation' => true,
+                'translation_source' => 'sahih_international',
+            ];
 
-        $uuid = $response->json('uuid');
-        $job = RenderJob::where('uuid', $uuid)->firstOrFail();
+            $response = $this->postJson('/api/renders', $payload);
 
-        $this->assertTrue($job->with_translation);
-        $this->assertEquals('sahih_international', $job->translation_source);
+            $response->assertStatus(200);
+            $response->assertJsonStructure(['uuid', 'status']);
+
+            $uuid = $response->json('uuid');
+            $job = RenderJob::where('uuid', $uuid)->firstOrFail();
+
+            $this->assertTrue($job->with_translation);
+            $this->assertEquals('sahih_international', $job->translation_source);
+        } finally {
+            @unlink($jsonPath);
+        }
     }
 
     public function test_can_create_render_job_without_translation_by_default(): void
@@ -198,11 +213,29 @@ class RenderJobTest extends TestCase
         // Truncate first to test fresh import
         \App\Modules\Quran\Models\AyahTranslation::truncate();
 
-        $this->artisan('import:verse-translations')
-            ->assertExitCode(0);
+        // Write a temporary json file with 6236 dummy records
+        $jsonPath = storage_path('app/quran/translations/sahih_international.json');
+        @mkdir(dirname($jsonPath), 0777, true);
 
-        $count = \App\Modules\Quran\Models\AyahTranslation::where('source', 'sahih_international')->count();
-        $this->assertEquals(6236, $count);
+        $records = [];
+        for ($i = 1; $i <= 6236; $i++) {
+            $records[] = [
+                'surah' => 108,
+                'ayah' => $i,
+                'text' => "Translation for verse {$i}",
+            ];
+        }
+        file_put_contents($jsonPath, json_encode($records));
+
+        try {
+            $this->artisan('import:verse-translations')
+                ->assertExitCode(0);
+
+            $count = \App\Modules\Quran\Models\AyahTranslation::where('source', 'sahih_international')->count();
+            $this->assertEquals(6236, $count);
+        } finally {
+            @unlink($jsonPath);
+        }
     }
 
     public function test_repository_returns_official_translation_when_exists(): void

@@ -151,4 +151,32 @@ class DatasetAudioController
 
         file_put_contents($reciterDir . '/metadata.json', json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
     }
+
+    /**
+     * Stream Surah audio file directly.
+     *
+     * GET /api/datasets/audio/stream
+     */
+    public function stream(Request $request, QuranPathResolver $pathResolver)
+    {
+        $reciterSlug = $request->query('reciter');
+        $surahNumber = (int)$request->query('surah');
+
+        $reciter = Reciter::where('slug', $reciterSlug)->first();
+        if (!$reciter) {
+            return response()->json(['error' => 'Reciter not found'], 404);
+        }
+
+        $filename = sprintf('%03d.mp3', $surahNumber);
+        $filePath = $pathResolver->audio("{$reciter->slug}/{$filename}");
+
+        if (!file_exists($filePath)) {
+            return response()->json(['error' => 'Audio file not found'], 404);
+        }
+
+        return response()->file($filePath, [
+            'Content-Type' => 'audio/mpeg',
+            'Accept-Ranges' => 'bytes',
+        ]);
+    }
 }

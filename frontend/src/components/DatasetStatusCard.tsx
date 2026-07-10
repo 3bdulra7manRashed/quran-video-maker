@@ -96,7 +96,34 @@ export default function DatasetStatusCard({ status, loading }: DatasetStatusCard
           {renderTimingMode(status.timings.mode, status.timings.timedWords, status.timings.totalWords)}
         </div>
 
-        {/* Renderable */}
+        {/* Translations (Sahih International) */}
+        <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl p-3 col-span-2 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Translations (Sahih International)</span>
+            {status.translations?.ready ? (
+              <span className="text-emerald-500 text-sm font-bold">Available</span>
+            ) : (
+              <span className="text-red-500 text-sm font-bold">Unavailable</span>
+            )}
+          </div>
+          {status.translations && !status.translations.ready && status.translations.error && (
+            <div className="mt-1 p-2 bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 text-[10px] font-mono rounded border border-red-150 dark:border-red-900/40 whitespace-pre-line leading-normal">
+              {status.translations.error}
+            </div>
+          )}
+        </div>
+
+        {/* Approved Segments count */}
+        <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl p-3 col-span-2 flex items-center justify-between">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Approved AI Segments</span>
+          {status.approved_segments && status.approved_segments.length > 0 ? (
+            <span className="text-emerald-500 text-sm font-bold">{status.approved_segments.length} segments</span>
+          ) : (
+            <span className="text-amber-500 text-sm font-bold">None</span>
+          )}
+        </div>
+
+        {/* Ready to Render */}
         <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl p-3 col-span-2 flex items-center justify-between">
           <span className="text-sm text-slate-800 dark:text-slate-250 font-bold">Ready to Render</span>
           {status.renderable ? (

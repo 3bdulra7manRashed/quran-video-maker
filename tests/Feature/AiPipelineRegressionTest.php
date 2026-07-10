@@ -823,4 +823,154 @@ class AiPipelineRegressionTest extends TestCase
 
         @unlink($tempFile);
     }
+
+    /**
+     * Test: JSON file missing -> throws TranslationUnavailableException
+     */
+    public function test_translation_rendering_fails_when_json_file_missing(): void
+    {
+        $this->seedSurahWithWords(108);
+
+        // Delete/move JSON translation file if it exists in test environment
+        $jsonPath = storage_path('app/quran/translations/sahih_international.json');
+        $tempPath = storage_path('app/quran/translations/sahih_international.json.bak');
+        if (file_exists($jsonPath)) {
+            @rename($jsonPath, $tempPath);
+        }
+
+        try {
+            $pipeline = app(RenderPipeline::class);
+            $pipeline->render(
+                108,
+                'test-reciter',
+                1,
+                3,
+                'reels',
+                1,
+                true, // with_translation = true
+                'sahih_international'
+            );
+            $this->fail("Expected TranslationUnavailableException was not thrown.");
+        } catch (\App\Modules\Rendering\Exceptions\TranslationUnavailableException $e) {
+            $this->assertStringContainsString('Missing translation dataset', $e->getMessage());
+            $this->assertStringContainsString('storage/app/quran/translations/sahih_international.json', $e->getMessage());
+        } finally {
+            if (file_exists($tempPath)) {
+                @rename($tempPath, $jsonPath);
+            }
+        }
+    }
+
+    /**
+     * Test: JSON exists but database empty -> throws TranslationUnavailableException
+     */
+    public function test_translation_rendering_fails_when_database_table_empty(): void
+    {
+        $this->seedSurahWithWords(108);
+
+        // Clear translations table
+        \App\Modules\Quran\Models\AyahTranslation::truncate();
+
+        // Ensure JSON file exists
+        $jsonPath = storage_path('app/quran/translations/sahih_international.json');
+        @mkdir(dirname($jsonPath), 0777, true);
+        file_put_contents($jsonPath, '[]');
+
+        try {
+            $pipeline = app(RenderPipeline::class);
+            $pipeline->render(
+                108,
+                'test-reciter',
+                1,
+                3,
+                'reels',
+                1,
+                true, // with_translation = true
+                'sahih_international'
+            );
+            $this->fail("Expected TranslationUnavailableException was not thrown.");
+        } catch (\App\Modules\Rendering\Exceptions\TranslationUnavailableException $e) {
+            $this->assertStringContainsString('Official Sahih International translations have not been imported', $e->getMessage());
+            $this->assertStringContainsString('php artisan import:verse-translations', $e->getMessage());
+        } finally {
+            @unlink($jsonPath);
+        }
+    }
+
+    /**
+     * Test: Database populated correctly -> rendering proceeds without throwing.
+     */
+    public function test_translation_rendering_succeeds_when_database_populated(): void
+    {
+        $this->seedSurahWithWords(108);
+
+        // Populate database
+        \App\Modules\Quran\Models\AyahTranslation::updateOrCreate(
+            ['source' => 'sahih_international', 'surah_number' => 108, 'ayah_number' => 1],
+            ['text' => 'Translation 1']
+        );
+        \App\Modules\Quran\Models\AyahTranslation::updateOrCreate(
+            ['source' => 'sahih_international', 'surah_number' => 108, 'ayah_number' => 2],
+            ['text' => 'Translation 2']
+        );
+        \App\Modules\Quran\Models\AyahTranslation::updateOrCreate(
+            ['source' => 'sahih_international', 'surah_number' => 108, 'ayah_number' => 3],
+            ['text' => 'Translation 3']
+        );
+
+        // Ensure JSON file exists
+        $jsonPath = storage_path('app/quran/translations/sahih_international.json');
+        @mkdir(dirname($jsonPath), 0777, true);
+        file_put_contents($jsonPath, '[]');
+
+        try {
+            $pipeline = app(RenderPipeline::class);
+            $pipeline->render(
+                108,
+                'test-reciter',
+                1,
+                3,
+                'reels',
+                1,
+                true, // with_translation = true
+                'sahih_international'
+            );
+            $this->assertTrue(true); // Rendering completed successfully without throwing exception
+        } finally {
+            @unlink($jsonPath);
+        }
+    }
+
+    /**
+     * Test: Controller returns 422 JSON response with error message when translations are not imported
+     */
+    public function test_api_render_endpoint_returns_422_when_translation_unavailable(): void
+    {
+        $this->seedSurahWithWords(108);
+
+        // Clear translations table
+        \App\Modules\Quran\Models\AyahTranslation::truncate();
+
+        // Ensure JSON file exists
+        $jsonPath = storage_path('app/quran/translations/sahih_international.json');
+        @mkdir(dirname($jsonPath), 0777, true);
+        file_put_contents($jsonPath, '[]');
+
+        try {
+            $response = $this->postJson('/api/renders', [
+                'reciter' => 'test-reciter',
+                'surah' => 108,
+                'scope' => 'full',
+                'with_translation' => true,
+                'translation_source' => 'sahih_international',
+            ]);
+
+            $response->assertStatus(422);
+            $response->assertJsonFragment([
+                'error' => "Official Sahih International translations have not been imported.\n\nRun:\n\nphp artisan import:verse-translations"
+            ]);
+        } finally {
+            @unlink($jsonPath);
+        }
+    }
 }

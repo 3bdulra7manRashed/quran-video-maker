@@ -181,14 +181,14 @@ class ImportManualTimingsService
             throw new \InvalidArgumentException("Reciter ID {$reciterId} not found.");
         }
 
-        // Fetch approved segments from reels_generated_content
-        $approvedSegments = \App\Modules\Quran\Models\ReelsGeneratedContent::where('reciter_id', $reciterId)
-            ->where('surah_number', $surahNumber)
-            ->orderBy('segment_order')
-            ->get();
+        // Fetch approved segments using the canonical ApprovedContentResolver
+        $resolver = app(\App\Services\ContentGeneration\ApprovedContentResolver::class);
+        $fromAyah = isset($data['from_ayah']) ? (int) $data['from_ayah'] : null;
+        $toAyah = isset($data['to_ayah']) ? (int) $data['to_ayah'] : null;
+        $approvedSegments = $resolver->resolve($reciterId, $surahNumber, $fromAyah, $toAyah, 'reels');
 
-        if ($approvedSegments->isEmpty()) {
-            throw new \RuntimeException("No approved segment definitions found for this Surah. Please generate and approve segments first.");
+        if ($approvedSegments === null || $approvedSegments->isEmpty()) {
+            throw new \RuntimeException("No approved segment definitions found for this Surah range. Please generate and approve segments first.");
         }
 
         // Fetch Surah & Words
@@ -197,17 +197,139 @@ class ImportManualTimingsService
             throw new \InvalidArgumentException("Surah {$surahNumber} not found.");
         }
 
-        $ayahIds = $surah->ayahs()->pluck('id');
+        $ayahQuery = $surah->ayahs();
+        if ($fromAyah !== null) {
+            $ayahQuery->where('ayah_number', '>=', $fromAyah);
+        }
+        if ($toAyah !== null) {
+            $ayahQuery->where('ayah_number', '<=', $toAyah);
+        }
+        $ayahIds = $ayahQuery->pluck('id');
+
         $words = Word::with('ayah')->whereIn('ayah_id', $ayahIds)
             ->orderBy('page_number')
             ->orderBy('line_number')
             ->orderBy('ayah_id')
             ->orderBy('word_index')
-            ->get();
+            ->get()
+            ->all();
+
+        // Instrumenting diagnostics logs for Segment #1 alignment failure
+        \Illuminate\Support\Facades\Log::info('ALIGNMENT_DIAGNOSTICS_START');
+        
+        // 8. ApprovedContentResolver info
+        \Illuminate\Support\Facades\Log::info('Resolver Check', [
+            'resolver_class' => get_class($resolver),
+            'collection_count' => $approvedSegments ? $approvedSegments->count() : 0,
+            'returned_ids' => $approvedSegments ? $approvedSegments->pluck('id')->toArray() : [],
+        ]);
+
+        // 1. Total approved segments loaded
+        \Illuminate\Support\Facades\Log::info('Total segments count', [
+            'count' => $approvedSegments ? $approvedSegments->count() : 0,
+        ]);
+
+        // 2. For every loaded segment
+        if ($approvedSegments) {
+            foreach ($approvedSegments as $idx => $s) {
+                $layout = is_object($s->layout_type) ? $s->layout_type->value : $s->layout_type;
+                $status = is_object($s->approval_status) ? $s->approval_status->value : $s->approval_status;
+                \Illuminate\Support\Facades\Log::info("Loaded Segment details #{$idx}", [
+                    'id' => $s->id,
+                    'segment_order' => $s->segment_order,
+                    'approval_status' => $status,
+                    'layout_type' => $layout,
+                    'start_ayah' => $s->start_ayah,
+                    'end_ayah' => $s->end_ayah,
+                    'arabic_text_first_80' => mb_substr($s->arabic, 0, 80),
+                ]);
+            }
+        }
+
+        // 3. Verify whether there is more than one Segment #1
+        if ($approvedSegments) {
+            $seg1Count = $approvedSegments->filter(fn($s) => $s->segment_order == 1)->count();
+            \Illuminate\Support\Facades\Log::info("Verify Segment #1 count", [
+                'more_than_one_segment_1' => $seg1Count > 1 ? 'YES' : 'NO',
+                'actual_segment_1_count' => $seg1Count,
+            ]);
+        }
+
+        // 4. Exact SQL used to load segments
+        $fromAyahVal = $fromAyah ?? 1;
+        $endAyahVal = $toAyah;
+        if ($endAyahVal === null) {
+            $endAyahVal = $surah ? $surah->verses_count : 114;
+        }
+        $mockQuery = \App\Modules\Quran\Models\ReelsGeneratedContent::where('reciter_id', $reciterId)
+            ->where('surah_number', $surahNumber)
+            ->where('start_ayah', $fromAyahVal)
+            ->where('end_ayah', $endAyahVal)
+            ->where('layout_type', 'reels')
+            ->where('approval_status', \App\Enums\ContentApprovalStatus::APPROVED)
+            ->orderBy('segment_order');
+        \Illuminate\Support\Facades\Log::info("Exact SQL executed", [
+            'sql' => $mockQuery->toSql(),
+            'bindings' => $mockQuery->getBindings(),
+            'result_count' => $approvedSegments ? $approvedSegments->count() : 0,
+        ]);
+
+        // 5. Log the first 20 database words passed into align()
+        $first20WordsInfo = [];
+        foreach (array_slice($words, 0, 20) as $idx => $w) {
+            $first20WordsInfo[] = [
+                'index' => $idx,
+                'id' => $w->id,
+                'char_type' => $w->char_type,
+                'uthmani_text' => $w->uthmani_text,
+                'normalized' => \App\Services\ContentGeneration\ContentNormalizer::normalizeForMatching($w->uthmani_text),
+            ];
+        }
+        \Illuminate\Support\Facades\Log::info("First 20 DB words passed into align()", $first20WordsInfo);
+
+        // 6. Log the normalized text of Segment #1 and database words consumed
+        if ($approvedSegments && !$approvedSegments->isEmpty()) {
+            $seg1 = $approvedSegments->first();
+            $seg1Norm = \App\Services\ContentGeneration\ContentNormalizer::normalizeForMatching($seg1->arabic);
+            $seg1NormClean = preg_replace('/\s+/u', '', $seg1Norm);
+
+            // Accumulate first 10 spoken words' normalized form
+            $accWords = [];
+            $accWordsText = "";
+            foreach ($words as $w) {
+                if ($w->char_type === 'word') {
+                    $wNorm = \App\Services\ContentGeneration\ContentNormalizer::normalizeForMatching($w->uthmani_text);
+                    $wClean = preg_replace('/\s+/u', '', $wNorm);
+                    if ($wClean !== '') {
+                        $accWords[] = $w->uthmani_text;
+                        $accWordsText .= $wClean;
+                        if (mb_strlen($accWordsText) >= mb_strlen($seg1NormClean)) {
+                            break;
+                        }
+                    }
+                }
+            }
+            \Illuminate\Support\Facades\Log::info("Normalized timing texts compared", [
+                'expected_seg1_normalized' => $seg1NormClean,
+                'database_spoken_words' => $accWords,
+                'database_accumulated_normalized' => $accWordsText,
+            ]);
+        }
 
         // Align segments with database words
         $aligner = app(\App\Services\ContentGeneration\GeneratedContentWordAligner::class);
-        $alignedRanges = $aligner->align($approvedSegments, $words);
+        try {
+            $alignedRanges = $aligner->align($approvedSegments, $words);
+        } catch (\Throwable $e) {
+            // 7. Print the exact point where align() throws AlignmentException
+            \Illuminate\Support\Facades\Log::error("Alignment failed with error", [
+                'error_class' => get_class($e),
+                'error_message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+            throw $e;
+        }
 
         // Map uploaded segment start times
         $uploadedMap = [];

@@ -398,7 +398,7 @@ export default function ConsolePage() {
     }
   };
 
-  const runImportSegTimJson = async () => {
+  const runImportSegTimJson = async (directJson?: string) => {
     if (selectedSurah === '') return;
     setSegTimValidating(true);
     setSegTimErrorMsg(null);
@@ -406,8 +406,10 @@ export default function ConsolePage() {
     setSegTimErrors([]);
     setSegTimWarnings([]);
 
+    const jsonToParse = directJson !== undefined ? directJson : segTimJsonInput;
+
     try {
-      JSON.parse(segTimJsonInput);
+      JSON.parse(jsonToParse);
     } catch (e: any) {
       setSegTimErrorMsg(isAr ? `خطأ في صياغة JSON: ${e.message}` : `JSON syntax error: ${e.message}`);
       setSegTimValidating(false);
@@ -425,7 +427,7 @@ export default function ConsolePage() {
           fromAyah,
           toAyah,
         },
-        segTimJsonInput
+        jsonToParse
       );
       if (res.success) {
         setSegTimSuccessMsg(isAr ? 'تم استيراد توقيت المقاطع بنجاح!' : 'Segment timings imported successfully!');
@@ -788,6 +790,18 @@ export default function ConsolePage() {
                     validationWarnings={segTimWarnings}
                     errorMessage={segTimErrorMsg}
                     isSegmentation={false}
+                    isSegmentTiming={true}
+                    surahNumber={Number(selectedSurah)}
+                    reciterSlug={selectedReciter}
+                    scope={scope}
+                    ayahNumber={ayahNumber}
+                    fromAyah={fromAyah}
+                    toAyah={toAyah}
+                    approvedSegments={status?.approved_segments || []}
+                    onManualTimingsComplete={async (json) => {
+                      setSegTimJsonInput(json);
+                      await runImportSegTimJson(json);
+                    }}
                   />
                 );
               }

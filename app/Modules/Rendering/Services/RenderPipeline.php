@@ -82,6 +82,19 @@ class RenderPipeline
     ): string {
         $this->cancellationGuard->ensureNotCancelled($renderJob);
 
+        if ($withTranslation) {
+            $jsonPath = 'storage/app/quran/translations/sahih_international.json';
+            if (!file_exists(storage_path('app/quran/translations/sahih_international.json'))) {
+                throw new \App\Modules\Rendering\Exceptions\TranslationUnavailableException("Missing translation dataset:\n{$jsonPath}");
+            }
+            $exists = \App\Modules\Quran\Models\AyahTranslation::where('source', 'sahih_international')->exists();
+            if (!$exists) {
+                throw new \App\Modules\Rendering\Exceptions\TranslationUnavailableException(
+                    "Official Sahih International translations have not been imported.\n\nRun:\n\nphp artisan import:verse-translations"
+                );
+            }
+        }
+
         Log::info("[RenderPipeline] Starting rendering pipeline", [
             'surah' => $surahNumber,
             'reciter' => $reciterSlug,
