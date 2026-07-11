@@ -219,22 +219,17 @@ class DatasetStatusService
      */
     protected function evaluateTranslations(): array
     {
-        $jsonPath = 'storage/app/quran/translations/sahih_international.json';
-        $jsonExists = file_exists(storage_path('app/quran/translations/sahih_international.json'));
-        
         $tablePopulated = \App\Modules\Quran\Models\AyahTranslation::where('source', 'sahih_international')->exists();
         
-        $ready = $jsonExists && $tablePopulated;
+        $ready = $tablePopulated;
         
         $error = null;
-        if (!$jsonExists) {
-            $error = "Missing translation dataset:\n{$jsonPath}";
-        } elseif (!$tablePopulated) {
+        if (!$tablePopulated) {
             $error = "Official Sahih International translations have not been imported.\n\nRun:\n\nphp artisan import:verse-translations";
         }
         
         return [
-            'json_exists' => $jsonExists,
+            'json_exists' => true, // Mocked for backward compatibility
             'table_populated' => $tablePopulated,
             'ready' => $ready,
             'error' => $error,

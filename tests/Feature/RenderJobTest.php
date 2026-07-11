@@ -44,34 +44,25 @@ class RenderJobTest extends TestCase
             ['text' => 'Translation 1']
         );
 
-        // Ensure JSON file exists
-        $jsonPath = storage_path('app/quran/translations/sahih_international.json');
-        @mkdir(dirname($jsonPath), 0777, true);
-        file_put_contents($jsonPath, '[]');
+        $payload = [
+            'reciter' => 'test-reciter',
+            'surah' => 108,
+            'scope' => 'full',
+            'layout' => 'reels',
+            'with_translation' => true,
+            'translation_source' => 'sahih_international',
+        ];
 
-        try {
-            $payload = [
-                'reciter' => 'test-reciter',
-                'surah' => 108,
-                'scope' => 'full',
-                'layout' => 'reels',
-                'with_translation' => true,
-                'translation_source' => 'sahih_international',
-            ];
+        $response = $this->postJson('/api/renders', $payload);
 
-            $response = $this->postJson('/api/renders', $payload);
+        $response->assertStatus(200);
+        $response->assertJsonStructure(['uuid', 'status']);
 
-            $response->assertStatus(200);
-            $response->assertJsonStructure(['uuid', 'status']);
+        $uuid = $response->json('uuid');
+        $job = RenderJob::where('uuid', $uuid)->firstOrFail();
 
-            $uuid = $response->json('uuid');
-            $job = RenderJob::where('uuid', $uuid)->firstOrFail();
-
-            $this->assertTrue($job->with_translation);
-            $this->assertEquals('sahih_international', $job->translation_source);
-        } finally {
-            @unlink($jsonPath);
-        }
+        $this->assertTrue($job->with_translation);
+        $this->assertEquals('sahih_international', $job->translation_source);
     }
 
     public function test_can_create_render_job_without_translation_by_default(): void

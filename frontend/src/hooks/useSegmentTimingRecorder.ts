@@ -115,8 +115,23 @@ export function useSegmentTimingRecorder({
 
   const startRecording = () => {
     if (recordingState === 'Ready') {
+      const currentMs = Math.round((audioRef.current?.currentTime || 0) * 1000);
+      const firstSegment = approvedSegments[0];
+      const initialTimestamps = firstSegment
+        ? { [firstSegment.order]: currentMs }
+        : {};
+
+      setTimestamps(initialTimestamps);
       setRecordingState('Recording');
       play();
+
+      if (approvedSegments.length > 1) {
+        setActiveIndex(1); // Start from Segment 2 (index 1)
+      } else {
+        // If there's only 1 segment in total, immediately complete
+        pause();
+        submitTimings(initialTimestamps);
+      }
     }
   };
 
@@ -167,7 +182,7 @@ export function useSegmentTimingRecorder({
     const activeSegment = approvedSegments[activeIndex];
     if (!activeSegment) return;
 
-    if (activeIndex > 0) {
+    if (activeIndex > 1) {
       const prevIndex = activeIndex - 1;
       const prevSegment = approvedSegments[prevIndex];
       setTimestamps((prev) => {
@@ -178,7 +193,7 @@ export function useSegmentTimingRecorder({
       });
       setActiveIndex(prevIndex);
     } else {
-      // Clear first segment timestamp
+      // If at index 1 (Segment 2), clear Segment 2 timestamp, but keep activeIndex = 1
       setTimestamps((prev) => {
         const updated = { ...prev };
         delete updated[activeSegment.order];
