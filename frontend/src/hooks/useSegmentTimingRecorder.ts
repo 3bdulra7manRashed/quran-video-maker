@@ -256,6 +256,7 @@ export function useSegmentTimingRecorder({
       type: 'segment_timings',
       from_ayah: startAyahVal,
       to_ayah: toAyahVal,
+      end_time_ms: Math.round(endTime * 1000),
       segments: segmentsPayload,
     };
 

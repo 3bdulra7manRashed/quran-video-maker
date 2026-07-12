@@ -366,7 +366,11 @@ class ImportManualTimingsService
                 // Retrieve segment start/end
                 $startMs = $uploadedMap[$order] ?? 0;
                 $nextStart = $uploadedMap[$order + 1] ?? null;
-                $endMs = $nextStart !== null ? $nextStart : ($totalDurationMs !== null ? $totalDurationMs : ($startMs + 5000));
+                $endMs = $nextStart !== null 
+                    ? $nextStart 
+                    : (isset($data['end_time_ms']) 
+                        ? (int)$data['end_time_ms'] 
+                        : ($totalDurationMs !== null ? $totalDurationMs : ($startMs + 5000)));
 
                 if ($endMs < $startMs) {
                     $endMs = $startMs;
