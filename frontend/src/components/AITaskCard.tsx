@@ -140,7 +140,6 @@ export default function AITaskCard({
           approvedSegments={approvedSegments || []}
           onRecordingComplete={async (json) => {
             await onManualTimingsComplete?.(json);
-            setIsRecording(false);
           }}
           onCancel={() => setIsRecording(false)}
         />

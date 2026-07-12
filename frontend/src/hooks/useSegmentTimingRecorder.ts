@@ -44,6 +44,11 @@ export function useSegmentTimingRecorder({
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // New start/end time boundary states
+  const [startTime, setStartTime] = useState<number>(0);
+  const [endTime, setEndTime] = useState<number>(0);
+  const hasSubmittedRef = useRef<boolean>(false);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Construct absolute API URL using the provided apiUrl prop
@@ -57,7 +62,10 @@ export function useSegmentTimingRecorder({
     setIsPlaying(false);
     setDuration(0);
     setCurrentTime(0);
+    setStartTime(0);
+    setEndTime(0);
     setErrorMsg(null);
+    hasSubmittedRef.current = false;
   }, [reciterSlug, surahNumber]);
 
   // Audio HTML5 listeners mapping helpers
@@ -70,15 +78,27 @@ export function useSegmentTimingRecorder({
   };
 
   const handleTimeUpdate = (e: React.SyntheticEvent<HTMLAudioElement>) => {
-    setCurrentTime(e.currentTarget.currentTime);
+    const time = e.currentTarget.currentTime;
+    setCurrentTime(time);
+
+    // Stop recording and submit when playhead reaches or exceeds endTime
+    if (recordingState === 'Recording' && endTime > 0 && time >= endTime && !hasSubmittedRef.current) {
+      hasSubmittedRef.current = true;
+      pause();
+      submitTimings();
+    }
   };
 
   const handleDurationChange = (e: React.SyntheticEvent<HTMLAudioElement>) => {
-    setDuration(e.currentTarget.duration || 0);
+    const dur = e.currentTarget.duration || 0;
+    setDuration(dur);
+    setEndTime((prev) => prev === 0 ? dur : prev);
   };
 
   const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLAudioElement>) => {
-    setDuration(e.currentTarget.duration || 0);
+    const dur = e.currentTarget.duration || 0;
+    setDuration(dur);
+    setEndTime(dur);
     setRecordingState('Ready');
     setErrorMsg(null);
   };
@@ -86,6 +106,14 @@ export function useSegmentTimingRecorder({
   const handleAudioError = () => {
     setRecordingState('Error');
     setErrorMsg('Failed to load audio file from backend server. Please verify the audio file exists.');
+  };
+
+  const handleEnded = () => {
+    if (recordingState === 'Recording' && !hasSubmittedRef.current) {
+      hasSubmittedRef.current = true;
+      pause();
+      submitTimings(timestamps);
+    }
   };
 
   // Playback control functions
@@ -115,23 +143,29 @@ export function useSegmentTimingRecorder({
 
   const startRecording = () => {
     if (recordingState === 'Ready') {
-      const currentMs = Math.round((audioRef.current?.currentTime || 0) * 1000);
+      if (approvedSegments.length === 0) return;
+
+      if (endTime > 0 && startTime >= endTime) {
+        setErrorMsg('The End Position must be strictly after the Start Position.');
+        return;
+      }
+
+      hasSubmittedRef.current = false;
+
+      // Seek to startTime before starting
+      if (audioRef.current) {
+        audioRef.current.currentTime = startTime;
+        setCurrentTime(startTime);
+      }
+
+      const currentMs = Math.round(startTime * 1000);
       const firstSegment = approvedSegments[0];
-      const initialTimestamps = firstSegment
-        ? { [firstSegment.order]: currentMs }
-        : {};
+      const initialTimestamps = { [firstSegment.order]: currentMs };
 
       setTimestamps(initialTimestamps);
       setRecordingState('Recording');
+      setActiveIndex(0); // Keep Segment 1 displayed
       play();
-
-      if (approvedSegments.length > 1) {
-        setActiveIndex(1); // Start from Segment 2 (index 1)
-      } else {
-        // If there's only 1 segment in total, immediately complete
-        pause();
-        submitTimings(initialTimestamps);
-      }
     }
   };
 
@@ -155,24 +189,20 @@ export function useSegmentTimingRecorder({
   const recordTimestamp = () => {
     if (!audioRef.current || recordingState !== 'Recording') return;
     
-    const activeSegment = approvedSegments[activeIndex];
-    if (!activeSegment) return;
+    const N = approvedSegments.length;
+    if (N === 0) return;
 
     const currentMs = Math.round(audioRef.current.currentTime * 1000);
-    const updatedTimestamps = {
-      ...timestamps,
-      [activeSegment.order]: currentMs,
-    };
-    
-    setTimestamps(updatedTimestamps);
 
-    // If it's the last segment, finalize and trigger import
-    if (activeIndex === approvedSegments.length - 1) {
-      pause();
-      submitTimings(updatedTimestamps);
-    } else {
-      // Auto advance
-      setActiveIndex((prev) => prev + 1);
+    if (activeIndex < N - 1) {
+      const nextSegment = approvedSegments[activeIndex + 1];
+      const updatedTimestamps = {
+        ...timestamps,
+        [nextSegment.order]: currentMs,
+      };
+      
+      setTimestamps(updatedTimestamps);
+      setActiveIndex(activeIndex + 1);
     }
   };
 
@@ -182,23 +212,14 @@ export function useSegmentTimingRecorder({
     const activeSegment = approvedSegments[activeIndex];
     if (!activeSegment) return;
 
-    if (activeIndex > 1) {
+    if (activeIndex > 0) {
       const prevIndex = activeIndex - 1;
-      const prevSegment = approvedSegments[prevIndex];
       setTimestamps((prev) => {
         const updated = { ...prev };
-        delete updated[prevSegment.order];
         delete updated[activeSegment.order];
         return updated;
       });
       setActiveIndex(prevIndex);
-    } else {
-      // If at index 1 (Segment 2), clear Segment 2 timestamp, but keep activeIndex = 1
-      setTimestamps((prev) => {
-        const updated = { ...prev };
-        delete updated[activeSegment.order];
-        return updated;
-      });
     }
   };
 
@@ -241,6 +262,9 @@ export function useSegmentTimingRecorder({
     try {
       await onRecordingComplete(JSON.stringify(payload, null, 2));
       setRecordingState('Completed');
+      setTimeout(() => {
+        onCancel();
+      }, 1500);
     } catch (err: any) {
       setErrorMsg(err.message || 'Auto-import timings failed.');
       setRecordingState('Error');
@@ -252,8 +276,9 @@ export function useSegmentTimingRecorder({
     setActiveIndex(0);
     setRecordingState('Ready');
     setErrorMsg(null);
+    hasSubmittedRef.current = false;
     if (audioRef.current) {
-      audioRef.current.currentTime = 0;
+      audioRef.current.currentTime = startTime;
     }
   };
 
@@ -268,6 +293,10 @@ export function useSegmentTimingRecorder({
     duration,
     currentTime,
     errorMsg,
+    startTime,
+    setStartTime,
+    endTime,
+    setEndTime,
     play,
     pause,
     togglePlayPause,
@@ -288,6 +317,7 @@ export function useSegmentTimingRecorder({
       onDurationChange: handleDurationChange,
       onLoadedMetadata: handleLoadedMetadata,
       onError: handleAudioError,
+      onEnded: handleEnded,
     },
   };
 }

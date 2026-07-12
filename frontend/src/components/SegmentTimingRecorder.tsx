@@ -41,6 +41,10 @@ export default function SegmentTimingRecorder({
     duration,
     currentTime,
     errorMsg,
+    startTime,
+    setStartTime,
+    endTime,
+    setEndTime,
     togglePlayPause,
     startRecording,
     seek,
@@ -209,14 +213,76 @@ export default function SegmentTimingRecorder({
       {recordingState === 'Ready' && (
         <div className="flex-1 flex flex-col items-center justify-center max-w-4xl mx-auto w-full gap-8 py-8">
           <div className="text-center flex flex-col gap-2 max-w-xl">
-            <h2 className="text-2xl font-bold text-white">Choose Starting Position</h2>
+            <h2 className="text-2xl font-bold text-white">Choose Recording Scope</h2>
             <p className="text-sm text-slate-400">
-              Seek the audio to the beginning of the verses you want to time before starting the recording.
+              Set the Start Position (required) and End Position (optional) to define the boundaries of your timing session.
             </p>
           </div>
 
           {/* Simple Slider & Play Preview */}
           <div className="w-full bg-slate-900 border border-slate-850 p-6 rounded-2xl flex flex-col gap-6 shadow-xl">
+            {/* Range markers display */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="bg-slate-950/60 border border-slate-850 p-4 rounded-xl flex flex-col gap-1 text-center relative">
+                <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">Start Position</span>
+                <span className="text-lg font-bold font-mono text-white mt-1">{formatTime(startTime)}</span>
+                <button
+                  type="button"
+                  onClick={() => seekTo(startTime)}
+                  className="absolute top-3 left-3 text-xs opacity-60 hover:opacity-100 transition cursor-pointer"
+                  title="Jump to Start"
+                >
+                  ⏮️
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStartTime(currentTime)}
+                  className="mt-2 py-1.5 px-3 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/40 border border-emerald-900/30 text-emerald-400 text-[10px] font-bold transition cursor-pointer"
+                >
+                  📍 Set to Playhead
+                </button>
+              </div>
+
+              <div className="bg-slate-950/60 border border-slate-850 p-4 rounded-xl flex flex-col gap-1 text-center relative">
+                <span className="text-[10px] uppercase font-bold text-red-400 tracking-wider">End Position (Optional)</span>
+                <span className="text-lg font-bold font-mono text-white mt-1">{formatTime(endTime)}</span>
+                <button
+                  type="button"
+                  onClick={() => seekTo(endTime)}
+                  className="absolute top-3 left-3 text-xs opacity-60 hover:opacity-100 transition cursor-pointer"
+                  title="Jump to End"
+                >
+                  ⏭️
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEndTime(currentTime)}
+                  className="mt-2 py-1.5 px-3 rounded-lg bg-red-950/40 hover:bg-red-900/40 border border-red-900/30 text-red-400 text-[10px] font-bold transition cursor-pointer"
+                >
+                  🏁 Set to Playhead
+                </button>
+              </div>
+            </div>
+
+            {/* Live Recording Scope Summary */}
+            <div className="bg-slate-950/40 border border-slate-850 p-4 rounded-xl flex flex-col gap-2.5">
+              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider text-center">Recording Scope Summary</span>
+              <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono text-slate-300">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[9px] uppercase font-bold text-slate-500">Start</span>
+                  <span className="text-emerald-400 font-bold">{formatTime(startTime)}</span>
+                </div>
+                <div className="flex flex-col gap-0.5 border-x border-slate-850">
+                  <span className="text-[9px] uppercase font-bold text-slate-500">End</span>
+                  <span className="text-red-400 font-bold">{formatTime(endTime)}</span>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[9px] uppercase font-bold text-slate-500">Duration</span>
+                  <span className="text-blue-400 font-bold">{formatTime(Math.max(0, endTime - startTime))}</span>
+                </div>
+              </div>
+            </div>
+
             <div className="flex items-center gap-4">
               <button
                 type="button"
@@ -273,6 +339,12 @@ export default function SegmentTimingRecorder({
             </div>
           </div>
 
+          {errorMsg && (
+            <div className="bg-red-950/40 border border-red-900/50 p-4 rounded-xl text-xs text-red-400 font-sans max-w-sm w-full text-center">
+              {errorMsg}
+            </div>
+          )}
+
           <button
             type="button"
             onClick={startRecording}
@@ -296,6 +368,15 @@ export default function SegmentTimingRecorder({
                 <div className="absolute inset-0 bg-slate-950/80 rounded-2xl z-20 flex flex-col items-center justify-center gap-3">
                   <div className="w-8 h-8 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
                   <span className="text-xs text-indigo-400 font-mono font-semibold">Auto-importing timing alignments...</span>
+                </div>
+              )}
+
+              {recordingState === 'Completed' && (
+                <div className="absolute inset-0 bg-slate-950/85 rounded-2xl z-20 flex flex-col items-center justify-center gap-3 animate-fade-in">
+                  <span className="text-3xl">✅</span>
+                  <span className="text-sm text-emerald-400 font-bold tracking-wide">
+                    Segment timings imported successfully.
+                  </span>
                 </div>
               )}
 
