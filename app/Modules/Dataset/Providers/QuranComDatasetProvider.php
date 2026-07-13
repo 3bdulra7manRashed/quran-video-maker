@@ -54,12 +54,18 @@ class QuranComDatasetProvider implements DatasetProvider
     public function downloadGlyphs(int $surahNumber): void
     {
         Log::info("[QuranComDatasetProvider] Downloading glyphs for Surah {$surahNumber}...");
-        $allVerses = [];
-        $page = 1;
-        $perPage = 50;
+        
+        $surah = Surah::where('number', $surahNumber)->first();
+        if (!$surah) {
+            throw new RuntimeException("Surah {$surahNumber} not found in database.");
+        }
 
-        while (true) {
-            $url = "https://api.quran.com/api/v4/verses/by_chapter/{$surahNumber}?language=en&words=true&word_fields=code_v1,text_uthmani,text_imlaei&fields=verse_key,verse_number,page_number,juz_number,hizb_number,rub_el_hizb_number,ruku_number,manzil_number,sajdah_number&per_page={$perPage}&page={$page}";
+        $startPage = $surah->start_page;
+        $endPage = $surah->end_page;
+        $allVerses = [];
+
+        for ($page = $startPage; $page <= $endPage; $page++) {
+            $url = "https://api.quran.com/api/v4/verses/by_page/{$page}?language=en&words=true&word_fields=code_v1,text_uthmani,text_imlaei&fields=verse_key,verse_number,page_number,juz_number,hizb_number,rub_el_hizb_number,ruku_number,manzil_number,sajdah_number";
             
             $response = Http::timeout(30)->get($url);
             if ($response->failed()) {
@@ -71,14 +77,23 @@ class QuranComDatasetProvider implements DatasetProvider
                 throw new RuntimeException("Invalid response format from Quran.com API (missing 'verses' key).");
             }
 
-            $allVerses = array_merge($allVerses, $data['verses']);
-
-            $totalRecords = $data['pagination']['total_records'] ?? count($allVerses);
-            if (count($allVerses) >= $totalRecords) {
-                break;
+            foreach ($data['verses'] as $verse) {
+                // Filter to keep only verses belonging to the requested Surah
+                if (str_starts_with($verse['verse_key'], "{$surahNumber}:")) {
+                    // Overwrite page numbers with the authoritative requested page
+                    $verse['page_number'] = $page;
+                    if (isset($verse['words']) && is_array($verse['words'])) {
+                        foreach ($verse['words'] as &$word) {
+                            $word['page_number'] = $page;
+                        }
+                    }
+                    $allVerses[] = $verse;
+                }
             }
-            $page++;
         }
+
+        // Sort the fetched verses by verse_number to guarantee ascending sequence
+        usort($allVerses, fn($a, $b) => $a['verse_number'] <=> $b['verse_number']);
 
         $destDir = storage_path('app/quran/glyph');
         if (!file_exists($destDir)) {
