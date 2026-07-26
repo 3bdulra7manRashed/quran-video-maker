@@ -147,7 +147,12 @@ class ImportAudioMetadataService
 
         $seenSurahs = [];
         foreach ($payload['audio_files'] as $audioFile) {
-            $this->validateAndImportAudioFile($reciter, $audioFile, $seenSurahs, $report);
+            try {
+                $this->validateAndImportAudioFile($reciter, $audioFile, $seenSurahs, $report);
+            } catch (\Throwable $e) {
+                $report['errors']++;
+                Log::error("[ImportAudioMetadata] Failed to import audio file for reciter '{$reciter->slug}': " . $e->getMessage());
+            }
         }
     }
 

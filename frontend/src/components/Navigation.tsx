@@ -72,7 +72,7 @@ export default function Navigation({ apiUrl, onApiUrlChange }: NavigationProps) 
             onChange={(e) => onApiUrlChange(e.target.value)}
             suppressHydrationWarning
             className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 px-3 py-1.5 rounded-lg text-xs font-mono focus:outline-none focus:border-slate-400 dark:focus:border-slate-650 w-full sm:w-64"
-            placeholder="http://localhost:8000"
+            placeholder="http://localhost:8001"
           />
         </div>
       </div>

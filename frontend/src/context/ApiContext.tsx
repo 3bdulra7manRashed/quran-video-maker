@@ -11,14 +11,21 @@ interface ApiContextType {
 
 const ApiContext = createContext<ApiContextType | undefined>(undefined);
 
+const DEFAULT_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+
 export function ApiProvider({ children }: { children: React.ReactNode }) {
-  const [apiUrl, setApiUrl] = useState<string>('http://localhost:8000');
+  const [apiUrl, setApiUrl] = useState<string>(DEFAULT_API_URL);
 
   // Load from localStorage on mount if available
   useEffect(() => {
     const saved = localStorage.getItem('qvm_api_url');
     if (saved) {
-      setApiUrl(saved);
+      if (saved === 'http://localhost:8000' && DEFAULT_API_URL !== 'http://localhost:8000') {
+        setApiUrl(DEFAULT_API_URL);
+        localStorage.setItem('qvm_api_url', DEFAULT_API_URL);
+      } else {
+        setApiUrl(saved);
+      }
     }
   }, []);
 
