@@ -139,20 +139,22 @@ class ImportAyahsAndWordsService
     {
         $this->validateVerse($surah, $verse);
 
-        $existing = Ayah::where('verse_key', $verse['verse_key'])->first();
-        if ($existing) {
-            $report['skipped']++;
-            return;
-        }
+        $ayah = Ayah::firstOrCreate(
+            ['verse_key' => $verse['verse_key']],
+            [
+                'surah_id'    => $surah->id,
+                'ayah_number' => $verse['verse_number'],
+                'page_number' => $verse['page_number'],
+                'juz_number'  => $verse['juz_number'],
+                'hizb_number' => $verse['hizb_number'],
+            ]
+        );
 
-        $ayah = Ayah::create([
-            'surah_id'    => $surah->id,
-            'verse_key'   => $verse['verse_key'],
-            'ayah_number' => $verse['verse_number'],
-            'page_number' => $verse['page_number'],
-            'juz_number'  => $verse['juz_number'],
-            'hizb_number' => $verse['hizb_number'],
-        ]);
+        if (!$ayah->wasRecentlyCreated) {
+            $report['skipped']++;
+        } else {
+            $report['ayahs_imported']++;
+        }
 
         $wordsToInsert = [];
         foreach ($verse['words'] as $w) {
@@ -174,11 +176,13 @@ class ImportAyahsAndWordsService
         }
 
         if (!empty($wordsToInsert)) {
-            DB::table('words')->insert($wordsToInsert);
+            DB::table('words')->upsert(
+                $wordsToInsert,
+                ['ayah_id', 'word_index'],
+                ['char_type', 'plain_text', 'uthmani_text', 'glyph_text', 'page_number', 'line_number', 'translation_en', 'updated_at']
+            );
             $report['words_imported'] += count($wordsToInsert);
         }
-
-        $report['ayahs_imported']++;
     }
 
     /**

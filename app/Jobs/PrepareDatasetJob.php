@@ -51,12 +51,18 @@ class PrepareDatasetJob implements ShouldQueue
         }
 
         // 1. Idempotent Glyphs Step
-        if (!$provider->determineGlyphsAvailability($this->surahNumber)) {
+        $destFile = storage_path("app/quran/glyph/surah_{$this->surahNumber}.json");
+        $jsonExists = file_exists($destFile) && filesize($destFile) > 0;
+
+        if (!$jsonExists) {
             $provider->downloadGlyphs($this->surahNumber);
             $provider->importGlyphs($this->surahNumber);
             Log::info("[PrepareDatasetJob] Glyphs downloaded and imported.");
+        } elseif (!$provider->determineGlyphsAvailability($this->surahNumber)) {
+            $provider->importGlyphs($this->surahNumber);
+            Log::info("[PrepareDatasetJob] Glyphs file existed on disk; imported missing glyphs into database.");
         } else {
-            Log::info("[PrepareDatasetJob] Glyphs already available on disk. Skipping download/import.");
+            Log::info("[PrepareDatasetJob] Glyphs already available on disk and in database. Skipping download/import.");
         }
 
         // Custom reciter source logic bypass

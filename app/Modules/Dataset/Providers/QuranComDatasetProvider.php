@@ -7,6 +7,7 @@ use App\Modules\Import\Services\ImportWordTimingsService;
 use App\Modules\Quran\Models\AudioFile;
 use App\Modules\Quran\Models\Reciter;
 use App\Modules\Quran\Models\Surah;
+use App\Modules\Quran\Models\Word;
 use App\Modules\Shared\Services\QuranPathResolver;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -40,12 +41,25 @@ class QuranComDatasetProvider implements DatasetProvider
     }
 
     /**
-     * Determine if glyph data is already downloaded on disk.
+     * Determine if glyph data is already downloaded on disk AND imported into database.
      */
     public function determineGlyphsAvailability(int $surahNumber): bool
     {
         $destFile = storage_path("app/quran/glyph/surah_{$surahNumber}.json");
-        return file_exists($destFile) && filesize($destFile) > 0;
+        $fileExists = file_exists($destFile) && filesize($destFile) > 0;
+        if (!$fileExists) {
+            return false;
+        }
+
+        $surah = Surah::where('number', $surahNumber)->first();
+        if (!$surah) {
+            return false;
+        }
+
+        return Word::whereHas('ayah', fn($q) => $q->where('surah_id', $surah->id))
+            ->whereNotNull('glyph_text')
+            ->where('glyph_text', '!=', '')
+            ->exists();
     }
 
     /**

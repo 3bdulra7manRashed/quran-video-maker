@@ -377,7 +377,7 @@ class RenderPipeline
 
                 $lineText = \App\Modules\Shared\Utils\GlyphStringCompiler::compile($segment->words);
 
-                $bbox = imagettfbbox($fontSize, 0, $fontPath, $lineText);
+                $bbox = \imagettfbbox($fontSize, 0, $fontPath, $lineText);
                 $segment->renderedWidth = abs($bbox[4] - $bbox[0]);
             } else {
                 $segment->renderedWidth = 0;

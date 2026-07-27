@@ -208,16 +208,16 @@ class TranslationTextLayer implements RenderLayerInterface
         // Allocate color
         $color = imagecolorallocate($context->image, $colorRGB[0], $colorRGB[1], $colorRGB[2]);
         if ($color === false) {
-            $color = imagecolorallocate($context->image, 255, 255, 255); // fallback to white
+            $color = \imagecolorallocate($context->image, 255, 255, 255); // fallback to white
         }
 
         foreach ($lines as $idx => $line) {
-            $bbox = imagettfbbox($fontSize, 0, $fontPath, $line);
+            $bbox = \imagettfbbox($fontSize, 0, $fontPath, $line);
             $w = abs($bbox[4] - $bbox[0]);
             $lineX = (int) (($context->width - $w) / 2);
             $lineY = (int) ($startY + ($idx * $fontSize * $lineHeightMult));
 
-            imagettftext($context->image, $fontSize, 0, $lineX, $lineY, $color, $fontPath, $line);
+            \imagettftext($context->image, $fontSize, 0, $lineX, $lineY, $color, $fontPath, $line);
         }
     }
 
@@ -236,7 +236,7 @@ class TranslationTextLayer implements RenderLayerInterface
         $currentLine = '';
         foreach ($words as $word) {
             $testLine = $currentLine === '' ? $word : $currentLine . ' ' . $word;
-            $bbox = imagettfbbox($fontSize, 0, $fontPath, $testLine);
+            $bbox = \imagettfbbox($fontSize, 0, $fontPath, $testLine);
             $width = abs($bbox[4] - $bbox[0]);
 
             if ($width <= $maxWidth) {
@@ -306,7 +306,7 @@ class TranslationTextLayer implements RenderLayerInterface
 
         $slice = array_slice($words, $start, $end - $start + 1);
         $text = implode(' ', $slice);
-        $bbox = imagettfbbox($fontSize, 0, $fontPath, $text);
+        $bbox = \imagettfbbox($fontSize, 0, $fontPath, $text);
         $width = abs($bbox[4] - $bbox[0]);
         
         $this->widthCache[$key] = $width;
