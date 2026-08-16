@@ -11,6 +11,8 @@ class AudioFile extends Model
         'surah_number',
         'file_path',
         'duration_ms',
+        'format',
+        'file_size',
     ];
 
     protected $casts = [

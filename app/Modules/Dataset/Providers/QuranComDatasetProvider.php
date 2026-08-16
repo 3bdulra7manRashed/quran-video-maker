@@ -21,11 +21,11 @@ class QuranComDatasetProvider implements DatasetProvider
 
     protected array $reciterMapping = [
         'yasser-al-dosari' => [
-            'quran_com_reciter_id' => 97,
+            'id' => 97,
             'audio_base_url' => 'https://server11.mp3quran.net/yasser/',
         ],
         'ali-jaber' => [
-            'quran_com_reciter_id' => 158,
+            'id' => 158,
             'audio_base_url' => 'https://download.quranicaudio.com/quran/ali_jaber/',
         ],
     ];
@@ -79,11 +79,27 @@ class QuranComDatasetProvider implements DatasetProvider
         $allVerses = [];
 
         for ($page = $startPage; $page <= $endPage; $page++) {
-            $url = "https://api.quran.com/api/v4/verses/by_page/{$page}?language=en&words=true&word_fields=code_v1,text_uthmani,text_imlaei&fields=verse_key,verse_number,page_number,juz_number,hizb_number,rub_el_hizb_number,ruku_number,manzil_number,sajdah_number";
-            
-            $response = Http::timeout(30)->get($url);
+            $url = "https://api.quran.com/api/v4/verses/by_page/{$page}";
+            $queryParams = [
+                'language' => 'en',
+                'words' => 'true',
+                'word_fields' => 'code_v1,text_uthmani,text_imlaei',
+                'fields' => 'verse_key,verse_number,page_number,juz_number,hizb_number,rub_el_hizb_number,ruku_number,manzil_number,sajdah_number',
+            ];
+
+            $response = Http::withoutVerifying()
+                ->timeout(30)
+                ->retry(3, 200)
+                ->withHeaders(['Accept' => 'application/json'])
+                ->get($url, $queryParams);
+
             if ($response->failed()) {
-                throw new RuntimeException("Failed to fetch glyph data page {$page} for Surah {$surahNumber} from Quran.com API.");
+                Log::error("Failed to download glyphs from Quran.com for surah {$surahNumber}", [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                    'url' => $url,
+                ]);
+                throw new RuntimeException("Quran.com API error: " . $response->status() . " - " . $response->body());
             }
 
             $data = $response->json();
@@ -181,7 +197,7 @@ class QuranComDatasetProvider implements DatasetProvider
         $url = $mapping['audio_base_url'] . $filename;
         $destFile = $this->pathResolver->audio("{$reciterSlug}/{$filename}");
 
-        $response = Http::timeout(600)->sink($destFile)->get($url);
+        $response = Http::withoutVerifying()->timeout(600)->sink($destFile)->get($url);
         if ($response->failed()) {
             if (file_exists($destFile)) {
                 unlink($destFile);
@@ -258,14 +274,14 @@ class QuranComDatasetProvider implements DatasetProvider
             return;
         }
 
-        $quranComReciterId = $mapping['quran_com_reciter_id'] ?? null;
+        $quranComReciterId = $mapping['id'] ?? $mapping['quran_com_reciter_id'] ?? null;
         if ($quranComReciterId === null) {
             Log::info("[QuranComDatasetProvider] No Quran.com reciter mapping for '{$reciterSlug}'. Timings download skipped.");
             return;
         }
 
         $url = "https://api.quran.com/api/v4/chapter_recitations/{$quranComReciterId}/{$surahNumber}?segments=true";
-        $response = Http::timeout(30)->get($url);
+        $response = Http::withoutVerifying()->timeout(30)->get($url);
         if ($response->failed()) {
             Log::warning("[QuranComDatasetProvider] Timings download failed from {$url}.");
             return;
