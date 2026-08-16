@@ -25,7 +25,7 @@ class QuranComDatasetProvider implements DatasetProvider
             'audio_base_url' => 'https://server11.mp3quran.net/yasser/',
         ],
         'ali-jaber' => [
-            'id' => 158,
+            'id' => 404,
             'audio_base_url' => 'https://download.quranicaudio.com/quran/ali_jaber/',
         ],
     ];
