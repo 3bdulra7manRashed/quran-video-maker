@@ -111,9 +111,15 @@ export default function DatasetActions({
           className="w-full bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-semibold px-4 py-2.5 rounded-xl text-xs disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer"
         >
           {preparing ? (
-            <span>Preparing...</span>
+            <>
+              <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+              <span>Preparing Dataset...</span>
+            </>
           ) : refreshing && lastAction === 'prepare' ? (
-            <span>Refreshing...</span>
+            <>
+              <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+              <span>Syncing...</span>
+            </>
           ) : (
             <span>⚡ Prepare Dataset</span>
           )}

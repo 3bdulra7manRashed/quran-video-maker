@@ -216,39 +216,54 @@ export default function ConsolePage() {
 
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
     }
 
+    // Trigger backend dataset preparation job
     await api.prepareDataset(selectedReciter, selectedSurah);
 
     setLoadingStatus(true);
-    let attempts = 0;
-    const maxAttempts = 30; // 60 seconds max
 
-    pollingIntervalRef.current = setInterval(async () => {
-      attempts++;
-      try {
-        const stats = await api.getDatasetStatus(selectedReciter, selectedSurah);
-        if (stats.renderable || attempts >= maxAttempts) {
-          if (pollingIntervalRef.current) {
-            clearInterval(pollingIntervalRef.current);
-            pollingIntervalRef.current = null;
-          }
+    return new Promise<void>((resolve, reject) => {
+      let attempts = 0;
+      const maxAttempts = 30; // 45s total (30 * 1500ms)
+      const targetReciter = selectedReciter;
+      const targetSurah = selectedSurah;
+
+      pollingIntervalRef.current = setInterval(async () => {
+        attempts++;
+        try {
+          const stats = await api.getDatasetStatus(targetReciter, targetSurah);
           setStatus(stats);
-          setLoadingStatus(false);
-        } else {
-          setStatus(stats);
-        }
-      } catch (err) {
-        console.error('Polling status failed:', err);
-        if (attempts >= maxAttempts) {
-          if (pollingIntervalRef.current) {
-            clearInterval(pollingIntervalRef.current);
-            pollingIntervalRef.current = null;
+
+          const isReady = stats.renderable || (stats.glyphs && stats.audio);
+
+          if (isReady || attempts >= maxAttempts) {
+            if (pollingIntervalRef.current) {
+              clearInterval(pollingIntervalRef.current);
+              pollingIntervalRef.current = null;
+            }
+            setLoadingStatus(false);
+
+            if (isReady) {
+              resolve();
+            } else {
+              reject(new Error('Dataset preparation timed out after 45 seconds.'));
+            }
           }
-          setLoadingStatus(false);
+        } catch (err) {
+          console.error('Polling dataset status failed:', err);
+          if (attempts >= maxAttempts) {
+            if (pollingIntervalRef.current) {
+              clearInterval(pollingIntervalRef.current);
+              pollingIntervalRef.current = null;
+            }
+            setLoadingStatus(false);
+            reject(new Error('Dataset status polling encountered an error.'));
+          }
         }
-      }
-    }, 2000);
+      }, 1500);
+    });
   };
 
   const handleUploadAudio = async (file: File) => {

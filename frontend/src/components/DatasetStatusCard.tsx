@@ -12,11 +12,11 @@ interface DatasetStatusCardProps {
 export default function DatasetStatusCard({ status, loading }: DatasetStatusCardProps) {
   const t = useT();
 
-  if (loading) {
+  if (loading && !status) {
     return (
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex items-center justify-center min-h-[180px]">
         <div className="flex flex-col items-center gap-2">
-          <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full"></div>
+          <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
           <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">Loading status...</span>
         </div>
       </div>
@@ -65,8 +65,14 @@ export default function DatasetStatusCard({ status, loading }: DatasetStatusCard
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col gap-4">
-      <div className="border-b border-slate-100 dark:border-slate-800/60 pb-2">
+      <div className="border-b border-slate-100 dark:border-slate-800/60 pb-2 flex items-center justify-between">
         <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Dataset Status</h3>
+        {loading && (
+          <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-mono">
+            <div className="w-3 h-3 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+            <span>Syncing...</span>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
