@@ -335,4 +335,49 @@ class RenderJobTest extends TestCase
         $this->assertEquals('Indeed, We have granted you, [O Muhammad], al-Kawthar.', $map[1]);
         $this->assertEquals('So pray to your Lord and offer sacrifice.', $map[2]);
     }
+
+    public function test_can_create_render_job_with_tafsir(): void
+    {
+        \App\Modules\Quran\Models\AyahTranslation::updateOrCreate(
+            ['source' => 'ar-tafsir-muyassar', 'surah_number' => 108, 'ayah_number' => 1],
+            ['text' => 'إنا أعطيناك الخير الكثير']
+        );
+
+        $payload = [
+            'reciter' => 'test-reciter',
+            'surah' => 108,
+            'scope' => 'full',
+            'with_tafsir' => true,
+            'tafsir_source' => 'ar-tafsir-muyassar',
+        ];
+
+        $response = $this->postJson('/api/renders', $payload);
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure(['uuid', 'status']);
+
+        $this->assertDatabaseHas('render_jobs', [
+            'surah_number' => 108,
+            'with_tafsir' => true,
+            'tafsir_source' => 'ar-tafsir-muyassar',
+        ]);
+    }
+
+    public function test_fails_when_tafsir_source_not_imported(): void
+    {
+        $payload = [
+            'reciter' => 'test-reciter',
+            'surah' => 108,
+            'scope' => 'full',
+            'with_tafsir' => true,
+            'tafsir_source' => 'unimported-tafsir-source',
+        ];
+
+        $response = $this->postJson('/api/renders', $payload);
+
+        $response->assertStatus(422);
+        $response->assertJsonFragment([
+            'error' => "Tafsir source 'unimported-tafsir-source' has not been imported.\n\nRun:\n\nphp artisan quran:download-tafsir"
+        ]);
+    }
 }

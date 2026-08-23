@@ -58,6 +58,7 @@ class YouTubeMushafLayoutStrategy
             ],
             'renderUnits' => $renderUnits,
             'translationBounds' => $this->getTranslationBounds(),
+            'tafsirBounds' => $this->getTafsirBounds(),
         ];
     }
 
@@ -71,6 +72,18 @@ class YouTubeMushafLayoutStrategy
             'lineHeight' => 1.4,      // Comfortable line height spacing for Georgia
             'fontPath' => base_path('fonts/georgia.ttf'), // Publication-grade Georgia font for English prose
             'color' => [225, 225, 225], // Sharp off-white matching Reels visual style
+        ];
+    }
+
+    public function getTafsirBounds(): array
+    {
+        return [
+            'y' => 960,              // Center Y coordinate of Tafsir block below translation
+            'width' => 1300,          // Safe margin container width for Arabic Tafsir
+            'fontSize' => 28,         // Cairo font size for landscape Arabic commentary
+            'lineHeight' => 1.5,      // Line height spacing for Cairo font
+            'fontPath' => base_path('fonts/Cairo-Regular.ttf'), // Cairo font for Arabic prose
+            'color' => [235, 235, 200], // Soft cream tint matching Reels style
         ];
     }
 }

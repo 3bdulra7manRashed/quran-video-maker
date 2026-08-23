@@ -43,13 +43,16 @@ class SegmentRenderer
         string $outputPath,
         array $layoutData,
         ?\App\Modules\Rendering\Layers\TranslationTextLayer $translationLayer = null,
-        ?\App\Modules\Rendering\Domain\TranslationSegment $translationSegment = null
+        ?\App\Modules\Rendering\Domain\TranslationSegment $translationSegment = null,
+        ?\App\Modules\Rendering\Layers\TafsirTextLayer $tafsirLayer = null,
+        ?\App\Modules\Rendering\Domain\TranslationSegment $tafsirSegment = null
     ): void
     {
         Log::info("[SegmentRenderer] Starting segment render using layout-agnostic model", [
             'surah' => $surah->number,
             'segment_index' => $segment->index,
-            'has_translation_layer' => !is_null($translationLayer)
+            'has_translation_layer' => !is_null($translationLayer),
+            'has_tafsir_layer' => !is_null($tafsirLayer)
         ]);
 
         // 1. Resolve canvas dimensions
@@ -146,6 +149,18 @@ class SegmentRenderer
                 $segment
             );
             $translationLayer->render($translationSegment, $context);
+        }
+
+        // 4.6. Draw Tafsir Layer if provided
+        if ($tafsirLayer) {
+            $context = new \App\Modules\Rendering\Domain\FrameContext(
+                $im,
+                $width,
+                $height,
+                $layoutData,
+                $segment
+            );
+            $tafsirLayer->render($tafsirSegment, $context);
         }
 
         // 5. Save the segment frame to PNG

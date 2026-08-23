@@ -78,7 +78,9 @@ class RenderPipeline
         bool $withTranslation = false,
         string $translationSource = 'sahih_international',
         ?\App\Modules\Quran\Models\RenderJob $renderJob = null,
-        bool $useGeneratedContent = false
+        bool $useGeneratedContent = false,
+        bool $withTafsir = false,
+        string $tafsirSource = 'ar-tafsir-muyassar'
     ): string {
         $this->cancellationGuard->ensureNotCancelled($renderJob);
 
@@ -91,6 +93,15 @@ class RenderPipeline
             }
         }
 
+        if ($withTafsir) {
+            $exists = \App\Modules\Quran\Models\AyahTranslation::where('source', $tafsirSource)->exists();
+            if (!$exists) {
+                throw new \App\Modules\Rendering\Exceptions\TranslationUnavailableException(
+                    "Tafsir source '{$tafsirSource}' has not been imported.\n\nRun:\n\nphp artisan quran:download-tafsir"
+                );
+            }
+        }
+
         Log::info("[RenderPipeline] Starting rendering pipeline", [
             'surah' => $surahNumber,
             'reciter' => $reciterSlug,
@@ -98,6 +109,8 @@ class RenderPipeline
             'to_ayah' => $toAyah,
             'with_translation' => $withTranslation,
             'translation_source' => $translationSource,
+            'with_tafsir' => $withTafsir,
+            'tafsir_source' => $tafsirSource,
         ]);
 
         // 1. Select Surah
@@ -364,6 +377,25 @@ class RenderPipeline
             Log::info("[RenderPipeline] Instantiated TranslationTextLayer with " . count($translationSegments) . " segments.");
         }
 
+        // Build Tafsir Layer if requested
+        $tafsirLayer = null;
+        if ($withTafsir) {
+            $repository = app(\App\Modules\Rendering\Repositories\TranslationRepository::class);
+            $tafsirProvider = new class($repository, $tafsirSource) implements \App\Modules\Rendering\Contracts\TranslationProviderInterface {
+                protected $repo;
+                protected string $src;
+                public function __construct($repo, string $src) { $this->repo = $repo; $this->src = $src; }
+                public function getAyahTranslation(int $surahNumber, int $ayahNumber): string { return $this->repo->getAyahTranslation($surahNumber, $ayahNumber, $this->src); }
+                public function getAyahTranslations(int $surahNumber): array { return $this->repo->getAyahTranslations($surahNumber, $this->src); }
+                public function source(): string { return $this->src; }
+            };
+
+            $tafsirBuilder = new \App\Modules\Rendering\Services\TranslationSegmentBuilder($tafsirProvider);
+            $tafsirSegments = $tafsirBuilder->build($segments, $surahNumber);
+            $tafsirLayer = new \App\Modules\Rendering\Layers\TafsirTextLayer($tafsirSegments);
+            Log::info("[RenderPipeline] Instantiated TafsirTextLayer with " . count($tafsirSegments) . " segments.");
+        }
+
         // Populate segment metrics for debug/report output
         $fontSize = ($layout === 'youtube') ? 50 : config('layouts.reels.font_size', 56);
         foreach ($segments as $segment) {
@@ -418,13 +450,20 @@ class RenderPipeline
                 $translationSegment = $translationLayer->getSegmentForArabic($segment);
             }
 
+            $tafsirSegment = null;
+            if ($tafsirLayer) {
+                $tafsirSegment = $tafsirLayer->getSegmentForArabic($segment);
+            }
+
             $this->segmentRenderer->renderSegment(
                 $surah,
                 $segment,
                 $segmentPath,
                 $layoutData,
                 $translationLayer,
-                $translationSegment
+                $translationSegment,
+                $tafsirLayer,
+                $tafsirSegment
             );
 
             $segmentDurationSec = ($segment->endMs - $segment->startMs) / 1000.0;

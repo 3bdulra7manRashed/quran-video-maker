@@ -31,6 +31,8 @@ class DatasetRenderController
             'max_lines'          => 'sometimes|integer|min:1',
             'with_translation'   => 'sometimes|boolean',
             'translation_source' => 'sometimes|string',
+            'with_tafsir'        => 'sometimes|boolean',
+            'tafsir_source'      => 'sometimes|string|nullable',
             'use_generated_content' => 'sometimes|boolean',
             'custom_json'        => 'sometimes|string|nullable',
         ]);
@@ -73,6 +75,8 @@ class DatasetRenderController
 
         $withTranslation = (bool) $request->input('with_translation', false);
         $translationSource = $withTranslation ? $request->input('translation_source', 'sahih_international') : null;
+        $withTafsir = (bool) $request->input('with_tafsir', false);
+        $tafsirSource = $withTafsir ? $request->input('tafsir_source', 'ar-tafsir-muyassar') : null;
         $useGeneratedContent = (bool) $request->input('use_generated_content', false);
         $customJson = $request->input('custom_json');
 
@@ -81,6 +85,15 @@ class DatasetRenderController
             if (!$exists) {
                 return response()->json([
                     'error' => "Official Sahih International translations have not been imported.\n\nRun:\n\nphp artisan import:verse-translations"
+                ], 422);
+            }
+        }
+
+        if ($withTafsir) {
+            $exists = \App\Modules\Quran\Models\AyahTranslation::where('source', $tafsirSource)->exists();
+            if (!$exists) {
+                return response()->json([
+                    'error' => "Tafsir source '{$tafsirSource}' has not been imported.\n\nRun:\n\nphp artisan quran:download-tafsir"
                 ], 422);
             }
         }
@@ -97,6 +110,8 @@ class DatasetRenderController
             'progress'           => 0,
             'with_translation'   => $withTranslation,
             'translation_source' => $translationSource,
+            'with_tafsir'        => $withTafsir,
+            'tafsir_source'      => $tafsirSource,
             'use_generated_content' => $useGeneratedContent || ($customJson !== null && trim($customJson) !== ''),
         ]);
 
@@ -143,6 +158,8 @@ class DatasetRenderController
             'progress'           => $job->progress,
             'with_translation'   => (bool) ($job->with_translation ?? false),
             'translation_source' => $job->translation_source,
+            'with_tafsir'        => (bool) ($job->with_tafsir ?? false),
+            'tafsir_source'      => $job->tafsir_source,
             'use_generated_content' => (bool) ($job->use_generated_content ?? false),
         ];
 
@@ -191,6 +208,8 @@ class DatasetRenderController
                 'error'              => $job->error_message,
                 'with_translation'   => (bool) ($job->with_translation ?? false),
                 'translation_source' => $job->translation_source,
+                'with_tafsir'        => (bool) ($job->with_tafsir ?? false),
+                'tafsir_source'      => $job->tafsir_source,
                 'use_generated_content' => (bool) ($job->use_generated_content ?? false),
             ];
 

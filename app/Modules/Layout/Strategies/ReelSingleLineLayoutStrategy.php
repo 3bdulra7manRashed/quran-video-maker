@@ -32,6 +32,7 @@ class ReelSingleLineLayoutStrategy
                 ]
             ],
             'translationBounds' => $this->getTranslationBounds(),
+            'tafsirBounds' => $this->getTafsirBounds(),
         ];
     }
 
@@ -45,6 +46,18 @@ class ReelSingleLineLayoutStrategy
             'lineHeight' => 1.4,      // Tighter but comfortable line height spacing for Georgia
             'fontPath' => base_path('fonts/georgia.ttf'), // Publication-grade Georgia font for English prose
             'color' => [225, 225, 225], // Slightly brighter off-white to enhance clarity and sharpness
+        ];
+    }
+
+    public function getTafsirBounds(): array
+    {
+        return [
+            'y' => 1340,              // Center Y coordinate of Tafsir block below translation
+            'width' => 760,           // Safe margin container width for Arabic Tafsir
+            'fontSize' => 26,         // Cairo font size for Arabic commentary
+            'lineHeight' => 1.5,      // Line height spacing for Cairo font
+            'fontPath' => base_path('fonts/Cairo-Regular.ttf'), // Cairo font for Arabic prose
+            'color' => [235, 235, 200], // Soft cream tint to visually distinguish Tafsir
         ];
     }
 }

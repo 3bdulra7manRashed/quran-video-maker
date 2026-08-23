@@ -28,6 +28,8 @@ class RenderJob extends Model
         'max_lines',
         'with_translation',
         'translation_source',
+        'with_tafsir',
+        'tafsir_source',
         'use_generated_content',
     ];
 
@@ -40,6 +42,7 @@ class RenderJob extends Model
         'duration' => 'float',
         'max_lines' => 'integer',
         'with_translation' => 'boolean',
+        'with_tafsir' => 'boolean',
         'use_generated_content' => 'boolean',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',

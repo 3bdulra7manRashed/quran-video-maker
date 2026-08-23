@@ -174,6 +174,8 @@ export class ApiService {
     max_lines?: number;
     with_translation?: boolean;
     translation_source?: string;
+    with_tafsir?: boolean;
+    tafsir_source?: string;
     use_generated_content?: boolean;
     custom_json?: string;
   }): Promise<{ uuid: string; status: string }> {

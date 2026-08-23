@@ -71,7 +71,9 @@ class GenerateVideoJob implements ShouldQueue
                 (bool) ($this->renderJob->with_translation ?? false),
                 $this->renderJob->translation_source ?? 'sahih_international',
                 $this->renderJob,
-                (bool) ($this->renderJob->use_generated_content ?? false)
+                (bool) ($this->renderJob->use_generated_content ?? false),
+                (bool) ($this->renderJob->with_tafsir ?? false),
+                $this->renderJob->tafsir_source ?? 'ar-tafsir-muyassar'
             );
 
             // Probe duration via ffprobe
