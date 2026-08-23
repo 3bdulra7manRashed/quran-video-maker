@@ -4,6 +4,7 @@ namespace App\Modules\Rendering\Layers;
 
 use App\Modules\Rendering\Contracts\RenderLayerInterface;
 use App\Modules\Rendering\Domain\FrameContext;
+use ArPHP\I18N\Arabic;
 use Illuminate\Support\Facades\Log;
 
 class TafsirTextLayer implements RenderLayerInterface
@@ -15,6 +16,7 @@ class TafsirTextLayer implements RenderLayerInterface
 
     protected array $tafsirSegments;
     protected array $widthCache = [];
+    protected ?Arabic $arabic = null;
 
     /**
      * @param \App\Modules\Rendering\Domain\TranslationSegment[] $tafsirSegments
@@ -22,6 +24,17 @@ class TafsirTextLayer implements RenderLayerInterface
     public function __construct(array $tafsirSegments = [])
     {
         $this->tafsirSegments = $tafsirSegments;
+    }
+
+    /**
+     * Helper to retrieve or instantiate ArPHP Arabic Glyphs converter.
+     */
+    protected function getArabicConverter(): Arabic
+    {
+        if ($this->arabic === null) {
+            $this->arabic = new Arabic('Glyphs');
+        }
+        return $this->arabic;
     }
 
     /**
@@ -112,7 +125,7 @@ class TafsirTextLayer implements RenderLayerInterface
             }
         }
 
-        // 4. Measure layout and wrap text into balanced lines
+        // 4. Measure layout and wrap text into balanced, Arabic-shaped lines
         $layoutResult = $this->measureTafsirLayout($activeSegment->text, $fontSize, $fontPath, $maxWidth, $lineHeightMult);
         $lines = $layoutResult['lines'];
 
@@ -129,18 +142,18 @@ class TafsirTextLayer implements RenderLayerInterface
             $color = imagecolorallocate($context->image, 235, 235, 200);
         }
 
-        foreach ($lines as $idx => $line) {
-            $bbox = imagettfbbox($fontSize, 0, $fontPath, $line);
+        foreach ($lines as $idx => $shapedLine) {
+            $bbox = imagettfbbox($fontSize, 0, $fontPath, $shapedLine);
             $w = abs($bbox[4] - $bbox[0]);
             $lineX = (int) (($context->width - $w) / 2);
             $lineY = (int) ($startY + ($idx * $fontSize * $lineHeightMult));
 
-            imagettftext($context->image, $fontSize, 0, $lineX, $lineY, $color, $fontPath, $line);
+            imagettftext($context->image, $fontSize, 0, $lineX, $lineY, $color, $fontPath, $shapedLine);
         }
     }
 
     /**
-     * Wrap text into lines using balanced partitioning.
+     * Wrap text into lines using balanced partitioning with Arabic shaping.
      */
     protected function wrapText(string $text, float $fontSize, string $fontPath, float $maxWidth): array
     {
@@ -149,24 +162,29 @@ class TafsirTextLayer implements RenderLayerInterface
             return [];
         }
 
+        $arabicConv = $this->getArabicConverter();
+
         $greedyLines = [];
-        $currentLine = '';
+        $currentLogicalWords = [];
+
         foreach ($words as $word) {
-            $testLine = $currentLine === '' ? $word : $currentLine . ' ' . $word;
-            $bbox = imagettfbbox($fontSize, 0, $fontPath, $testLine);
+            $testWords = array_merge($currentLogicalWords, [$word]);
+            $testShaped = $arabicConv->utf8Glyphs(implode(' ', $testWords));
+
+            $bbox = imagettfbbox($fontSize, 0, $fontPath, $testShaped);
             $width = abs($bbox[4] - $bbox[0]);
 
             if ($width <= $maxWidth) {
-                $currentLine = $testLine;
+                $currentLogicalWords[] = $word;
             } else {
-                if ($currentLine !== '') {
-                    $greedyLines[] = $currentLine;
+                if (!empty($currentLogicalWords)) {
+                    $greedyLines[] = $arabicConv->utf8Glyphs(implode(' ', $currentLogicalWords));
                 }
-                $currentLine = $word;
+                $currentLogicalWords = [$word];
             }
         }
-        if ($currentLine !== '') {
-            $greedyLines[] = $currentLine;
+        if (!empty($currentLogicalWords)) {
+            $greedyLines[] = $arabicConv->utf8Glyphs(implode(' ', $currentLogicalWords));
         }
 
         $linesCount = count($greedyLines);
@@ -199,15 +217,18 @@ class TafsirTextLayer implements RenderLayerInterface
         $start = 0;
         foreach ($result['splits'] as $splitIndex) {
             $slice = array_slice($words, $start, $splitIndex - $start + 1);
-            $balancedLines[] = implode(' ', $slice);
+            $balancedLines[] = $arabicConv->utf8Glyphs(implode(' ', $slice));
             $start = $splitIndex + 1;
         }
         $slice = array_slice($words, $start);
-        $balancedLines[] = implode(' ', $slice);
+        $balancedLines[] = $arabicConv->utf8Glyphs(implode(' ', $slice));
 
         return $balancedLines;
     }
 
+    /**
+     * Compute and cache the visual width of an Arabic word slice after shaping.
+     */
     protected function getSliceWidth(array $words, int $start, int $end, float $fontSize, string $fontPath): float
     {
         $key = $start . '_' . $end;
@@ -216,8 +237,10 @@ class TafsirTextLayer implements RenderLayerInterface
         }
 
         $slice = array_slice($words, $start, $end - $start + 1);
-        $text = implode(' ', $slice);
-        $bbox = imagettfbbox($fontSize, 0, $fontPath, $text);
+        $logicalText = implode(' ', $slice);
+        $shapedText = $this->getArabicConverter()->utf8Glyphs($logicalText);
+
+        $bbox = imagettfbbox($fontSize, 0, $fontPath, $shapedText);
         $width = abs($bbox[4] - $bbox[0]);
         
         $this->widthCache[$key] = $width;
