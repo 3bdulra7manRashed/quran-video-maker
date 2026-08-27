@@ -50,11 +50,13 @@ export default function SegmentTimingRecorder({
     seek,
     seekTo,
     recordTimestamp,
+    undoMark,
     stepBack,
     navigateNext,
     navigatePrev,
     submitTimings,
     resetRecording,
+    resetAll,
     audioEvents,
   } = useSegmentTimingRecorder({
     surahNumber,
@@ -89,8 +91,10 @@ export default function SegmentTimingRecorder({
       if (recordingState === 'Recording') {
         if (e.key === ' ' || e.code === 'Space') {
           recordTimestamp();
-        } else if (e.key === 'Backspace') {
-          stepBack();
+        } else if (e.key === 'Backspace' || (e.ctrlKey && e.key.toLowerCase() === 'z')) {
+          undoMark();
+        } else if (e.key.toLowerCase() === 'r' && (e.shiftKey || e.ctrlKey)) {
+          resetRecording();
         } else if (e.key === 'ArrowLeft') {
           navigatePrev();
         } else if (e.key === 'ArrowRight') {
@@ -111,7 +115,7 @@ export default function SegmentTimingRecorder({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [recordingState, recordTimestamp, stepBack, navigateNext, navigatePrev, startRecording, onCancel]);
+  }, [recordingState, recordTimestamp, undoMark, stepBack, resetRecording, navigateNext, navigatePrev, startRecording, onCancel]);
 
   const formatTime = (seconds: number) => {
     if (isNaN(seconds) || seconds === Infinity) return '0:00.000';
@@ -191,6 +195,17 @@ export default function SegmentTimingRecorder({
         </div>
         <div className="flex items-center gap-3">
           {renderStateBadge()}
+          {recordingState === 'Recording' && (
+            <button
+              type="button"
+              onClick={resetRecording}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 transition cursor-pointer flex items-center gap-1.5"
+              title="Reset all recorded timestamps and return to segment 1 (Shift+R)"
+            >
+              <span>🔄</span>
+              <span>إعادة ضبط (Reset All)</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={onCancel}
@@ -413,6 +428,42 @@ export default function SegmentTimingRecorder({
                         : 'Pending Tap...'}
                     </span>
                   </div>
+
+                  {/* Undo Mark, Reset All & Mark Next Action Controls */}
+                  <div className="shrink-0 flex items-center justify-center gap-2.5 mt-4 w-full max-w-lg">
+                    <button
+                      type="button"
+                      disabled={recordingState !== 'Recording' || (activeIndex === 0 && timestamps[approvedSegments[0]?.order] === undefined)}
+                      onClick={undoMark}
+                      className="flex-1 py-2.5 px-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                      title="Undo last recorded mark and rewind audio (Backspace / Ctrl+Z)"
+                    >
+                      <span>↩️</span>
+                      <span>Undo Mark</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={recordingState !== 'Recording'}
+                      onClick={resetRecording}
+                      className="py-2.5 px-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                      title="Reset all recorded timestamps and restart (Shift+R)"
+                    >
+                      <span>🔄</span>
+                      <span>إعادة ضبط</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={recordingState !== 'Recording' || activeIndex >= approvedSegments.length - 1}
+                      onClick={recordTimestamp}
+                      className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold transition flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-950/40 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                      title="Record timestamp for current segment and move to next (Space)"
+                    >
+                      <span>⚡</span>
+                      <span>Mark Next</span>
+                    </button>
+                  </div>
                 </>
               ) : (
                 <div className="text-slate-500 text-sm">No segments loaded.</div>
@@ -421,7 +472,29 @@ export default function SegmentTimingRecorder({
 
             {/* Segments timeline list (RHS) */}
             <div className="lg:col-span-4 bg-slate-950/20 border border-slate-850 rounded-2xl p-4 flex flex-col gap-3 min-h-0 overflow-y-auto">
-              <span className="text-xs font-bold text-slate-450 uppercase tracking-wider px-1">Segment timeline status</span>
+              <div className="flex items-center justify-between px-1 gap-2">
+                <span className="text-xs font-bold text-slate-450 uppercase tracking-wider truncate">Segment timeline status</span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    disabled={recordingState !== 'Recording' || (activeIndex === 0 && timestamps[approvedSegments[0]?.order] === undefined)}
+                    onClick={undoMark}
+                    className="text-[10px] font-bold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded-lg transition cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Undo last recorded mark (Backspace)"
+                  >
+                    ↩️ Undo
+                  </button>
+                  <button
+                    type="button"
+                    disabled={recordingState !== 'Recording'}
+                    onClick={resetRecording}
+                    className="text-[10px] font-bold text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 px-2 py-0.5 rounded-lg transition cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Reset all recorded timestamps (Shift+R)"
+                  >
+                    🔄 Reset
+                  </button>
+                </div>
+              </div>
               <div className="flex-1 flex flex-col gap-2 overflow-y-auto pr-1">
                 {approvedSegments.map((seg, i) => {
                   const hasTime = timestamps[seg.order] !== undefined;
@@ -480,6 +553,39 @@ export default function SegmentTimingRecorder({
                 {isPlaying ? '⏸️' : '▶️'}
               </button>
 
+              <button
+                type="button"
+                disabled={recordingState !== 'Recording'}
+                onClick={undoMark}
+                className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Undo last mark (Backspace / Ctrl+Z)"
+              >
+                <span>↩️</span>
+                <span className="hidden sm:inline">Undo Mark</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={recordingState !== 'Recording'}
+                onClick={resetRecording}
+                className="px-3 py-2 rounded-xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-400 text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Reset all recorded timestamps and restart (Shift+R)"
+              >
+                <span>🔄</span>
+                <span className="hidden sm:inline">إعادة ضبط (Reset)</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={recordingState !== 'Recording' || activeIndex >= approvedSegments.length - 1}
+                onClick={recordTimestamp}
+                className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold transition flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Record timestamp (Space)"
+              >
+                <span>⚡</span>
+                <span className="hidden sm:inline">Mark Next</span>
+              </button>
+
               <div className="flex-1 flex flex-col gap-1">
                 <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden relative">
                   <div
@@ -520,14 +626,18 @@ export default function SegmentTimingRecorder({
             )}
 
             {/* Quick instructions bar */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 bg-slate-950/30 border border-slate-900 p-3 rounded-xl text-[10px] text-slate-400 font-sans leading-relaxed">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 bg-slate-950/30 border border-slate-900 p-3 rounded-xl text-[10px] text-slate-400 font-sans leading-relaxed">
               <div className="flex items-center gap-1.5">
                 <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-white font-mono font-bold">Space</kbd>
                 <span>Record Timestamp & Advance</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-white font-mono font-bold">Backspace</kbd>
-                <span>Undo Timestamp & Step Back</span>
+                <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-white font-mono font-bold">Backspace / Ctrl+Z</kbd>
+                <span>Undo Timestamp & Seek Back</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-white font-mono font-bold">Shift + R</kbd>
+                <span>إعادة ضبط (Reset All)</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-white font-mono font-bold">← / →</kbd>

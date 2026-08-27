@@ -206,22 +206,63 @@ export function useSegmentTimingRecorder({
     }
   };
 
-  const stepBack = () => {
+  const undoMark = () => {
     if (recordingState !== 'Recording') return;
 
-    const activeSegment = approvedSegments[activeIndex];
-    if (!activeSegment) return;
+    const N = approvedSegments.length;
+    if (N === 0) return;
 
-    if (activeIndex > 0) {
-      const prevIndex = activeIndex - 1;
+    const currentActiveSeg = approvedSegments[activeIndex];
+    const currentSegOrder = currentActiveSeg?.order;
+
+    const hasCurrentTimestamp = currentSegOrder !== undefined && timestamps[currentSegOrder] !== undefined;
+
+    let targetIndex: number;
+    if (hasCurrentTimestamp) {
+      targetIndex = activeIndex;
+    } else if (activeIndex > 0) {
+      targetIndex = activeIndex - 1;
+    } else {
+      return;
+    }
+
+    // Do not delete initial start timestamp of segment 0 if activeIndex is 0
+    if (targetIndex === 0 && approvedSegments[0] && timestamps[approvedSegments[0].order] !== undefined) {
+      if (activeIndex > 0) {
+        setActiveIndex(0);
+        const seekTime = startTime;
+        if (audioRef.current) {
+          audioRef.current.currentTime = seekTime;
+          setCurrentTime(seekTime);
+        }
+      }
+      return;
+    }
+
+    const segToDelete = approvedSegments[targetIndex];
+    if (segToDelete) {
       setTimestamps((prev) => {
         const updated = { ...prev };
-        delete updated[activeSegment.order];
+        delete updated[segToDelete.order];
         return updated;
       });
-      setActiveIndex(prevIndex);
+    }
+
+    const newIndex = Math.max(0, targetIndex - 1);
+    setActiveIndex(newIndex);
+
+    const prevSegOrder = approvedSegments[newIndex]?.order;
+    const prevTimeMs = prevSegOrder !== undefined ? timestamps[prevSegOrder] : undefined;
+    const targetSec = prevTimeMs !== undefined ? prevTimeMs / 1000 : startTime;
+    const seekTime = Math.max(startTime, targetSec > startTime ? targetSec - 0.3 : startTime);
+
+    if (audioRef.current) {
+      audioRef.current.currentTime = seekTime;
+      setCurrentTime(seekTime);
     }
   };
+
+  const stepBack = undoMark;
 
   const navigateNext = () => {
     if (activeIndex < approvedSegments.length - 1) {
@@ -273,15 +314,19 @@ export function useSegmentTimingRecorder({
   };
 
   const resetRecording = () => {
-    setTimestamps({});
+    const firstSegment = approvedSegments[0];
+    const initialTimestamps = firstSegment ? { [firstSegment.order]: Math.round(startTime * 1000) } : {};
+    setTimestamps(initialTimestamps);
     setActiveIndex(0);
-    setRecordingState('Ready');
     setErrorMsg(null);
     hasSubmittedRef.current = false;
     if (audioRef.current) {
       audioRef.current.currentTime = startTime;
+      setCurrentTime(startTime);
     }
   };
+
+  const resetAll = resetRecording;
 
   return {
     audioRef,
@@ -305,11 +350,13 @@ export function useSegmentTimingRecorder({
     seek,
     seekTo,
     recordTimestamp,
+    undoMark,
     stepBack,
     navigateNext,
     navigatePrev,
     submitTimings,
     resetRecording,
+    resetAll,
     // Event listeners to plug into the HTMLAudioElement
     audioEvents: {
       onPlay: handlePlay,
