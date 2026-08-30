@@ -34,12 +34,26 @@ class ApprovedContentResolver
             $endAyah = $surah ? $surah->verses_count : 114;
         }
 
+        // Determine highest approved content_version to prevent duplicate or stale segments
+        $latestVersion = ReelsGeneratedContent::where('reciter_id', $reciterId)
+            ->where('surah_number', $surahNumber)
+            ->where('start_ayah', $startAyah)
+            ->where('end_ayah', $endAyah)
+            ->where('layout_type', $layout)
+            ->where('approval_status', ContentApprovalStatus::APPROVED)
+            ->max('content_version');
+
+        if ($latestVersion === null) {
+            return null;
+        }
+
         $records = ReelsGeneratedContent::where('reciter_id', $reciterId)
             ->where('surah_number', $surahNumber)
             ->where('start_ayah', $startAyah)
             ->where('end_ayah', $endAyah)
             ->where('layout_type', $layout)
             ->where('approval_status', ContentApprovalStatus::APPROVED)
+            ->where('content_version', $latestVersion)
             ->orderBy('segment_order')
             ->get();
 

@@ -46,18 +46,26 @@ class DatasetStatusService
 
         $approvedSegments = [];
         if ($reciter) {
-            $approvedSegments = \App\Modules\Quran\Models\ReelsGeneratedContent::where('reciter_id', $reciter->id)
+            $latestVersion = \App\Modules\Quran\Models\ReelsGeneratedContent::where('reciter_id', $reciter->id)
                 ->where('surah_number', $surahNumber)
                 ->where('approval_status', \App\Enums\ContentApprovalStatus::APPROVED)
-                ->orderBy('segment_order')
-                ->get()
-                ->map(fn($seg) => [
-                    'order' => $seg->segment_order,
-                    'arabic' => $seg->arabic,
-                    'translation' => $seg->translation,
-                    'tafsir' => $seg->tafsir,
-                ])
-                ->all();
+                ->max('content_version');
+
+            if ($latestVersion !== null) {
+                $approvedSegments = \App\Modules\Quran\Models\ReelsGeneratedContent::where('reciter_id', $reciter->id)
+                    ->where('surah_number', $surahNumber)
+                    ->where('approval_status', \App\Enums\ContentApprovalStatus::APPROVED)
+                    ->where('content_version', $latestVersion)
+                    ->orderBy('segment_order')
+                    ->get()
+                    ->map(fn($seg) => [
+                        'order' => $seg->segment_order,
+                        'arabic' => $seg->arabic,
+                        'translation' => $seg->translation,
+                        'tafsir' => $seg->tafsir,
+                    ])
+                    ->all();
+            }
         }
 
         $translationsStatus = $this->evaluateTranslations();

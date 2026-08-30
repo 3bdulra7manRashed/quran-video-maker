@@ -20,7 +20,8 @@ export interface UseSegmentTimingRecorderProps {
   toAyah: number | null;
   approvedSegments: ApprovedSegment[];
   apiUrl: string;
-  onRecordingComplete: (json: string) => Promise<void>;
+  persistToDatabase?: boolean;
+  onRecordingComplete: (json: string, persistToDatabase?: boolean) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -33,6 +34,7 @@ export function useSegmentTimingRecorder({
   toAyah,
   approvedSegments,
   apiUrl,
+  persistToDatabase = false,
   onRecordingComplete,
   onCancel,
 }: UseSegmentTimingRecorderProps) {
@@ -48,8 +50,30 @@ export function useSegmentTimingRecorder({
   const [startTime, setStartTime] = useState<number>(0);
   const [endTime, setEndTime] = useState<number>(0);
   const hasSubmittedRef = useRef<boolean>(false);
+  const lastMarkTimeRef = useRef<number>(0);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Deduplicate and strictly sort approved segments sequentially by order
+  const sortedSegments = React.useMemo(() => {
+    const seen = new Set<number>();
+    const result: ApprovedSegment[] = [];
+    const raw = [...approvedSegments].sort((a, b) => (a.order ?? (a as any).segment_order ?? 0) - (b.order ?? (b as any).segment_order ?? 0));
+    
+    for (let i = 0; i < raw.length; i++) {
+      const seg = raw[i];
+      let order = seg.order ?? (seg as any).segment_order ?? (i + 1);
+      if (seen.has(order)) {
+        order = i + 1;
+      }
+      seen.add(order);
+      result.push({
+        ...seg,
+        order,
+      });
+    }
+    return result;
+  }, [approvedSegments]);
 
   // Construct absolute API URL using the provided apiUrl prop
   const audioUrl = `${apiUrl}/api/datasets/audio/stream?reciter=${reciterSlug}&surah=${surahNumber}`;
@@ -143,7 +167,7 @@ export function useSegmentTimingRecorder({
 
   const startRecording = () => {
     if (recordingState === 'Ready') {
-      if (approvedSegments.length === 0) return;
+      if (sortedSegments.length === 0) return;
 
       if (endTime > 0 && startTime >= endTime) {
         setErrorMsg('The End Position must be strictly after the Start Position.');
@@ -158,11 +182,8 @@ export function useSegmentTimingRecorder({
         setCurrentTime(startTime);
       }
 
-      const currentMs = Math.round(startTime * 1000);
-      const firstSegment = approvedSegments[0];
-      const initialTimestamps = { [firstSegment.order]: currentMs };
-
-      setTimestamps(initialTimestamps);
+      // Start with completely empty timestamps - never auto-stamp segment 1
+      setTimestamps({});
       setRecordingState('Recording');
       setActiveIndex(0); // Keep Segment 1 displayed
       play();
@@ -185,87 +206,85 @@ export function useSegmentTimingRecorder({
     }
   };
 
-  // Recording operations
-  const recordTimestamp = () => {
+  // Recording operations with 300ms debounce: records timestamp for current segment and advances strictly by 1
+  const recordTimestamp = React.useCallback(() => {
     if (!audioRef.current || recordingState !== 'Recording') return;
-    
-    const N = approvedSegments.length;
+
+    const now = Date.now();
+    if (now - lastMarkTimeRef.current < 300) return; // Prevent double firing within 300ms
+    lastMarkTimeRef.current = now;
+
+    const N = sortedSegments.length;
     if (N === 0) return;
 
     const currentMs = Math.round(audioRef.current.currentTime * 1000);
 
-    if (activeIndex < N - 1) {
-      const nextSegment = approvedSegments[activeIndex + 1];
-      const updatedTimestamps = {
-        ...timestamps,
-        [nextSegment.order]: currentMs,
-      };
-      
-      setTimestamps(updatedTimestamps);
-      setActiveIndex(activeIndex + 1);
-    }
-  };
+    setActiveIndex((currentIdx) => {
+      const currentSegment = sortedSegments[currentIdx];
+      if (currentSegment) {
+        setTimestamps((prev) => ({
+          ...prev,
+          [currentSegment.order]: currentMs,
+        }));
+      }
 
-  const undoMark = () => {
+      if (currentIdx < N - 1) {
+        return currentIdx + 1;
+      }
+      return currentIdx;
+    });
+  }, [recordingState, sortedSegments]);
+
+  const undoMark = React.useCallback(() => {
     if (recordingState !== 'Recording') return;
 
-    const N = approvedSegments.length;
+    const N = sortedSegments.length;
     if (N === 0) return;
 
-    const currentActiveSeg = approvedSegments[activeIndex];
-    const currentSegOrder = currentActiveSeg?.order;
+    setActiveIndex((currentIdx) => {
+      const currentActiveSeg = sortedSegments[currentIdx];
+      const currentSegOrder = currentActiveSeg?.order;
 
-    const hasCurrentTimestamp = currentSegOrder !== undefined && timestamps[currentSegOrder] !== undefined;
+      const hasCurrentTimestamp = currentSegOrder !== undefined && timestamps[currentSegOrder] !== undefined;
 
-    let targetIndex: number;
-    if (hasCurrentTimestamp) {
-      targetIndex = activeIndex;
-    } else if (activeIndex > 0) {
-      targetIndex = activeIndex - 1;
-    } else {
-      return;
-    }
-
-    // Do not delete initial start timestamp of segment 0 if activeIndex is 0
-    if (targetIndex === 0 && approvedSegments[0] && timestamps[approvedSegments[0].order] !== undefined) {
-      if (activeIndex > 0) {
-        setActiveIndex(0);
-        const seekTime = startTime;
-        if (audioRef.current) {
-          audioRef.current.currentTime = seekTime;
-          setCurrentTime(seekTime);
-        }
+      let targetIndex: number;
+      if (hasCurrentTimestamp) {
+        targetIndex = currentIdx;
+      } else if (currentIdx > 0) {
+        targetIndex = currentIdx - 1;
+      } else {
+        return currentIdx;
       }
-      return;
-    }
 
-    const segToDelete = approvedSegments[targetIndex];
-    if (segToDelete) {
-      setTimestamps((prev) => {
-        const updated = { ...prev };
-        delete updated[segToDelete.order];
-        return updated;
-      });
-    }
+      const segToDelete = sortedSegments[targetIndex];
+      if (segToDelete) {
+        setTimestamps((prev) => {
+          const updated = { ...prev };
+          delete updated[segToDelete.order];
+          return updated;
+        });
+      }
 
-    const newIndex = Math.max(0, targetIndex - 1);
-    setActiveIndex(newIndex);
+      const newIndex = Math.max(0, targetIndex);
 
-    const prevSegOrder = approvedSegments[newIndex]?.order;
-    const prevTimeMs = prevSegOrder !== undefined ? timestamps[prevSegOrder] : undefined;
-    const targetSec = prevTimeMs !== undefined ? prevTimeMs / 1000 : startTime;
-    const seekTime = Math.max(startTime, targetSec > startTime ? targetSec - 0.3 : startTime);
+      const prevSegOrder = sortedSegments[Math.max(0, newIndex - 1)]?.order;
+      const prevTimeMs = prevSegOrder !== undefined ? timestamps[prevSegOrder] : undefined;
+      const targetSec = prevTimeMs !== undefined ? prevTimeMs / 1000 : startTime;
+      const seekTime = Math.max(startTime, targetSec > startTime ? targetSec - 0.3 : startTime);
 
-    if (audioRef.current) {
-      audioRef.current.currentTime = seekTime;
-      setCurrentTime(seekTime);
-    }
-  };
+      if (audioRef.current) {
+        audioRef.current.currentTime = seekTime;
+        setCurrentTime(seekTime);
+      }
+
+      return newIndex;
+    });
+  }, [recordingState, sortedSegments, timestamps, startTime]);
 
   const stepBack = undoMark;
 
   const navigateNext = () => {
-    if (activeIndex < approvedSegments.length - 1) {
+    if (activeIndex < sortedSegments.length - 1) {
       setActiveIndex((prev) => prev + 1);
     }
   };
@@ -287,9 +306,13 @@ export function useSegmentTimingRecorder({
       toAyahVal = ayahNumber;
     }
 
-    const segmentsPayload = approvedSegments.map((seg) => ({
+    const segmentsPayload = sortedSegments.map((seg) => ({
       segment_order: seg.order,
+      order: seg.order,
       start: targetTimestamps[seg.order] ?? 0,
+      arabic: seg.arabic,
+      translation: seg.translation,
+      tafsir: seg.tafsir,
     }));
 
     const payload = {
@@ -298,11 +321,12 @@ export function useSegmentTimingRecorder({
       from_ayah: startAyahVal,
       to_ayah: toAyahVal,
       end_time_ms: Math.round(endTime * 1000),
+      persist_to_database: persistToDatabase,
       segments: segmentsPayload,
     };
 
     try {
-      await onRecordingComplete(JSON.stringify(payload, null, 2));
+      await onRecordingComplete(JSON.stringify(payload, null, 2), persistToDatabase);
       setRecordingState('Completed');
       setTimeout(() => {
         onCancel();
@@ -313,10 +337,8 @@ export function useSegmentTimingRecorder({
     }
   };
 
-  const resetRecording = () => {
-    const firstSegment = approvedSegments[0];
-    const initialTimestamps = firstSegment ? { [firstSegment.order]: Math.round(startTime * 1000) } : {};
-    setTimestamps(initialTimestamps);
+  const resetRecording = React.useCallback(() => {
+    setTimestamps({});
     setActiveIndex(0);
     setErrorMsg(null);
     hasSubmittedRef.current = false;
@@ -324,7 +346,7 @@ export function useSegmentTimingRecorder({
       audioRef.current.currentTime = startTime;
       setCurrentTime(startTime);
     }
-  };
+  }, [startTime]);
 
   const resetAll = resetRecording;
 
@@ -335,6 +357,8 @@ export function useSegmentTimingRecorder({
     activeIndex,
     setActiveIndex,
     timestamps,
+    approvedSegments: sortedSegments,
+    sortedSegments,
     isPlaying,
     duration,
     currentTime,

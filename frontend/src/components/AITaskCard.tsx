@@ -58,7 +58,9 @@ interface AITaskCardProps {
   fromAyah?: number | null;
   toAyah?: number | null;
   approvedSegments?: Array<{ order: number; arabic: string; translation: string; tafsir: string }>;
-  onManualTimingsComplete?: (json: string) => Promise<void>;
+  persistToDatabase?: boolean;
+  onPersistToDatabaseChange?: (val: boolean) => void;
+  onManualTimingsComplete?: (json: string, persistToDatabase?: boolean) => Promise<void>;
 }
 
 export default function AITaskCard({
@@ -110,6 +112,8 @@ export default function AITaskCard({
   fromAyah,
   toAyah,
   approvedSegments,
+  persistToDatabase,
+  onPersistToDatabaseChange,
   onManualTimingsComplete,
 }: AITaskCardProps) {
   const { language } = useLanguage();
@@ -138,8 +142,10 @@ export default function AITaskCard({
           fromAyah={fromAyah ?? null}
           toAyah={toAyah ?? null}
           approvedSegments={approvedSegments || []}
-          onRecordingComplete={async (json) => {
-            await onManualTimingsComplete?.(json);
+          persistToDatabase={persistToDatabase}
+          onPersistToDatabaseChange={onPersistToDatabaseChange}
+          onRecordingComplete={async (json, persist) => {
+            await onManualTimingsComplete?.(json, persist);
           }}
           onCancel={() => setIsRecording(false)}
         />

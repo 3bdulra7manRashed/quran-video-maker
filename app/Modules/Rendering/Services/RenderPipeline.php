@@ -318,41 +318,34 @@ class RenderPipeline
         // Checkpoint 1: Before segment generation
         $this->cancellationGuard->ensureNotCancelled($renderJob);
 
-        // 6. Segment the words
+        // 6. Segment the words (Priority Hierarchy: 1. Custom JSON -> 2. DB Templates -> 3. Automated Segmentation)
         $hasApprovedGeneratedContent = false;
         $alignedRanges = [];
 
-        if ($useGeneratedContent) {
-            $resolver = app(\App\Services\ContentGeneration\ApprovedContentResolver::class);
-            $approvedSegmentsData = $resolver->resolve($reciter->id, $surahNumber, $fromAyah, $toAyah, $layout);
+        $resolver = app(\App\Services\ContentGeneration\ApprovedContentResolver::class);
+        $approvedSegmentsData = $resolver->resolve($reciter->id, $surahNumber, $fromAyah, $toAyah, $layout);
 
-            if ($approvedSegmentsData !== null) {
-                Log::info('RENDER SOURCE', [
-                    'source' => 'approved_generated',
-                ]);
+        if ($approvedSegmentsData !== null && !$approvedSegmentsData->isEmpty()) {
+            Log::info('RENDER SOURCE', [
+                'source' => 'approved_generated',
+            ]);
 
-                $aligner = app(\App\Services\ContentGeneration\GeneratedContentWordAligner::class);
-                $segmentBuilder = app(\App\Services\ContentGeneration\ApprovedSegmentBuilder::class);
-                
-                $alignedRanges = $aligner->align($approvedSegmentsData, $words);
-                
-                // Validate aligned ranges using ReelsSegmentValidator
-                $reelsValidator = app(\App\Services\ContentGeneration\ReelsSegmentValidator::class);
-                $reelsValidator->validate($alignedRanges);
+            $aligner = app(\App\Services\ContentGeneration\GeneratedContentWordAligner::class);
+            $segmentBuilder = app(\App\Services\ContentGeneration\ApprovedSegmentBuilder::class);
+            
+            $alignedRanges = $aligner->align($approvedSegmentsData, $words);
+            
+            // Validate aligned ranges using ReelsSegmentValidator
+            $reelsValidator = app(\App\Services\ContentGeneration\ReelsSegmentValidator::class);
+            $reelsValidator->validate($alignedRanges);
 
-                // Build the SegmentTimeline before building the segments
-                $timelineResolver = app(\App\Modules\Rendering\Services\SegmentTimelineResolver::class);
-                $timeline = $timelineResolver->resolve($alignedRanges, $audioEndMs);
+            // Build the SegmentTimeline before building the segments
+            $timelineResolver = app(\App\Modules\Rendering\Services\SegmentTimelineResolver::class);
+            $timeline = $timelineResolver->resolve($alignedRanges, $audioEndMs);
 
-                $segments = $segmentBuilder->build($alignedRanges, $timeline);
-                $hasApprovedGeneratedContent = true;
-                Log::info("[RenderPipeline] Loaded " . count($segments) . " segments from approved generated content using SegmentTimeline.");
-            } else {
-                Log::info('RENDER SOURCE', [
-                    'source' => 'default',
-                ]);
-                $segments = $this->segmentationService->segment($words, $totalDuration, $layout, $maxLines, $reciter, $surahNumber);
-            }
+            $segments = $segmentBuilder->build($alignedRanges, $timeline);
+            $hasApprovedGeneratedContent = true;
+            Log::info("[RenderPipeline] Loaded " . count($segments) . " segments from approved generated content using SegmentTimeline.");
         } else {
             Log::info('RENDER SOURCE', [
                 'source' => 'default',

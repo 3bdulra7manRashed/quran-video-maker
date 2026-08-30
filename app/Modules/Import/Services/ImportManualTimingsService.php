@@ -187,6 +187,36 @@ class ImportManualTimingsService
         $toAyah = isset($data['to_ayah']) ? (int) $data['to_ayah'] : null;
         $approvedSegments = $resolver->resolve($reciterId, $surahNumber, $fromAyah, $toAyah, 'reels');
 
+        // If not found in DB, but provided in incoming payload, build them in-memory
+        if (($approvedSegments === null || $approvedSegments->isEmpty()) && !empty($jsonSegments)) {
+            $hasSegmentArabic = false;
+            foreach ($jsonSegments as $js) {
+                if (!empty($js['arabic'])) {
+                    $hasSegmentArabic = true;
+                    break;
+                }
+            }
+
+            if ($hasSegmentArabic) {
+                $collection = collect();
+                foreach ($jsonSegments as $seg) {
+                    $record = new \App\Modules\Quran\Models\ReelsGeneratedContent();
+                    $record->reciter_id = $reciterId;
+                    $record->surah_number = $surahNumber;
+                    $record->start_ayah = $fromAyah ?? 1;
+                    $record->end_ayah = $toAyah ?? 999;
+                    $record->layout_type = \App\Enums\LayoutType::REELS;
+                    $record->segment_order = (int)($seg['order'] ?? $seg['segment_order'] ?? 1);
+                    $record->arabic = $seg['arabic'] ?? '';
+                    $record->translation = $seg['translation'] ?? '';
+                    $record->tafsir = $seg['tafsir'] ?? '';
+                    $record->approval_status = \App\Enums\ContentApprovalStatus::APPROVED;
+                    $collection->push($record);
+                }
+                $approvedSegments = $collection;
+            }
+        }
+
         if ($approvedSegments === null || $approvedSegments->isEmpty()) {
             throw new \RuntimeException("No approved segment definitions found for this Surah range. Please generate and approve segments first.");
         }
@@ -414,6 +444,53 @@ class ImportManualTimingsService
                 'from_ayah' => $fromAyah ? (int)$fromAyah : null,
                 'to_ayah' => $toAyah ? (int)$toAyah : null,
             ]);
+
+            // If persist_to_database is requested, cleanly archive existing records and save new template version
+            if (!empty($data['persist_to_database']) || !empty($data['save_to_database'])) {
+                $startAyahVal = $fromAyah ? (int)$fromAyah : 1;
+                $endAyahVal = $toAyah ? (int)$toAyah : ($surah ? $surah->verses_count : 114);
+                $layoutType = \App\Enums\LayoutType::REELS;
+
+                $maxVersion = \App\Modules\Quran\Models\ReelsGeneratedContent::where('reciter_id', $reciterId)
+                    ->where('surah_number', $surahNumber)
+                    ->where('start_ayah', $startAyahVal)
+                    ->where('end_ayah', $endAyahVal)
+                    ->where('layout_type', $layoutType)
+                    ->max('content_version') ?? 0;
+
+                $newVersion = $maxVersion + 1;
+
+                // Archive all currently approved entries for this key
+                \App\Modules\Quran\Models\ReelsGeneratedContent::where('reciter_id', $reciterId)
+                    ->where('surah_number', $surahNumber)
+                    ->where('start_ayah', $startAyahVal)
+                    ->where('end_ayah', $endAyahVal)
+                    ->where('layout_type', $layoutType)
+                    ->where('approval_status', \App\Enums\ContentApprovalStatus::APPROVED)
+                    ->update(['approval_status' => \App\Enums\ContentApprovalStatus::ARCHIVED]);
+
+                // Save new approved entries
+                foreach ($jsonSegments as $seg) {
+                    if (!empty($seg['arabic'])) {
+                        \App\Modules\Quran\Models\ReelsGeneratedContent::create([
+                            'reciter_id' => $reciterId,
+                            'surah_number' => $surahNumber,
+                            'start_ayah' => $startAyahVal,
+                            'end_ayah' => $endAyahVal,
+                            'layout_type' => $layoutType,
+                            'segment_order' => (int)($seg['order'] ?? $seg['segment_order'] ?? 1),
+                            'arabic' => \App\Services\ContentGeneration\ContentNormalizer::normalizeArabic($seg['arabic']),
+                            'translation' => \App\Services\ContentGeneration\ContentNormalizer::normalizeTranslation($seg['translation'] ?? ''),
+                            'tafsir' => \App\Services\ContentGeneration\ContentNormalizer::normalizeTafsir($seg['tafsir'] ?? ''),
+                            'approval_status' => \App\Enums\ContentApprovalStatus::APPROVED,
+                            'content_version' => $newVersion,
+                            'generator_type' => \App\Enums\GeneratorType::MANUAL,
+                            'source_json' => $data,
+                            'generated_at' => now(),
+                        ]);
+                    }
+                }
+            }
 
             DB::commit();
 

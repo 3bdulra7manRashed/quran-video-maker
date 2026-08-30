@@ -18,6 +18,8 @@ interface RenderOptionsProps {
   onWithTafsirChange: (val: boolean) => void;
   useGeneratedContent: boolean;
   onUseGeneratedContentChange: (val: boolean) => void;
+  persistToDatabase?: boolean;
+  onPersistToDatabaseChange?: (val: boolean) => void;
   disabled: boolean;
 }
 
@@ -34,6 +36,8 @@ export default function RenderOptions({
   onWithTafsirChange,
   useGeneratedContent,
   onUseGeneratedContentChange,
+  persistToDatabase = false,
+  onPersistToDatabaseChange,
   disabled,
 }: RenderOptionsProps) {
   const t = useT();
@@ -192,6 +196,26 @@ export default function RenderOptions({
             disabled={disabled}
             checked={useGeneratedContent}
             onChange={(e) => onUseGeneratedContentChange(e.target.checked)}
+            className="w-4 h-4 accent-emerald-600 rounded bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 cursor-pointer disabled:opacity-40"
+          />
+        </div>
+
+        {/* Persist Segments to Database Toggle */}
+        <div className="border-t border-slate-100 dark:border-slate-800/60 pt-4 flex items-center justify-between">
+          <div className="flex flex-col">
+            <label htmlFor="persistToDatabase" className="text-xs text-slate-700 dark:text-slate-350 font-semibold cursor-pointer">
+              {isAr ? 'حفظ كقالب معتمد في قاعدة البيانات' : 'Save permanently to Database'}
+            </label>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400">
+              {isAr ? 'حفظ المقاطع والتوقيت كقالب دائم في قاعدة البيانات بدلاً من الجلسة الحالية فقط.' : 'Permanently save segment templates in DB instead of current run only.'}
+            </span>
+          </div>
+          <input
+            id="persistToDatabase"
+            type="checkbox"
+            disabled={disabled}
+            checked={persistToDatabase}
+            onChange={(e) => onPersistToDatabaseChange?.(e.target.checked)}
             className="w-4 h-4 accent-emerald-600 rounded bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 cursor-pointer disabled:opacity-40"
           />
         </div>

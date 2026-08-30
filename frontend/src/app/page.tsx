@@ -75,6 +75,7 @@ export default function ConsolePage() {
 
   // AI content states
   const [useGeneratedContent, setUseGeneratedContent] = useState<boolean>(false);
+  const [persistToDatabase, setPersistToDatabase] = useState<boolean>(false);
 
   // ===================================================
   // AI TASK 1: SEGMENTATION STATES
@@ -101,6 +102,7 @@ export default function ConsolePage() {
   const [segTimMarkers, setSegTimMarkers] = useState<string>('');
   const [segTimPrompt, setSegTimPrompt] = useState<string>('');
   const [segTimJsonInput, setSegTimJsonInput] = useState<string>('');
+  const [lastSegTimJson, setLastSegTimJson] = useState<string | undefined>();
   const [segTimCopied, setSegTimCopied] = useState<boolean>(false);
   const [segTimGenerating, setSegTimGenerating] = useState<boolean>(false);
   const [segTimValidating, setSegTimValidating] = useState<boolean>(false);
@@ -445,7 +447,9 @@ export default function ConsolePage() {
         jsonToParse
       );
       if (res.success) {
-        setSegTimSuccessMsg(isAr ? 'تم استيراد توقيت المقاطع بنجاح!' : 'Segment timings imported successfully!');
+        setSegTimSuccessMsg(isAr ? 'تم استيراد وتثبيت توقيت المقاطع في قاعدة البيانات بنجاح!' : 'Segment timings imported & saved permanently!');
+        setLastSegTimJson(jsonToParse);
+        setUseGeneratedContent(true);
         await loadDatasetStatus();
       }
     } catch (err: any) {
@@ -731,6 +735,8 @@ export default function ConsolePage() {
               onWithTafsirChange={setWithTafsir}
               useGeneratedContent={useGeneratedContent}
               onUseGeneratedContentChange={setUseGeneratedContent}
+              persistToDatabase={persistToDatabase}
+              onPersistToDatabaseChange={setPersistToDatabase}
             />
 
             {/* PROGRESSIVE DISCLOSURE: Render AI Operations Dynamically from Config */}
@@ -813,9 +819,18 @@ export default function ConsolePage() {
                     fromAyah={fromAyah}
                     toAyah={toAyah}
                     approvedSegments={status?.approved_segments || []}
-                    onManualTimingsComplete={async (json) => {
+                    persistToDatabase={persistToDatabase}
+                    onPersistToDatabaseChange={setPersistToDatabase}
+                    onManualTimingsComplete={async (json, persist) => {
                       setSegTimJsonInput(json);
-                      await runImportSegTimJson(json);
+                      setLastSegTimJson(json);
+                      setUseGeneratedContent(true);
+                      const shouldPersist = persist !== undefined ? persist : persistToDatabase;
+                      if (shouldPersist) {
+                        await runImportSegTimJson(json);
+                      } else {
+                        setSegTimSuccessMsg(isAr ? 'تم حفظ التوقيت لجلسة العمل الحالية فقط (Run-only)' : 'Segment timings saved for current session only (Run-only)');
+                      }
                     }}
                   />
                 );
@@ -873,7 +888,7 @@ export default function ConsolePage() {
                 translationSource={translationSource}
                 withTafsir={withTafsir}
                 useGeneratedContent={useGeneratedContent}
-                customJsonPayload={undefined}
+                customJsonPayload={lastSegTimJson || undefined}
               />
             )}
           </div>
