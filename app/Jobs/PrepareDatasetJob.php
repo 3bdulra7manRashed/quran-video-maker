@@ -21,6 +21,11 @@ class PrepareDatasetJob implements ShouldQueue
     protected int $surahNumber;
 
     /**
+     * The number of seconds the job can run before timing out.
+     */
+    public int $timeout = 0;
+
+    /**
      * Create a new job instance.
      */
     public function __construct(string $reciterSlug, int $surahNumber)
@@ -34,6 +39,10 @@ class PrepareDatasetJob implements ShouldQueue
      */
     public function handle(DatasetProvider $provider): void
     {
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(0);
+        }
+
         Log::info("[PrepareDatasetJob] Starting preparation for {$this->reciterSlug} Surah {$this->surahNumber}");
 
         // TODO: Future dataset preparation tracking implementation

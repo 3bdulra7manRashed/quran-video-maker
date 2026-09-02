@@ -67,6 +67,10 @@ class QuranComDatasetProvider implements DatasetProvider
      */
     public function downloadGlyphs(int $surahNumber): void
     {
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(0);
+        }
+
         Log::info("[QuranComDatasetProvider] Downloading glyphs for Surah {$surahNumber}...");
         
         $surah = Surah::where('number', $surahNumber)->first();
@@ -163,6 +167,10 @@ class QuranComDatasetProvider implements DatasetProvider
      */
     public function importGlyphs(int $surahNumber): void
     {
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(0);
+        }
+
         Log::info("[QuranComDatasetProvider] Importing glyphs for Surah {$surahNumber}...");
         $destFile = storage_path("app/quran/glyph/surah_{$surahNumber}.json");
         if (!file_exists($destFile)) {
@@ -187,6 +195,10 @@ class QuranComDatasetProvider implements DatasetProvider
      */
     public function downloadAudio(string $reciterSlug, int $surahNumber): void
     {
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(0);
+        }
+
         Log::info("[QuranComDatasetProvider] Downloading audio for {$reciterSlug} Surah {$surahNumber}...");
         $mapping = $this->reciterMapping[$reciterSlug] ?? null;
         if (!$mapping) {
@@ -267,6 +279,10 @@ class QuranComDatasetProvider implements DatasetProvider
      */
     public function downloadTimings(string $reciterSlug, int $surahNumber): void
     {
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(0);
+        }
+
         Log::info("[QuranComDatasetProvider] Downloading timings for {$reciterSlug} Surah {$surahNumber}...");
         $mapping = $this->reciterMapping[$reciterSlug] ?? null;
         if (!$mapping) {
@@ -326,6 +342,10 @@ class QuranComDatasetProvider implements DatasetProvider
      */
     public function importTimings(string $reciterSlug, int $surahNumber): void
     {
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(0);
+        }
+
         Log::info("[QuranComDatasetProvider] Importing timings for {$reciterSlug} Surah {$surahNumber}...");
         $reciter = Reciter::where('slug', $reciterSlug)->first();
         if (!$reciter) {

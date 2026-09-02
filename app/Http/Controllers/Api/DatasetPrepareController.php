@@ -14,6 +14,10 @@ class DatasetPrepareController
      */
     public function prepare(Request $request): JsonResponse
     {
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(0);
+        }
+
         $validator = Validator::make($request->all(), [
             'reciter' => 'required|string|exists:reciters,slug',
             'surah'   => 'required|integer|exists:surahs,number',
@@ -33,7 +37,7 @@ class DatasetPrepareController
         );
 
         $response = [
-            'status' => 'queued',
+            'status' => 'processing',
         ];
 
         // Only return real trackable job ID if driver is capable and returned a scalar ID

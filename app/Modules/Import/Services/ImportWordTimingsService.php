@@ -22,6 +22,10 @@ class ImportWordTimingsService
      */
     public function import(?string $sourcePath = null, ?int $reciterId = null): array
     {
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(0);
+        }
+
         $startTime = microtime(true);
 
         if ($reciterId === null) {

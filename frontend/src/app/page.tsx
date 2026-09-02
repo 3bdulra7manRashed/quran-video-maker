@@ -228,7 +228,7 @@ export default function ConsolePage() {
 
     return new Promise<void>((resolve, reject) => {
       let attempts = 0;
-      const maxAttempts = 30; // 45s total (30 * 1500ms)
+      const maxAttempts = 80; // 120s total (80 * 1500ms)
       const targetReciter = selectedReciter;
       const targetSurah = selectedSurah;
 
@@ -250,7 +250,7 @@ export default function ConsolePage() {
             if (isReady) {
               resolve();
             } else {
-              reject(new Error('Dataset preparation timed out after 45 seconds.'));
+              reject(new Error('Dataset preparation timed out after 120 seconds.'));
             }
           }
         } catch (err) {
