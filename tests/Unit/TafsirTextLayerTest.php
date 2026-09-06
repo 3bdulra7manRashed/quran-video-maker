@@ -379,19 +379,21 @@ class TafsirTextLayerTest extends TestCase
         // Check context recorded capsule bounds
         $this->assertArrayHasKey('tafsirCapsuleBounds', $context->layoutData);
         $capsuleBounds = $context->layoutData['tafsirCapsuleBounds'];
-        $expectedRadius = floor($capsuleBounds['height'] / 2.0);
-        $this->assertEquals($expectedRadius, $capsuleBounds['radius'], "Radius must equal half the capsule height (full pill)");
+        $this->assertEquals(110.0, $capsuleBounds['height'], "Capsule height must be locked to exactly 110px");
+        $this->assertEquals(55.0, $capsuleBounds['radius'], "Radius must be 55px for full pill rounding");
         $this->assertEquals([77, 49, 38], $capsuleBounds['color'], "Capsule color must be #4D3126");
         $this->assertEquals(51, $capsuleBounds['alpha'], "Capsule alpha must be 51 for 60% opacity");
         $this->assertEquals(0.60, $capsuleBounds['opacity']);
         $this->assertLessThanOrEqual(940.0, $capsuleBounds['width']);
         $this->assertEqualsWithDelta(540.0, ($capsuleBounds['x1'] + $capsuleBounds['x2']) / 2.0, 1.0);
         $this->assertEqualsWithDelta(1081.0, ($capsuleBounds['y1'] + $capsuleBounds['y2']) / 2.0, 1.0);
+        $this->assertEqualsWithDelta(1026.0, $capsuleBounds['y1'], 1.0);
+        $this->assertEqualsWithDelta(1136.0, $capsuleBounds['y2'], 1.0);
 
         // Check for capsule color pixels (#4D3126 at 60% opacity over black: R~46, G~29, B~23)
         $capsulePixelsX = [];
         $capsulePixelsY = [];
-        for ($y = 1030; $y <= 1130; $y++) {
+        for ($y = 1035; $y <= 1125; $y++) {
             for ($x = 0; $x < $width; $x++) {
                 $rgb = imagecolorat($im, $x, $y);
                 $r = ($rgb >> 16) & 0xFF;
@@ -412,6 +414,76 @@ class TafsirTextLayerTest extends TestCase
         $this->assertEqualsWithDelta(1081.0, $centerY, 2.0, "Capsule must center vertically around Y = 1081");
 
         imagedestroy($im);
+    }
+
+    public function test_capsule_height_remains_identically_110px_across_single_and_two_line_tafsir(): void
+    {
+        $layer = new TafsirTextLayer();
+        $width = 1080;
+        $height = 1920;
+
+        // 1. Single-line Tafsir
+        $im1 = imagecreatetruecolor($width, $height);
+        $arabicSeg1 = new Segment(1, 110, 2, [1, 2], 0, 1000);
+        $tafsirSeg1 = new TranslationSegment(1, "إذا جاء نصر الله والفتح", 110, 2, 0, 1000);
+        $layoutData1 = [
+            'theme' => 'quran_me',
+            'tafsirBounds' => [
+                'x' => 540,
+                'y' => 1081,
+                'width' => 920,
+                'fontSize' => 30,
+                'lineHeight' => 44,
+                'fontPath' => $this->fontPath,
+                'color' => [255, 255, 255],
+            ],
+        ];
+
+        $ctx1 = new FrameContext($im1, $width, $height, $layoutData1, $arabicSeg1);
+        $layer->render($tafsirSeg1, $ctx1);
+
+        $bounds1 = $ctx1->layoutData['tafsirCapsuleBounds'];
+        $this->assertEquals(110.0, $bounds1['height'], "1-line capsule height must be exactly 110px");
+        $this->assertEquals(55.0, $bounds1['radius'], "1-line capsule radius must be exactly 55px");
+        $this->assertGreaterThanOrEqual(200.0, $bounds1['width']);
+        $this->assertLessThanOrEqual(940.0, $bounds1['width']);
+        imagedestroy($im1);
+
+        // 2. Two-line Tafsir
+        $im2 = imagecreatetruecolor($width, $height);
+        $arabicSeg2 = new Segment(2, 110, 3, [1, 2], 0, 1000);
+        $mediumText = "فسبح بحمد ربك منزها له عن كل نقص، واسأله المغفرة، إنه كان توابا رحيما بالمستغفرين";
+        $tafsirSeg2 = new TranslationSegment(2, $mediumText, 110, 3, 0, 1000);
+        $layoutData2 = [
+            'theme' => 'quran_me',
+            'tafsirBounds' => [
+                'x' => 540,
+                'y' => 1081,
+                'width' => 920,
+                'fontSize' => 30,
+                'lineHeight' => 44,
+                'fontPath' => $this->fontPath,
+                'color' => [255, 255, 255],
+            ],
+        ];
+
+        $ctx2 = new FrameContext($im2, $width, $height, $layoutData2, $arabicSeg2);
+        $layer->render($tafsirSeg2, $ctx2);
+
+        $bounds2 = $ctx2->layoutData['tafsirCapsuleBounds'];
+        $this->assertEquals(110.0, $bounds2['height'], "2-line capsule height must also be exactly 110px");
+        $this->assertEquals(55.0, $bounds2['radius'], "2-line capsule radius must also be exactly 55px");
+        $this->assertGreaterThanOrEqual(200.0, $bounds2['width']);
+        $this->assertLessThanOrEqual(940.0, $bounds2['width']);
+        imagedestroy($im2);
+
+        // Height is identical
+        $this->assertEquals($bounds1['height'], $bounds2['height'], "Capsule height must not change between 1-line and 2-line text");
+        // Center coordinates are identical
+        $this->assertEqualsWithDelta($bounds1['y1'], $bounds2['y1'], 0.1);
+        $this->assertEqualsWithDelta($bounds1['y2'], $bounds2['y2'], 0.1);
+        $this->assertEqualsWithDelta(1026.0, $bounds1['y1'], 0.1);
+        $this->assertEqualsWithDelta(1136.0, $bounds1['y2'], 0.1);
     }
 }
 

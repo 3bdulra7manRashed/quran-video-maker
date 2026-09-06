@@ -17,6 +17,8 @@ class TafsirTextLayer implements RenderLayerInterface
     public const DEFAULT_LINE_HEIGHT = 44.0; // 42-46px line-height for 2 lines
     public const MAX_TAFSIR_LINES = 2; // approx 1 to 2 lines max
     public const MIN_FONT_SIZE = 24;
+    public const FIXED_CAPSULE_HEIGHT = 110.0; // Fixed 110px height for all segments
+    public const DEFAULT_CAPSULE_PADDING_X = 50.0; // 50px on each side
 
     protected array $tafsirSegments;
     protected array $widthCache = [];
@@ -316,15 +318,16 @@ class TafsirTextLayer implements RenderLayerInterface
             || isset($bounds['capsulePaddingX']);
 
         if ($isCapsuleEnabled) {
-            $paddingX = (float) ($bounds['capsulePaddingX'] ?? 50.0);
-            $paddingY = (float) ($bounds['capsulePaddingY'] ?? 18.0);
+            $paddingX = (float) ($bounds['capsulePaddingX'] ?? self::DEFAULT_CAPSULE_PADDING_X);
             $maxPillWidth = (float) ($bounds['maxCapsuleWidth'] ?? 940.0);
+            $minPillWidth = (float) ($bounds['minCapsuleWidth'] ?? 200.0);
+            $fixedPillHeight = (float) ($bounds['capsuleHeight'] ?? self::FIXED_CAPSULE_HEIGHT);
 
-            $pillWidth = min($textWidth + ($paddingX * 2.0), $maxPillWidth);
-            $pillHeight = $textHeight + ($paddingY * 2.0);
+            $pillWidth = min(max($textWidth + ($paddingX * 2.0), $minPillWidth), $maxPillWidth);
+            $pillHeight = $fixedPillHeight;
 
-            // Full pill rounding where corner radius strictly equals half the capsule height
-            $defaultRadius = (float) floor($pillHeight / 2.0);
+            // Full pill rounding where corner radius strictly equals half the fixed capsule height (55.0 for 110px)
+            $defaultRadius = (float) floor($fixedPillHeight / 2.0);
             $radius = (float) ($bounds['capsuleRadius'] ?? $defaultRadius);
 
             $capsuleColorRGB = $bounds['capsuleColor'] ?? [77, 49, 38]; // #4D3126 matching Ayah & translation
@@ -332,9 +335,9 @@ class TafsirTextLayer implements RenderLayerInterface
             $alpha = (int) round(127 * (1.0 - $capsuleOpacity)); // ~51
 
             $pillX1 = $centerX - ($pillWidth / 2.0);
-            $pillY1 = $tafsirCenterY - ($pillHeight / 2.0);
+            $pillY1 = $tafsirCenterY - ($fixedPillHeight / 2.0);
             $pillX2 = $centerX + ($pillWidth / 2.0);
-            $pillY2 = $tafsirCenterY + ($pillHeight / 2.0);
+            $pillY2 = $tafsirCenterY + ($fixedPillHeight / 2.0);
 
             imagealphablending($context->image, true);
             imagesavealpha($context->image, true);
