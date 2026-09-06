@@ -21,9 +21,13 @@ class GeneratedContentWordAligner
         $wordCount = count($words);
 
         foreach ($approvedSegments as $genSeg) {
-            $segmentText = $genSeg->arabic;
+            // Restrict alignment strictly to the segment's Quranic Arabic text
+            $segmentText = is_object($genSeg) ? ($genSeg->arabic ?? '') : ($genSeg['arabic'] ?? '');
+            $segmentOrder = (int)(is_object($genSeg) ? ($genSeg->segment_order ?? $genSeg->order ?? 1) : ($genSeg['segment_order'] ?? $genSeg['order'] ?? 1));
+            $segmentTafsir = is_object($genSeg) ? ($genSeg->tafsir ?? null) : ($genSeg['tafsir'] ?? null);
+            $segmentTranslation = is_object($genSeg) ? ($genSeg->translation ?? null) : ($genSeg['translation'] ?? null);
 
-            // Normalize segment text for matching
+            // Normalize segment Arabic text for matching against database words
             $normSegment = ContentNormalizer::normalizeForMatching($segmentText);
             $normSegmentClean = preg_replace('/\s+/u', '', $normSegment);
 
@@ -33,7 +37,7 @@ class GeneratedContentWordAligner
 
             // Log ALIGNMENT ATTEMPT
             Log::info('ALIGNMENT ATTEMPT', [
-                'segment_order' => (int)$genSeg->segment_order,
+                'segment_order' => $segmentOrder,
                 'segment_text' => $segmentText,
                 'normalized_segment' => $normSegmentClean,
                 'start_index' => $startIndex,
@@ -68,7 +72,7 @@ class GeneratedContentWordAligner
                 if (mb_strlen($currentMatch) > mb_strlen($normSegmentClean) + 3) {
                     // Log ALIGNMENT FAILURE
                     Log::error('Alignment Failure (Runaway Stopped Early)', [
-                        'segment_order' => (int)$genSeg->segment_order,
+                        'segment_order' => $segmentOrder,
                         'segment_original' => $segmentText,
                         'segment_normalized' => $normSegmentClean,
                         'candidate_original' => collect($matchedWords)->pluck('uthmani_text')->implode(' '),
@@ -90,8 +94,8 @@ class GeneratedContentWordAligner
                     ]);
 
                     throw new \App\Services\ContentGeneration\Exceptions\AlignmentException(
-                        "Alignment failed for segment #{$genSeg->segment_order} (runaway accumulation stopped early). Mismatch between pre-generated Arabic text and database words.",
-                        (int)$genSeg->segment_order,
+                        "Alignment failed for segment #{$segmentOrder} (runaway accumulation stopped early). Mismatch between pre-generated Arabic text and database words.",
+                        $segmentOrder,
                         $segmentText,
                         $normSegmentClean,
                         $matchedWords,
@@ -105,25 +109,26 @@ class GeneratedContentWordAligner
             if ($currentMatch === $normSegmentClean && !empty($matchedWords)) {
                 // Log ALIGNMENT SUCCESS
                 Log::info('ALIGNMENT SUCCESS', [
-                    'segment_order' => (int)$genSeg->segment_order,
+                    'segment_order' => $segmentOrder,
                     'matched_words_count' => count($matchedWords),
                 ]);
 
                 $wordIds = array_map(fn($w) => $w->id, $matchedWords);
 
+                // Tafsir and Translation are passed through strictly as display payload
                 $alignedRanges[] = [
-                    'segmentOrder' => (int)$genSeg->segment_order,
+                    'segmentOrder' => $segmentOrder,
                     'startWordId' => $matchedWords[0]->id,
                     'endWordId' => end($matchedWords)->id,
                     'wordIds' => $wordIds,
                     'words' => $matchedWords,
-                    'tafsir' => $genSeg->tafsir ?? null,
-                    'translation' => $genSeg->translation ?? null,
+                    'tafsir' => $segmentTafsir,
+                    'translation' => $segmentTranslation,
                 ];
             } else {
                 // Log ALIGNMENT FAILURE
                 Log::error('Alignment Failure', [
-                    'segment_order' => (int)$genSeg->segment_order,
+                    'segment_order' => $segmentOrder,
                     'segment_original' => $segmentText,
                     'segment_normalized' => $normSegmentClean,
                     'candidate_original' => collect($matchedWords)->pluck('uthmani_text')->implode(' '),
@@ -145,8 +150,8 @@ class GeneratedContentWordAligner
                 ]);
 
                 throw new \App\Services\ContentGeneration\Exceptions\AlignmentException(
-                    "Alignment failed for segment #{$genSeg->segment_order}. Mismatch between pre-generated Arabic text and database words.",
-                    (int)$genSeg->segment_order,
+                    "Alignment failed for segment #{$segmentOrder}. Mismatch between pre-generated Arabic text and database words.",
+                    $segmentOrder,
                     $segmentText,
                     $normSegmentClean,
                     $matchedWords,

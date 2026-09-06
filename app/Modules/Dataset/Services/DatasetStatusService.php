@@ -30,7 +30,7 @@ class DatasetStatusService
      */
     public function evaluate(string $reciterSlug, int $surahNumber): array
     {
-        $reciter = Reciter::where('slug', $reciterSlug)->first();
+        $reciter = Reciter::findBySlug($reciterSlug);
         $surah = Surah::where('number', $surahNumber)->first();
 
         $glyphs = $this->evaluateGlyphs($surah);

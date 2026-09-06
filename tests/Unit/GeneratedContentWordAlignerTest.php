@@ -242,4 +242,74 @@ class GeneratedContentWordAlignerTest extends TestCase
         $this->assertEquals(2, $ranges[0]['endWordId']);
         $this->assertEquals(3, $ranges[1]['startWordId']);
     }
+
+    /**
+     * Test that modifying, truncating, or leaving empty Tafsir/Translation does not break alignment,
+     * and that Tafsir and Translation are passed through strictly as payload data.
+     */
+    public function test_align_with_truncated_or_modified_tafsir_passes_and_preserves_payload(): void
+    {
+        $seg1 = $this->createSegment(1, "إِنَّا أَعْطَيْنَاكَ");
+        $seg1->tafsir = "مختصر جداً"; // truncated tafsir
+        $seg1->translation = "Indeed, We have granted you";
+
+        $seg2 = $this->createSegment(2, "الْكَوْثَرَ");
+        $seg2->tafsir = null; // empty/deleted tafsir
+        $seg2->translation = "al-Kawthar.";
+
+        $segments = collect([$seg1, $seg2]);
+
+        $words = [
+            $this->createWord(1, "إِنَّا"),
+            $this->createWord(2, "أَعْطَيْنَاكَ"),
+            $this->createWord(3, "الْكَوْثَرَ"),
+        ];
+
+        $ranges = $this->aligner->align($segments, $words);
+
+        $this->assertCount(2, $ranges);
+        $this->assertEquals("مختصر جداً", $ranges[0]['tafsir']);
+        $this->assertEquals("Indeed, We have granted you", $ranges[0]['translation']);
+        $this->assertNull($ranges[1]['tafsir']);
+        $this->assertEquals("al-Kawthar.", $ranges[1]['translation']);
+        $this->assertEquals([1, 2], $ranges[0]['wordIds']);
+        $this->assertEquals([3], $ranges[1]['wordIds']);
+    }
+
+    /**
+     * Test that align supports array representation of segments.
+     */
+    public function test_align_supports_array_segments(): void
+    {
+        $segments = collect([
+            [
+                'order' => 1,
+                'arabic' => "إِنَّا أَعْطَيْنَاكَ",
+                'tafsir' => "تفسير مقطع 1",
+                'translation' => "Translation 1",
+            ],
+            [
+                'order' => 2,
+                'arabic' => "الْكَوْثَرَ",
+                'tafsir' => "تفسير مقطع 2",
+                'translation' => "Translation 2",
+            ],
+        ]);
+
+        $words = [
+            $this->createWord(1, "إِنَّا"),
+            $this->createWord(2, "أَعْطَيْنَاكَ"),
+            $this->createWord(3, "الْكَوْثَرَ"),
+        ];
+
+        $ranges = $this->aligner->align($segments, $words);
+
+        $this->assertCount(2, $ranges);
+        $this->assertEquals(1, $ranges[0]['segmentOrder']);
+        $this->assertEquals("تفسير مقطع 1", $ranges[0]['tafsir']);
+        $this->assertEquals("Translation 1", $ranges[0]['translation']);
+        $this->assertEquals(2, $ranges[1]['segmentOrder']);
+        $this->assertEquals("تفسير مقطع 2", $ranges[1]['tafsir']);
+        $this->assertEquals("Translation 2", $ranges[1]['translation']);
+    }
 }

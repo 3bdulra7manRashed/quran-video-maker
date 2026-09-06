@@ -20,7 +20,7 @@ class DatasetStatusController
      */
     public function status(Request $request): JsonResponse
     {
-        $reciterSlug = $request->query('reciter');
+        $reciterSlug = \App\Modules\Quran\Models\Reciter::normalizeSlug((string) $request->query('reciter'));
         $surahNumber = $request->query('surah');
 
         if (!$reciterSlug || !$surahNumber) {

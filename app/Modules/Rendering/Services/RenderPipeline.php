@@ -80,7 +80,8 @@ class RenderPipeline
         ?\App\Modules\Quran\Models\RenderJob $renderJob = null,
         bool $useGeneratedContent = false,
         bool $withTafsir = false,
-        string $tafsirSource = 'ar-tafsir-muyassar'
+        string $tafsirSource = 'ar-tafsir-muyassar',
+        ?string $customJson = null
     ): string {
         $this->cancellationGuard->ensureNotCancelled($renderJob);
 
@@ -94,7 +95,8 @@ class RenderPipeline
         }
 
         if ($withTafsir) {
-            $isCustomOrGenerated = $useGeneratedContent || ($renderJob && $renderJob->use_generated_content);
+            $hasCustomFile = $renderJob && file_exists(storage_path('app/temp/custom_render_' . $renderJob->uuid . '.json'));
+            $isCustomOrGenerated = $useGeneratedContent || ($renderJob && $renderJob->use_generated_content) || ($customJson !== null && trim($customJson) !== '') || $hasCustomFile;
             if (!$isCustomOrGenerated) {
                 $exists = \App\Modules\Quran\Models\AyahTranslation::where('source', $tafsirSource)->exists();
                 if (!$exists) {
@@ -123,78 +125,215 @@ class RenderPipeline
         }
 
         // 2. Select Reciter
-        $reciter = Reciter::where('slug', $reciterSlug)->first();
+        $reciter = Reciter::findBySlug($reciterSlug);
         if (!$reciter) {
             throw new RuntimeException("Reciter '{$reciterSlug}' not found in database.");
         }
+        $reciterSlug = $reciter->slug;
 
         // Detect and inject custom JSON timing/segment payload if present
-        if ($renderJob) {
+        $parsedCustomJson = null;
+        if ($customJson !== null && trim($customJson) !== '') {
+            $parsedCustomJson = is_array($customJson) ? $customJson : json_decode($customJson, true);
+        } elseif ($renderJob) {
             $tempFile = storage_path('app/temp/custom_render_' . $renderJob->uuid . '.json');
             if (file_exists($tempFile)) {
                 $customJsonStr = file_get_contents($tempFile);
-                $customJson = json_decode($customJsonStr, true);
-                if (json_last_error() === JSON_ERROR_NONE) {
-                    // 1. If it contains segments (Reels generated content)
-                    if (isset($customJson['segments'])) {
-                        $useGeneratedContent = true;
+                $parsedCustomJson = json_decode($customJsonStr, true);
+                @unlink($tempFile);
+            }
+        }
 
-                        // Auto-enable withTafsir if any custom segment has tafsir text
-                        foreach ($customJson['segments'] as $seg) {
-                            if (!empty($seg['tafsir'])) {
-                                $withTafsir = true;
-                                break;
-                            }
-                        }
-                        
-                        $mockResolver = new class($customJson['segments'], $reciter, $surahNumber) extends \App\Services\ContentGeneration\ApprovedContentResolver {
-                            protected array $segments;
-                            protected $reciter;
-                            protected int $surahNumber;
-                            public function __construct(array $segments, $reciter, int $surahNumber) {
-                                $this->segments = $segments;
-                                $this->reciter = $reciter;
-                                $this->surahNumber = $surahNumber;
-                            }
-                            public function resolve(int $reciterId, int $surahNumber, ?int $fromAyah = null, ?int $toAyah = null, string $layout = 'reels'): ?\Illuminate\Support\Collection {
-                                $collection = collect();
-                                foreach ($this->segments as $seg) {
-                                    $record = new \App\Modules\Quran\Models\ReelsGeneratedContent();
-                                    $record->reciter_id = $reciterId;
-                                    $record->surah_number = $this->surahNumber;
-                                    $record->segment_order = (int)$seg['order'];
-                                    $record->arabic = $seg['arabic'] ?? '';
-                                    $record->translation = $seg['translation'] ?? null;
-                                    $record->tafsir = $seg['tafsir'] ?? null;
-                                    $collection->push($record);
-                                }
-                                return $collection;
-                            }
-                        };
-                        app()->instance(\App\Services\ContentGeneration\ApprovedContentResolver::class, $mockResolver);
-                    }
-                    
-                    // 2. If it contains lines (Mushaf Line Timings)
-                    if (isset($customJson['lines'])) {
-                        $customLineTimings = [];
-                        foreach ($customJson['lines'] as $line) {
-                            $timing = new \App\Modules\Quran\Models\ReciterLineTiming();
-                            $timing->page_number = (int)$line['page_number'];
-                            $timing->line_number = (int)$line['line_number'];
-                            $timing->start_ms = (int)$line['start'];
-                            $customLineTimings[$timing->page_number . ':' . $timing->line_number] = $timing;
-                        }
-                        $lineTimingResolver = app(LineTimingResolver::class);
-                        $lineTimingResolver->setCustomTimings($customLineTimings);
-                    }
+        // Fallback: If no explicit customJson was passed but useGeneratedContent is true, check if approved content has source_json
+        if ($parsedCustomJson === null && ($useGeneratedContent || ($renderJob && $renderJob->use_generated_content))) {
+            $existingResolver = new \App\Services\ContentGeneration\ApprovedContentResolver();
+            $approvedFromDb = $existingResolver->resolve($reciter->id, $surahNumber, $fromAyah, $toAyah, $layout);
+            if ($approvedFromDb !== null && !$approvedFromDb->isEmpty()) {
+                $firstWithSource = $approvedFromDb->first(fn($item) => !empty($item->source_json) && (isset($item->source_json['segments']) || isset($item->source_json['lines'])));
+                if ($firstWithSource) {
+                    $parsedCustomJson = $firstWithSource->source_json;
+                }
+            }
+        }
 
-                    // 3. If it contains words (Manual Word Timings)
-                    if (isset($customJson['words'])) {
-                        $wordTimingResolver = app(WordTimingResolver::class);
-                        $wordTimingResolver->setCustomTimings($customJson['words']);
+        $customSegments = null;
+        $hasCustomSegmentTimings = false;
+        $customTimelineMap = [];
+
+        if (is_array($parsedCustomJson)) {
+            // 1. If it contains segments (Reels generated content)
+            if (isset($parsedCustomJson['segments']) && is_array($parsedCustomJson['segments']) && !empty($parsedCustomJson['segments'])) {
+                $customSegments = $parsedCustomJson['segments'];
+                $useGeneratedContent = true;
+
+                // Check if custom segments have explicit timestamps
+                foreach ($customSegments as $seg) {
+                    if (
+                        isset($seg['start']) || isset($seg['start_ms']) || isset($seg['startMs']) ||
+                        isset($seg['end']) || isset($seg['end_ms']) || isset($seg['endMs']) ||
+                        isset($seg['duration_ms'])
+                    ) {
+                        $hasCustomSegmentTimings = true;
+                        break;
                     }
                 }
-                @unlink($tempFile);
+
+                // Auto-enable withTafsir if any custom segment has tafsir text
+                foreach ($customSegments as $seg) {
+                    if (!empty($seg['tafsir'])) {
+                        $withTafsir = true;
+                        break;
+                    }
+                }
+
+                // Auto-enable withTranslation if any custom segment has translation text
+                foreach ($customSegments as $seg) {
+                    if (!empty($seg['translation'])) {
+                        $withTranslation = true;
+                        break;
+                    }
+                }
+
+                // Sort custom segments sequentially by order
+                usort($customSegments, function ($a, $b) {
+                    $orderA = (int)($a['order'] ?? $a['segment_order'] ?? 1);
+                    $orderB = (int)($b['order'] ?? $b['segment_order'] ?? 1);
+                    return $orderA <=> $orderB;
+                });
+
+                // If explicit segment timestamps are present, compute exact custom timeline map
+                if ($hasCustomSegmentTimings) {
+                    $numSegs = count($customSegments);
+                    for ($i = 0; $i < $numSegs; $i++) {
+                        $seg = $customSegments[$i];
+                        $order = (int)($seg['order'] ?? $seg['segment_order'] ?? ($i + 1));
+
+                        // Extract start timestamp
+                        $rawStart = $seg['start'] ?? $seg['start_ms'] ?? $seg['startMs'] ?? null;
+                        if ($rawStart === null) {
+                            $segStart = ($i === 0) ? 0 : $customSegments[$i - 1]['_computed_end'];
+                        } else {
+                            $segStart = (is_float($rawStart) && $rawStart < 1000)
+                                ? (int) round($rawStart * 1000)
+                                : (int) round($rawStart);
+                        }
+
+                        // Extract end timestamp
+                        $rawEnd = $seg['end'] ?? $seg['end_ms'] ?? $seg['endMs'] ?? null;
+                        if ($rawEnd !== null) {
+                            $segEnd = (is_float($rawEnd) && $rawEnd < 1000)
+                                ? (int) round($rawEnd * 1000)
+                                : (int) round($rawEnd);
+                        } elseif (isset($seg['duration_ms'])) {
+                            $segEnd = $segStart + (int) round($seg['duration_ms']);
+                        } elseif ($i < $numSegs - 1) {
+                            $nextRawStart = $customSegments[$i + 1]['start'] ?? $customSegments[$i + 1]['start_ms'] ?? $customSegments[$i + 1]['startMs'] ?? null;
+                            if ($nextRawStart !== null) {
+                                $segEnd = (is_float($nextRawStart) && $nextRawStart < 1000)
+                                    ? (int) round($nextRawStart * 1000)
+                                    : (int) round($nextRawStart);
+                            } else {
+                                $segEnd = $segStart + 5000;
+                            }
+                        } else {
+                            if (isset($parsedCustomJson['end_time_ms'])) {
+                                $segEnd = (int) round($parsedCustomJson['end_time_ms']);
+                            } else {
+                                $segEnd = $segStart + 5000;
+                            }
+                        }
+
+                        if ($segEnd <= $segStart) {
+                            $segEnd = $segStart + 1000;
+                        }
+
+                        $customSegments[$i]['_computed_start'] = $segStart;
+                        $customSegments[$i]['_computed_end'] = $segEnd;
+
+                        $customTimelineMap[$order] = [
+                            'start_ms' => $segStart,
+                            'end_ms'   => $segEnd,
+                        ];
+                    }
+                }
+
+                // If custom segments don't provide Quranic arabic text, backfill from existing approved records if available
+                $hasCustomArabic = false;
+                foreach ($customSegments as $cs) {
+                    if (!empty($cs['arabic'])) {
+                        $hasCustomArabic = true;
+                        break;
+                    }
+                }
+
+                if (!$hasCustomArabic) {
+                    $existingResolver = new \App\Services\ContentGeneration\ApprovedContentResolver();
+                    $existingApproved = $existingResolver->resolve($reciter->id, $surahNumber, $fromAyah, $toAyah, $layout);
+                    if ($existingApproved !== null && !$existingApproved->isEmpty()) {
+                        $existingByOrder = $existingApproved->keyBy('segment_order');
+                        foreach ($customSegments as $k => $cs) {
+                            $ord = (int)($cs['order'] ?? $cs['segment_order'] ?? ($k + 1));
+                            $ex = $existingByOrder->get($ord);
+                            if ($ex) {
+                                if (empty($cs['arabic'])) {
+                                    $customSegments[$k]['arabic'] = $ex->arabic;
+                                }
+                                if (!array_key_exists('translation', $cs) || $cs['translation'] === null) {
+                                    $customSegments[$k]['translation'] = $ex->translation;
+                                }
+                                if (!array_key_exists('tafsir', $cs) || $cs['tafsir'] === null) {
+                                    $customSegments[$k]['tafsir'] = $ex->tafsir;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                $mockResolver = new class($customSegments, $reciter, $surahNumber) extends \App\Services\ContentGeneration\ApprovedContentResolver {
+                    protected array $segments;
+                    protected $reciter;
+                    protected int $surahNumber;
+                    public function __construct(array $segments, $reciter, int $surahNumber) {
+                        $this->segments = $segments;
+                        $this->reciter = $reciter;
+                        $this->surahNumber = $surahNumber;
+                    }
+                    public function resolve(int $reciterId, int $surahNumber, ?int $fromAyah = null, ?int $toAyah = null, string $layout = 'reels'): ?\Illuminate\Support\Collection {
+                        $collection = collect();
+                        foreach ($this->segments as $idx => $seg) {
+                            $record = new \App\Modules\Quran\Models\ReelsGeneratedContent();
+                            $record->reciter_id = $reciterId;
+                            $record->surah_number = $this->surahNumber;
+                            $record->segment_order = (int)($seg['order'] ?? $seg['segment_order'] ?? ($idx + 1));
+                            $record->arabic = $seg['arabic'] ?? '';
+                            $record->translation = $seg['translation'] ?? null;
+                            $record->tafsir = $seg['tafsir'] ?? null;
+                            $collection->push($record);
+                        }
+                        return $collection;
+                    }
+                };
+                app()->instance(\App\Services\ContentGeneration\ApprovedContentResolver::class, $mockResolver);
+            }
+
+            // 2. If it contains lines (Mushaf Line Timings)
+            if (isset($parsedCustomJson['lines'])) {
+                $customLineTimings = [];
+                foreach ($parsedCustomJson['lines'] as $line) {
+                    $timing = new \App\Modules\Quran\Models\ReciterLineTiming();
+                    $timing->page_number = (int)$line['page_number'];
+                    $timing->line_number = (int)$line['line_number'];
+                    $timing->start_ms = (int)$line['start'];
+                    $customLineTimings[$timing->page_number . ':' . $timing->line_number] = $timing;
+                }
+                $lineTimingResolver = app(LineTimingResolver::class);
+                $lineTimingResolver->setCustomTimings($customLineTimings);
+            }
+
+            // 3. If it contains words (Manual Word Timings)
+            if (isset($parsedCustomJson['words'])) {
+                $wordTimingResolver = app(WordTimingResolver::class);
+                $wordTimingResolver->setCustomTimings($parsedCustomJson['words']);
             }
         }
 
@@ -253,76 +392,96 @@ class RenderPipeline
             throw new RuntimeException("No words found in database for the selected ayah range.");
         }
 
-        // Resolve and assign reciter-specific timings in-memory (never save to DB!)
-        $timingMap = $this->timingResolver->resolve($reciter, $words);
-        foreach ($words as $w) {
-            if (isset($timingMap[$w->id])) {
-                $w->start_ms_from_surah = $timingMap[$w->id]['start_ms'];
-                $w->end_ms_from_surah = $timingMap[$w->id]['end_ms'];
-            }
-        }
-
         // 5. Check timings and apply proportional scheduling fallback if timings are unavailable
-        $hasTimings = false;
-        foreach ($words as $w) {
-            if ($w->char_type === 'word' && $w->start_ms_from_surah !== null) {
-                $hasTimings = true;
-                break;
-            }
-        }
+        if ($hasCustomSegmentTimings) {
+            Log::info("[RenderPipeline] Custom segment timings detected. Enforcing absolute priority for segment timestamps (skipping proportional fallback).");
 
-        $audioStartMs = 0;
-        $audioEndMs = (int) round($totalDuration * 1000);
+            $audioStartMs = $customSegments[0]['_computed_start'];
+            $audioEndMs = end($customSegments)['_computed_end'];
+            $totalDuration = ($audioEndMs - $audioStartMs) / 1000.0;
 
-        if (!$hasTimings) {
-            Log::info("[RenderPipeline] Timings not found in DB. Falling back to proportional scheduling.");
-
-            $spokenWords = array_filter($words, fn($w) => $w->char_type === 'word');
-            $spokenCount = count($spokenWords);
-
-            if ($spokenCount > 0) {
-                $durationPerWord = $audioEndMs / $spokenCount;
-
-                $spokenIndex = 0;
+            // Only query ReciterWordTiming if granular word-level karaoke highlighting is explicitly active
+            $isKaraokeActive = false;
+            if ($isKaraokeActive) {
+                $timingMap = $this->timingResolver->resolve($reciter, $words);
                 foreach ($words as $w) {
-                    if ($w->char_type === 'word') {
-                        // Modify in-memory only (do not call save())
-                        $w->start_ms_from_surah = (int) round($spokenIndex * $durationPerWord);
-                        $w->end_ms_from_surah = (int) round(($spokenIndex + 1) * $durationPerWord);
-                        $spokenIndex++;
+                    if (isset($timingMap[$w->id])) {
+                        $w->start_ms_from_surah = $timingMap[$w->id]['start_ms'];
+                        $w->end_ms_from_surah = $timingMap[$w->id]['end_ms'];
                     }
                 }
             }
         } else {
-            // Find absolute bounds for trimming
-            $firstSpoken = null;
-            $lastSpoken = null;
+            // Resolve and assign reciter-specific timings in-memory (never save to DB!)
+            $timingMap = $this->timingResolver->resolve($reciter, $words);
             foreach ($words as $w) {
-                if ($w->char_type === 'word' && $w->start_ms_from_surah !== null) {
-                    if ($firstSpoken === null || $w->start_ms_from_surah < $firstSpoken->start_ms_from_surah) {
-                        $firstSpoken = $w;
-                    }
-                    if ($lastSpoken === null || $w->end_ms_from_surah > $lastSpoken->end_ms_from_surah) {
-                        $lastSpoken = $w;
-                    }
+                if (isset($timingMap[$w->id])) {
+                    $w->start_ms_from_surah = $timingMap[$w->id]['start_ms'];
+                    $w->end_ms_from_surah = $timingMap[$w->id]['end_ms'];
                 }
             }
 
-            if ($firstSpoken !== null && $lastSpoken !== null) {
-                $audioStartMs = $firstSpoken->start_ms_from_surah;
-                $audioEndMs = $lastSpoken->end_ms_from_surah;
+            $hasTimings = false;
+            foreach ($words as $w) {
+                if ($w->char_type === 'word' && $w->start_ms_from_surah !== null) {
+                    $hasTimings = true;
+                    break;
+                }
+            }
 
-                // Normalize timings in-memory relative to trimmed start
-                foreach ($words as $w) {
-                    if ($w->char_type === 'word' && $w->start_ms_from_surah !== null) {
-                        // Modify in-memory only (do not call save())
-                        $w->start_ms_from_surah = max(0, $w->start_ms_from_surah - $audioStartMs);
-                        $w->end_ms_from_surah = max(0, $w->end_ms_from_surah - $audioStartMs);
+            $audioStartMs = 0;
+            $audioEndMs = (int) round($totalDuration * 1000);
+
+            if (!$hasTimings) {
+                Log::info("[RenderPipeline] Timings not found in DB. Falling back to proportional scheduling.");
+
+                $spokenWords = array_filter($words, fn($w) => $w->char_type === 'word');
+                $spokenCount = count($spokenWords);
+
+                if ($spokenCount > 0) {
+                    $durationPerWord = $audioEndMs / $spokenCount;
+
+                    $spokenIndex = 0;
+                    foreach ($words as $w) {
+                        if ($w->char_type === 'word') {
+                            // Modify in-memory only (do not call save())
+                            $w->start_ms_from_surah = (int) round($spokenIndex * $durationPerWord);
+                            $w->end_ms_from_surah = (int) round(($spokenIndex + 1) * $durationPerWord);
+                            $spokenIndex++;
+                        }
                     }
                 }
-                
-                // Update total duration constraint to match the trimmed segment length
-                $totalDuration = ($audioEndMs - $audioStartMs) / 1000.0;
+            } else {
+                // Find absolute bounds for trimming
+                $firstSpoken = null;
+                $lastSpoken = null;
+                foreach ($words as $w) {
+                    if ($w->char_type === 'word' && $w->start_ms_from_surah !== null) {
+                        if ($firstSpoken === null || $w->start_ms_from_surah < $firstSpoken->start_ms_from_surah) {
+                            $firstSpoken = $w;
+                        }
+                        if ($lastSpoken === null || $w->end_ms_from_surah > $lastSpoken->end_ms_from_surah) {
+                            $lastSpoken = $w;
+                        }
+                    }
+                }
+
+                if ($firstSpoken !== null && $lastSpoken !== null) {
+                    $audioStartMs = $firstSpoken->start_ms_from_surah;
+                    $audioEndMs = $lastSpoken->end_ms_from_surah;
+
+                    // Normalize timings in-memory relative to trimmed start
+                    foreach ($words as $w) {
+                        if ($w->char_type === 'word' && $w->start_ms_from_surah !== null) {
+                            // Modify in-memory only (do not call save())
+                            $w->start_ms_from_surah = max(0, $w->start_ms_from_surah - $audioStartMs);
+                            $w->end_ms_from_surah = max(0, $w->end_ms_from_surah - $audioStartMs);
+                        }
+                    }
+                    
+                    // Update total duration constraint to match the trimmed segment length
+                    $totalDuration = ($audioEndMs - $audioStartMs) / 1000.0;
+                }
             }
         }
 
@@ -352,8 +511,13 @@ class RenderPipeline
             $reelsValidator->validate($alignedRanges);
 
             // Build the SegmentTimeline before building the segments
-            $timelineResolver = app(\App\Modules\Rendering\Services\SegmentTimelineResolver::class);
-            $timeline = $timelineResolver->resolve($alignedRanges, $audioEndMs);
+            if ($hasCustomSegmentTimings) {
+                Log::info("[RenderPipeline] Directly constructing SegmentTimeline from custom segment timestamps (" . count($customTimelineMap) . " segments).");
+                $timeline = new \App\Modules\Rendering\Services\SegmentTimeline($customTimelineMap);
+            } else {
+                $timelineResolver = app(\App\Modules\Rendering\Services\SegmentTimelineResolver::class);
+                $timeline = $timelineResolver->resolve($alignedRanges, $audioEndMs);
+            }
 
             $segments = $segmentBuilder->build($alignedRanges, $timeline);
             $hasApprovedGeneratedContent = true;
@@ -364,6 +528,20 @@ class RenderPipeline
                 if ($genSeg) {
                     $segment->tafsir = $genSeg->tafsir ?? null;
                     $segment->translation = $genSeg->translation ?? null;
+                }
+            }
+
+            // Clamp any word timings strictly within parent segment boundaries
+            foreach ($segments as $segment) {
+                if (!empty($segment->words)) {
+                    foreach ($segment->words as $w) {
+                        if ($w->start_ms_from_surah !== null) {
+                            $w->start_ms_from_surah = max($segment->startMs, min($segment->endMs, $w->start_ms_from_surah));
+                        }
+                        if ($w->end_ms_from_surah !== null) {
+                            $w->end_ms_from_surah = max($segment->startMs, min($segment->endMs, $w->end_ms_from_surah));
+                        }
+                    }
                 }
             }
 

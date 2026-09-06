@@ -43,7 +43,7 @@ class SegmentTimingPromptBuilder
         $markersText = implode("\n", $cleanedMarkers);
 
         // Fetch Reciter
-        $reciter = Reciter::where('slug', $reciterSlug)->first();
+        $reciter = Reciter::findBySlug($reciterSlug);
         if (!$reciter) {
             throw new \RuntimeException("Reciter '{$reciterSlug}' not found.");
         }

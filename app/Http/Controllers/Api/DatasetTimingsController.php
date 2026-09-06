@@ -15,6 +15,10 @@ class DatasetTimingsController
      */
     public function upload(Request $request, ImportManualTimingsService $manualImporter): JsonResponse
     {
+        if ($request->has('reciter')) {
+            $request->merge(['reciter' => Reciter::normalizeSlug((string) $request->input('reciter'))]);
+        }
+
         $validator = Validator::make($request->all(), [
             'reciter' => 'required|string|exists:reciters,slug',
             'file'    => 'required|file',
@@ -35,7 +39,7 @@ class DatasetTimingsController
             ], 422);
         }
 
-        $reciter = Reciter::where('slug', $reciterSlug)->first();
+        $reciter = Reciter::findBySlug($reciterSlug);
         if (!$reciter) {
             return response()->json([
                 'error' => "Reciter '{$reciterSlug}' not found.",

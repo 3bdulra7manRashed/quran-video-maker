@@ -41,6 +41,7 @@ export default function SegmentTimingRecorder({
     activeIndex,
     setActiveIndex,
     timestamps,
+    segmentTimings,
     isPlaying,
     duration,
     currentTime,
@@ -340,7 +341,7 @@ export default function SegmentTimingRecorder({
                     key={btn.label}
                     type="button"
                     onClick={() => seek(btn.val)}
-                    className="py-2.5 px-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 text-xs font-bold font-mono transition cursor-pointer"
+                    className="py-2.5 px-2 rounded-xl bg-slate-800 hover:bg-slate-755 text-slate-200 text-xs font-bold font-mono transition cursor-pointer"
                   >
                     {btn.label}
                   </button>
@@ -439,9 +440,11 @@ export default function SegmentTimingRecorder({
                   <div className="shrink-0 flex flex-col items-center gap-1.5 mt-2 bg-slate-900/50 px-4 py-2 rounded-xl border border-slate-900">
                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Recorded Start Time</span>
                     <span className="text-xl font-bold font-mono text-white">
-                      {timestamps[activeSegment.order] !== undefined
-                        ? formatTime(timestamps[activeSegment.order] / 1000)
-                        : 'Pending Tap...'}
+                      {segmentTimings[activeSegment.order]?.start_ms !== undefined
+                        ? formatTime(segmentTimings[activeSegment.order].start_ms / 1000)
+                        : (timestamps[activeSegment.order] !== undefined
+                            ? formatTime(timestamps[activeSegment.order] / 1000)
+                            : (activeIndex === 0 ? formatTime(startTime) : 'Pending Tap...'))}
                     </span>
                   </div>
 
@@ -472,9 +475,14 @@ export default function SegmentTimingRecorder({
               </div>
               <div className="flex-1 flex flex-col gap-2 overflow-y-auto pr-1">
                 {approvedSegments.map((seg, i) => {
-                  const hasTime = timestamps[seg.order] !== undefined;
+                  const timing = segmentTimings[seg.order];
+                  const hasStart = timing?.start_ms !== undefined || (i === 0 && recordingState === 'Recording');
+                  const isCompleted = timing?.end_ms !== undefined;
                   const isActive = i === activeIndex;
                   const uniqueKey = `seg-${seg.order ?? (seg as any).segment_order ?? i}-${i}`;
+                  const startSec = timing?.start_ms !== undefined ? timing.start_ms / 1000 : (i === 0 ? startTime : 0);
+                  const durationSec = isCompleted ? (timing.end_ms! - timing.start_ms) / 1000 : null;
+
                   return (
                     <div
                       key={uniqueKey}
@@ -486,28 +494,52 @@ export default function SegmentTimingRecorder({
                       className={`p-3 rounded-xl border flex items-center justify-between transition cursor-pointer ${
                         isActive
                           ? 'bg-slate-900 border-emerald-500 shadow-md shadow-emerald-950/20'
-                          : hasTime
-                          ? 'bg-slate-900/60 border-slate-800 text-slate-350'
+                          : isCompleted
+                          ? 'bg-slate-900/60 border-emerald-900/40 text-slate-200'
+                          : hasStart
+                          ? 'bg-slate-900/40 border-slate-800 text-slate-300'
                           : 'bg-slate-950/40 border-slate-900/80 text-slate-500'
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold font-mono shrink-0 ${
-                          isActive
+                          isCompleted
+                            ? 'bg-emerald-950 border border-emerald-500/50 text-emerald-400 font-bold'
+                            : isActive
                             ? 'bg-emerald-500 text-slate-950'
-                            : hasTime
-                            ? 'bg-emerald-950 text-emerald-400'
                             : 'bg-slate-800 text-slate-500'
                         }`}>
-                          {hasTime ? '✓' : i + 1}
+                          {isCompleted ? '✓' : i + 1}
                         </span>
-                        <span className="text-xs font-mono font-semibold truncate shrink-0 max-w-[100px] text-right" dir="rtl">
+                        <span className="text-xs font-mono font-semibold truncate shrink-0 max-w-[120px] text-right" dir="rtl">
                           {seg.arabic}
                         </span>
                       </div>
-                      <span className="text-xs font-mono font-bold">
-                        {hasTime ? formatTime(timestamps[seg.order] / 1000) : '--:--.---'}
-                      </span>
+                      <div className="flex flex-col items-end text-right">
+                        {isCompleted ? (
+                          <>
+                            <span className="text-xs font-mono font-bold text-emerald-400">
+                              {durationSec !== null ? `${durationSec.toFixed(2)}s` : ''}
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-400">
+                              {formatTime(startSec)}
+                            </span>
+                          </>
+                        ) : isActive && hasStart ? (
+                          <>
+                            <span className="text-xs font-mono font-bold text-amber-400 animate-pulse">
+                              Recording...
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-400">
+                              {formatTime(startSec)}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-xs font-mono font-bold text-slate-600">
+                            --:--.---
+                          </span>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -532,7 +564,7 @@ export default function SegmentTimingRecorder({
               <button
                 type="button"
                 tabIndex={-1}
-                disabled={recordingState !== 'Recording' || (activeIndex === 0 && timestamps[approvedSegments[0]?.order] === undefined)}
+                disabled={recordingState !== 'Recording' || activeIndex === 0}
                 onClick={undoMark}
                 className="px-4 py-2 bg-amber-600/30 hover:bg-amber-600/50 text-amber-300 rounded-lg text-sm border border-amber-500/30 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
@@ -545,7 +577,7 @@ export default function SegmentTimingRecorder({
                 onClick={recordTimestamp}
                 className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg shadow-lg text-sm transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Mark Next (Space) ⚡
+                {activeIndex === approvedSegments.length - 1 ? 'Finish Recording (Space) 🏁' : 'Mark Next (Space) ⚡'}
               </button>
             </div>
 
@@ -581,7 +613,7 @@ export default function SegmentTimingRecorder({
             {recordingState === 'Error' && errorMsg && (
               <div className="bg-red-950/20 text-red-400 border border-red-900/40 p-4 rounded-xl text-xs flex flex-col gap-3 font-sans">
                 <div className="font-semibold">{errorMsg}</div>
-                {Object.keys(timestamps).length > 0 && (
+                {(Object.keys(segmentTimings).length > 0 || Object.keys(timestamps).length > 0) && (
                   <div className="flex items-center gap-3">
                     <button
                       type="button"

@@ -20,6 +20,10 @@ class DatasetRenderController
      */
     public function store(Request $request): JsonResponse
     {
+        if ($request->has('reciter')) {
+            $request->merge(['reciter' => Reciter::normalizeSlug((string) $request->input('reciter'))]);
+        }
+
         $validator = Validator::make($request->all(), [
             'reciter'            => 'required|string|exists:reciters,slug',
             'surah'              => 'required|integer|exists:surahs,number',
@@ -47,7 +51,7 @@ class DatasetRenderController
         $layout = $request->input('layout', 'reels');
         $maxLines = (int) $request->input('max_lines', 1);
 
-        $reciter = Reciter::where('slug', $reciterSlug)->firstOrFail();
+        $reciter = Reciter::findBySlug($reciterSlug) ?? Reciter::where('slug', $reciterSlug)->firstOrFail();
         $surah = Surah::where('number', $surahNumber)->firstOrFail();
 
         $fromAyah = null;

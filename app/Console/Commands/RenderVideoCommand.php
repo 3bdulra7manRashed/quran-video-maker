@@ -29,7 +29,7 @@ class RenderVideoCommand extends Command
     public function handle(RenderPipeline $pipeline, FontResolver $fontResolver, QuranPathResolver $pathResolver): int
     {
         $surahNumber = (int) $this->argument('surah_number');
-        $reciterSlug = $this->option('reciter');
+        $reciterSlug = Reciter::normalizeSlug((string) $this->option('reciter'));
         $layout = $this->option('layout');
         $maxLines = (int) $this->option('max-lines');
         $withTranslation = $this->option('with-translation');
@@ -124,7 +124,7 @@ class RenderVideoCommand extends Command
         }
 
         // 4. Validate Reciter exists in database
-        $reciter = Reciter::where('slug', $reciterSlug)->first();
+        $reciter = Reciter::findBySlug($reciterSlug);
         if (!$reciter) {
             throw new InvalidArgumentException("Reciter '{$reciterSlug}' not found in database. Check that the audio files have been imported.");
         }

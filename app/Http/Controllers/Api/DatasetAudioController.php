@@ -19,6 +19,10 @@ class DatasetAudioController
      */
     public function upload(Request $request, QuranPathResolver $pathResolver): JsonResponse
     {
+        if ($request->has('reciter')) {
+            $request->merge(['reciter' => Reciter::normalizeSlug((string) $request->input('reciter'))]);
+        }
+
         $validator = Validator::make($request->all(), [
             'reciter' => 'required|string|exists:reciters,slug',
             'surah'   => 'required|integer|exists:surahs,number',
@@ -42,7 +46,7 @@ class DatasetAudioController
             ], 422);
         }
 
-        $reciter = Reciter::where('slug', $reciterSlug)->first();
+        $reciter = Reciter::findBySlug($reciterSlug);
         if (!$reciter) {
             return response()->json([
                 'error' => "Reciter '{$reciterSlug}' not found.",
@@ -159,10 +163,10 @@ class DatasetAudioController
      */
     public function stream(Request $request, QuranPathResolver $pathResolver)
     {
-        $reciterSlug = $request->query('reciter');
-        $surahNumber = (int)$request->query('surah');
+        $reciterSlug = (string) $request->query('reciter');
+        $surahNumber = (int) $request->query('surah');
 
-        $reciter = Reciter::where('slug', $reciterSlug)->first();
+        $reciter = Reciter::findBySlug($reciterSlug);
         if (!$reciter) {
             return response()->json(['error' => 'Reciter not found'], 404);
         }

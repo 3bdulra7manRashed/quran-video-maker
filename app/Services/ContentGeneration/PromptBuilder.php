@@ -105,7 +105,7 @@ class PromptBuilder
         $tafsirText = implode("\n", $tafsirLines);
 
         // 5. Initial Dynamic Segments
-        $reciter = \App\Modules\Quran\Models\Reciter::where('slug', $reciterSlug)->first();
+        $reciter = \App\Modules\Quran\Models\Reciter::findBySlug($reciterSlug);
         // Fallback or dynamic segmentation using standard timing
         $segments = $this->segmentationService->segment($words->all(), 10.0, 'reels', 1, $reciter, $surahNumber);
         

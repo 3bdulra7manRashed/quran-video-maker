@@ -181,39 +181,57 @@ class ImportManualTimingsService
             throw new \InvalidArgumentException("Reciter ID {$reciterId} not found.");
         }
 
-        // Fetch approved segments using the canonical ApprovedContentResolver
-        $resolver = app(\App\Services\ContentGeneration\ApprovedContentResolver::class);
+        // Fetch approved segments using the canonical ApprovedContentResolver or incoming payload
         $fromAyah = isset($data['from_ayah']) ? (int) $data['from_ayah'] : null;
         $toAyah = isset($data['to_ayah']) ? (int) $data['to_ayah'] : null;
-        $approvedSegments = $resolver->resolve($reciterId, $surahNumber, $fromAyah, $toAyah, 'reels');
+        $resolver = app(\App\Services\ContentGeneration\ApprovedContentResolver::class);
 
-        // If not found in DB, but provided in incoming payload, build them in-memory
-        if (($approvedSegments === null || $approvedSegments->isEmpty()) && !empty($jsonSegments)) {
-            $hasSegmentArabic = false;
+        // Prioritize segments provided directly in incoming payload if they contain Quranic Arabic text
+        $hasSegmentArabic = false;
+        if (!empty($jsonSegments)) {
             foreach ($jsonSegments as $js) {
                 if (!empty($js['arabic'])) {
                     $hasSegmentArabic = true;
                     break;
                 }
             }
+        }
 
-            if ($hasSegmentArabic) {
-                $collection = collect();
-                foreach ($jsonSegments as $seg) {
-                    $record = new \App\Modules\Quran\Models\ReelsGeneratedContent();
-                    $record->reciter_id = $reciterId;
-                    $record->surah_number = $surahNumber;
-                    $record->start_ayah = $fromAyah ?? 1;
-                    $record->end_ayah = $toAyah ?? 999;
-                    $record->layout_type = \App\Enums\LayoutType::REELS;
-                    $record->segment_order = (int)($seg['order'] ?? $seg['segment_order'] ?? 1);
-                    $record->arabic = $seg['arabic'] ?? '';
-                    $record->translation = $seg['translation'] ?? '';
-                    $record->tafsir = $seg['tafsir'] ?? '';
-                    $record->approval_status = \App\Enums\ContentApprovalStatus::APPROVED;
-                    $collection->push($record);
+        if ($hasSegmentArabic) {
+            $collection = collect();
+            foreach ($jsonSegments as $seg) {
+                $record = new \App\Modules\Quran\Models\ReelsGeneratedContent();
+                $record->reciter_id = $reciterId;
+                $record->surah_number = $surahNumber;
+                $record->start_ayah = $fromAyah ?? 1;
+                $record->end_ayah = $toAyah ?? 999;
+                $record->layout_type = \App\Enums\LayoutType::REELS;
+                $record->segment_order = (int)($seg['order'] ?? $seg['segment_order'] ?? 1);
+                $record->arabic = $seg['arabic'] ?? '';
+                $record->translation = $seg['translation'] ?? '';
+                $record->tafsir = $seg['tafsir'] ?? '';
+                $record->approval_status = \App\Enums\ContentApprovalStatus::APPROVED;
+                $collection->push($record);
+            }
+            $approvedSegments = $collection;
+        } else {
+            // Otherwise resolve pre-existing approved segments from DB
+            $approvedSegments = $resolver->resolve($reciterId, $surahNumber, $fromAyah, $toAyah, 'reels');
+
+            // Overlay any custom tafsir or translation supplied in incoming jsonSegments
+            if ($approvedSegments !== null && !$approvedSegments->isEmpty() && !empty($jsonSegments)) {
+                $jsonSegByOrder = collect($jsonSegments)->keyBy(fn($s) => (int)($s['order'] ?? $s['segment_order'] ?? 1));
+                foreach ($approvedSegments as $seg) {
+                    $js = $jsonSegByOrder->get($seg->segment_order);
+                    if ($js) {
+                        if (array_key_exists('tafsir', $js)) {
+                            $seg->tafsir = $js['tafsir'];
+                        }
+                        if (array_key_exists('translation', $js)) {
+                            $seg->translation = $js['translation'];
+                        }
+                    }
                 }
-                $approvedSegments = $collection;
             }
         }
 
@@ -470,18 +488,25 @@ class ImportManualTimingsService
                     ->update(['approval_status' => \App\Enums\ContentApprovalStatus::ARCHIVED]);
 
                 // Save new approved entries
-                foreach ($jsonSegments as $seg) {
-                    if (!empty($seg['arabic'])) {
+                $jsonSegByOrder = collect($jsonSegments)->keyBy(fn($s) => (int)($s['order'] ?? $s['segment_order'] ?? 1));
+                foreach ($approvedSegments as $appSeg) {
+                    $order = (int)$appSeg->segment_order;
+                    $js = $jsonSegByOrder->get($order);
+                    $arabicText = (!empty($js) && !empty($js['arabic'])) ? $js['arabic'] : $appSeg->arabic;
+                    $transText = (!empty($js) && array_key_exists('translation', $js)) ? $js['translation'] : ($appSeg->translation ?? '');
+                    $tafsirText = (!empty($js) && array_key_exists('tafsir', $js)) ? $js['tafsir'] : ($appSeg->tafsir ?? '');
+
+                    if (!empty($arabicText)) {
                         \App\Modules\Quran\Models\ReelsGeneratedContent::create([
                             'reciter_id' => $reciterId,
                             'surah_number' => $surahNumber,
                             'start_ayah' => $startAyahVal,
                             'end_ayah' => $endAyahVal,
                             'layout_type' => $layoutType,
-                            'segment_order' => (int)($seg['order'] ?? $seg['segment_order'] ?? 1),
-                            'arabic' => \App\Services\ContentGeneration\ContentNormalizer::normalizeArabic($seg['arabic']),
-                            'translation' => \App\Services\ContentGeneration\ContentNormalizer::normalizeTranslation($seg['translation'] ?? ''),
-                            'tafsir' => \App\Services\ContentGeneration\ContentNormalizer::normalizeTafsir($seg['tafsir'] ?? ''),
+                            'segment_order' => $order,
+                            'arabic' => \App\Services\ContentGeneration\ContentNormalizer::normalizeArabic($arabicText),
+                            'translation' => \App\Services\ContentGeneration\ContentNormalizer::normalizeTranslation($transText ?? ''),
+                            'tafsir' => \App\Services\ContentGeneration\ContentNormalizer::normalizeTafsir($tafsirText ?? ''),
                             'approval_status' => \App\Enums\ContentApprovalStatus::APPROVED,
                             'content_version' => $newVersion,
                             'generator_type' => \App\Enums\GeneratorType::MANUAL,
