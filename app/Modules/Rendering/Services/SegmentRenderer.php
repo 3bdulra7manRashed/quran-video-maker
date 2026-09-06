@@ -7,6 +7,7 @@ use App\Modules\Quran\Models\Word;
 use App\Modules\Segmentation\DTO\Segment;
 use App\Modules\Layout\Services\FontResolver;
 use App\Modules\Shared\Services\QuranPathResolver;
+use App\Modules\Rendering\Layers\FooterLayer;
 use ArPHP\I18N\Arabic;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -16,15 +17,18 @@ class SegmentRenderer
     protected FontResolver $fontResolver;
     protected BackgroundFactory $backgroundFactory;
     protected QuranPathResolver $pathResolver;
+    protected FooterLayer $footerLayer;
 
     public function __construct(
         FontResolver $fontResolver,
         BackgroundFactory $backgroundFactory,
-        QuranPathResolver $pathResolver
+        QuranPathResolver $pathResolver,
+        ?FooterLayer $footerLayer = null
     ) {
         $this->fontResolver = $fontResolver;
         $this->backgroundFactory = $backgroundFactory;
         $this->pathResolver = $pathResolver;
+        $this->footerLayer = $footerLayer ?? new FooterLayer();
     }
 
     /**
@@ -58,6 +62,8 @@ class SegmentRenderer
         // 1. Resolve canvas dimensions
         $width = $layoutData['width'] ?? 1080;
         $height = $layoutData['height'] ?? 1920;
+        $layoutData['surahNumber'] = $surah->number;
+        $layoutData['surah'] = $surah;
         $im = imagecreatetruecolor($width, $height);
 
         // 2. Draw background
@@ -70,7 +76,7 @@ class SegmentRenderer
 
         // 3. Draw headers if enabled in layoutData
         $headerConfig = $layoutData['header'] ?? [];
-        $showHeaders = $headerConfig['show'] ?? true;
+        $showHeaders = $headerConfig['show'] ?? (($layoutData['theme'] ?? '') !== 'quran_me');
 
         if ($showHeaders) {
             $headersConfig = config('qcf_surah_headers');
@@ -169,6 +175,18 @@ class SegmentRenderer
                 $segment
             );
             $tafsirLayer->render($tafsirSegment, $context);
+        }
+
+        // 4.7. Draw Footer Layer (equran.me preset or footerBounds)
+        if (($layoutData['theme'] ?? '') === 'quran_me' || !empty($layoutData['footerBounds']['show'])) {
+            $context = new \App\Modules\Rendering\Domain\FrameContext(
+                $im,
+                $width,
+                $height,
+                $layoutData,
+                $segment
+            );
+            $this->footerLayer->render($context);
         }
 
         // 5. Save the segment frame to PNG

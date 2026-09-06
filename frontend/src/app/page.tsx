@@ -235,7 +235,10 @@ export default function ConsolePage() {
       const targetReciter = selectedReciter;
       const targetSurah = selectedSurah;
 
+      let inFlight = false;
       pollingIntervalRef.current = setInterval(async () => {
+        if (inFlight) return;
+        inFlight = true;
         attempts++;
         try {
           const stats = await api.getDatasetStatus(targetReciter, targetSurah);
@@ -266,6 +269,8 @@ export default function ConsolePage() {
             setLoadingStatus(false);
             reject(new Error('Dataset status polling encountered an error.'));
           }
+        } finally {
+          inFlight = false;
         }
       }, 1500);
     });

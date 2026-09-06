@@ -18,8 +18,12 @@ export default function JobsPage() {
   // For inline video player modal
   const [activeVideo, setActiveVideo] = useState<{ filename: string; url: string } | null>(null);
 
+  const inFlightRef = React.useRef(false);
+
   // Fetch all jobs
   async function loadJobs() {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     try {
       const allJobs = await api.getAllRenders();
       setJobs(allJobs);
@@ -28,6 +32,7 @@ export default function JobsPage() {
       console.error('Failed to load render jobs:', err);
       setErrorMsg(t('jobs.failedToLoad'));
     } finally {
+      inFlightRef.current = false;
       setLoading(false);
     }
   }

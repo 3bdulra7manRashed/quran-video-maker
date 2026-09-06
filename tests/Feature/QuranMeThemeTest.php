@@ -88,4 +88,40 @@ class QuranMeThemeTest extends TestCase
         $this->assertEquals([77, 49, 38], $layout['translationBounds']['color'], 'Translation color must be #4D3126 (77, 49, 38)');
         $this->assertEquals([255, 255, 255], $layout['tafsirBounds']['color'], 'Tafsir color must remain pure white #FFFFFF');
     }
+
+    public function test_reel_strategy_configures_footer_bounds_for_quran_me_theme(): void
+    {
+        $strategy = new ReelSingleLineLayoutStrategy();
+        $segment = new Segment(1, 1, 1, [1], 0, 1000, []);
+
+        $layout = $strategy->layout($segment, ['theme' => 'quran_me']);
+
+        $this->assertFalse($layout['header']['show']);
+        $this->assertArrayHasKey('footerBounds', $layout);
+        $this->assertEquals(540, $layout['footerBounds']['x']);
+        $this->assertEquals([77, 49, 38], $layout['footerBounds']['color']);
+        $this->assertEquals(1200, $layout['footerBounds']['surah']['y']);
+        $this->assertEquals(1275, $layout['footerBounds']['reciter']['y']);
+        $this->assertEquals(1335, $layout['footerBounds']['watermark']['y']);
+        $this->assertEquals('equran.me', $layout['footerBounds']['watermark']['text']);
+    }
+
+    public function test_footer_layer_resolves_all_fonts_and_surah_glyphs(): void
+    {
+        $footerLayer = new \App\Modules\Rendering\Layers\FooterLayer();
+
+        $this->assertFileExists($footerLayer->resolveBsmlFont());
+        $this->assertFileExists($footerLayer->resolveArabicFont());
+        $this->assertFileExists($footerLayer->resolveGeorgiaFont());
+
+        // Surah 1: U+FB8D U+FB8C
+        $glyph1 = $footerLayer->resolveSurahGlyph(1);
+        $this->assertNotNull($glyph1);
+        $this->assertEquals(mb_chr(0xFB8D, 'UTF-8') . mb_chr(0xFB8C, 'UTF-8'), $glyph1);
+
+        // Surah 93: U+FC0A U+FB8C
+        $glyph93 = $footerLayer->resolveSurahGlyph(93);
+        $this->assertNotNull($glyph93);
+        $this->assertEquals(mb_chr(0xFC0A, 'UTF-8') . mb_chr(0xFB8C, 'UTF-8'), $glyph93);
+    }
 }

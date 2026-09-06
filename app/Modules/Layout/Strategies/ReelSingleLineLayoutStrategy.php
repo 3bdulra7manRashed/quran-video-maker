@@ -57,7 +57,7 @@ class ReelSingleLineLayoutStrategy
 
         $tafsirBounds = $this->getTafsirBounds($tafsirY);
 
-        return [
+        $layoutData = [
             'width' => 1080,
             'height' => 1920,
             'fontSize' => $fontSize,
@@ -74,6 +74,13 @@ class ReelSingleLineLayoutStrategy
             'translationBounds' => $translationBounds,
             'tafsirBounds' => $tafsirBounds,
         ];
+
+        if ($theme === 'quran_me') {
+            $layoutData['header'] = ['show' => false];
+            $layoutData['footerBounds'] = $this->getFooterBounds();
+        }
+
+        return $layoutData;
     }
 
     public function getTranslationBounds(int $y = 942): array
@@ -102,6 +109,31 @@ class ReelSingleLineLayoutStrategy
             'color' => [255, 255, 255], // Pure White #FFFFFF
             'dynamicStacking' => false, // Maintain fixed capsule coordinate alignment at Y = 1081
             'stackMargin' => 60,      // Clean margin (55px - 65px) below translation if dynamic stacking is used
+        ];
+    }
+
+    public function getFooterBounds(): array
+    {
+        return [
+            'show' => true,
+            'x' => 540,
+            'color' => [77, 49, 38], // #4D3126
+            'surah' => [
+                'y' => 1200,
+                'fontSize' => 45, // ~40-50pt
+                'fontPath' => base_path('fonts/QCF_BSML.ttf'),
+            ],
+            'reciter' => [
+                'y' => 1275,
+                'fontSize' => 28, // ~26-30pt
+                'fontPath' => base_path('fonts/Al-Jazeera-Arabic-Regular.ttf'),
+            ],
+            'watermark' => [
+                'text' => 'equran.me',
+                'y' => 1335,
+                'fontSize' => 24, // ~24pt
+                'fontPath' => base_path('fonts/georgia.ttf'),
+            ],
         ];
     }
 }
