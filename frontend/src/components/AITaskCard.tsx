@@ -30,7 +30,7 @@ interface AITaskCardProps {
   jsonInput: string;
   onJsonInputChange: (val: string) => void;
   isValidating: boolean;
-  onValidateJson: () => void;
+  onValidateJson: (json?: string) => void;
   validationSuccessMessage: string | null;
   validationErrors: string[];
   validationWarnings: string[];
@@ -182,6 +182,45 @@ export default function AITaskCard({
             {errorMessage && (
               <div className="bg-red-50 text-red-750 dark:bg-red-950/20 dark:text-red-400 border border-red-200 dark:border-red-900/50 p-3 rounded-xl text-xs font-semibold">
                 {errorMessage}
+              </div>
+            )}
+
+            {jsonInput && (
+              <div className="flex flex-col gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/60">
+                <button
+                  type="button"
+                  onClick={() => onValidateJson?.(jsonInput)}
+                  disabled={isValidating}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer transition shadow-md shadow-emerald-950/20"
+                >
+                  {isValidating ? (
+                    <span>⏳ {isAr ? 'جاري الحفظ والتثبيت...' : 'Saving & Persisting...'}</span>
+                  ) : (
+                    <span>💾 {isAr ? 'حفظ وتثبيت التوقيت في قاعدة البيانات' : 'Save & Persist to Database'}</span>
+                  )}
+                </button>
+
+                <details className="mt-1">
+                  <summary className="text-xs text-slate-400 cursor-pointer select-none hover:text-slate-300">
+                    {isAr ? 'عرض وتعديل صياغة JSON للتوقيت' : 'View & Edit Timing JSON'}
+                  </summary>
+                  <div className="mt-2 flex flex-col gap-2">
+                    <textarea
+                      rows={6}
+                      value={jsonInput}
+                      onChange={(e) => onJsonInputChange?.(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 text-slate-300 p-3 rounded-xl font-mono text-xs focus:outline-none focus:border-emerald-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => onValidateJson?.(jsonInput)}
+                      disabled={isValidating}
+                      className="self-end bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold py-1.5 px-3 rounded-lg cursor-pointer"
+                    >
+                      {isAr ? 'حفظ واستيراد' : 'Save & Import'}
+                    </button>
+                  </div>
+                </details>
               </div>
             )}
           </div>
@@ -388,7 +427,7 @@ export default function AITaskCard({
             {/* Trigger Validation & Import */}
             <button
               type="button"
-              onClick={onValidateJson}
+              onClick={() => onValidateJson()}
               disabled={isValidating || !jsonInput.trim()}
               className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:bg-emerald-700/20 disabled:text-emerald-500/50 disabled:cursor-not-allowed text-white font-semibold py-2.5 px-4 rounded-xl text-xs transition-none flex items-center justify-center gap-2 cursor-pointer"
             >

@@ -54,10 +54,11 @@ export default function GenerateVideoCard({
   // Calculate prerequisites
   const isPrepared = status?.glyphs ?? false;
   const isAudioUploaded = status?.audio ?? false;
+  const hasSessionSegmentTimings = useGeneratedContent && !!customJsonPayload;
   const isWordTimingsImported = (status?.timings?.mode === 'full' || (status?.timings?.timedWords ?? 0) > 0);
   const isLineTimingsImported = status?.timings?.mode === 'partial' || (status?.timings?.mode === 'full' && (status?.timings?.timedWords ?? 0) > 0);
 
-  const isTimingsReady = layout === 'reels' ? isWordTimingsImported : isLineTimingsImported;
+  const isTimingsReady = layout === 'reels' ? (isWordTimingsImported || hasSessionSegmentTimings) : isLineTimingsImported;
   const allPrereqsMet = isPrepared && isAudioUploaded && isTimingsReady;
 
   const handleGenerate = async () => {
@@ -156,7 +157,7 @@ export default function GenerateVideoCard({
           </span>
           {isTimingsReady ? (
             <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-              ✓ {isAr ? 'مستورد' : 'Imported'}
+              ✓ {isWordTimingsImported ? (isAr ? 'مستورد' : 'Imported') : (isAr ? 'جاهز (جلسة العمل)' : 'Ready (Session)')}
             </span>
           ) : (
             <span className="text-red-500 font-semibold flex items-center gap-1">

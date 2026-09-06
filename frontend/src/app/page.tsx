@@ -75,7 +75,7 @@ export default function ConsolePage() {
 
   // AI content states
   const [useGeneratedContent, setUseGeneratedContent] = useState<boolean>(false);
-  const [persistToDatabase, setPersistToDatabase] = useState<boolean>(false);
+  const [persistToDatabase, setPersistToDatabase] = useState<boolean>(true);
 
   // ===================================================
   // AI TASK 1: SEGMENTATION STATES

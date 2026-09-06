@@ -36,7 +36,7 @@ export default function RenderOptions({
   onWithTafsirChange,
   useGeneratedContent,
   onUseGeneratedContentChange,
-  persistToDatabase = false,
+  persistToDatabase = true,
   onPersistToDatabaseChange,
   disabled,
 }: RenderOptionsProps) {

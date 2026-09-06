@@ -28,6 +28,26 @@ class QuranComDatasetProvider implements DatasetProvider
             'id' => 404,
             'audio_base_url' => 'https://download.quranicaudio.com/quran/ali_jaber/',
         ],
+        'mishari-al-afasy' => [
+            'id' => 7,
+            'audio_base_url' => 'https://server8.mp3quran.net/afs/',
+        ],
+        'mahmoud-khalil-al-hussary' => [
+            'id' => 6,
+            'audio_base_url' => 'https://server13.mp3quran.net/husr/',
+        ],
+        'mohamed-siddiq-al-minshawi' => [
+            'id' => 8,
+            'audio_base_url' => 'https://server10.mp3quran.net/minsh/',
+        ],
+        'abdul-baset-abdul-samad' => [
+            'id' => 2,
+            'audio_base_url' => 'https://server7.mp3quran.net/basit/',
+        ],
+        'maher-al-muaiqly' => [
+            'id' => 12,
+            'audio_base_url' => 'https://server12.mp3quran.net/maher/',
+        ],
     ];
 
     public function __construct(

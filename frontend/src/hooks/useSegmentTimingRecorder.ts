@@ -34,7 +34,7 @@ export function useSegmentTimingRecorder({
   toAyah,
   approvedSegments,
   apiUrl,
-  persistToDatabase = false,
+  persistToDatabase = true,
   onRecordingComplete,
   onCancel,
 }: UseSegmentTimingRecorderProps) {

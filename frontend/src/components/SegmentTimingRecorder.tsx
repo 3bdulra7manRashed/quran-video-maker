@@ -26,7 +26,7 @@ export default function SegmentTimingRecorder({
   fromAyah,
   toAyah,
   approvedSegments,
-  persistToDatabase = false,
+  persistToDatabase = true,
   onPersistToDatabaseChange,
   onRecordingComplete,
   onCancel,

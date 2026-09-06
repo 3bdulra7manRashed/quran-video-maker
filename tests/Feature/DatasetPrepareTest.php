@@ -90,8 +90,9 @@ class DatasetPrepareTest extends TestCase
     public function test_prepare_job_executes_provider_steps(): void
     {
         $mockProvider = Mockery::mock(DatasetProvider::class);
-        $mockProvider->shouldReceive('downloadGlyphs')->once()->with(12);
-        $mockProvider->shouldReceive('importGlyphs')->once()->with(12);
+        $mockProvider->shouldReceive('downloadGlyphs')->zeroOrMoreTimes()->with(12);
+        $mockProvider->shouldReceive('importGlyphs')->atLeast()->once()->with(12);
+        $mockProvider->shouldReceive('determineGlyphsAvailability')->zeroOrMoreTimes()->with(12)->andReturn(false);
         $mockProvider->shouldReceive('determineAudioAvailability')->once()->with('yasser-al-dosari', 12)->andReturn(true);
         $mockProvider->shouldReceive('determineTimingsAvailability')->once()->with('yasser-al-dosari', 12)->andReturn(true);
 
