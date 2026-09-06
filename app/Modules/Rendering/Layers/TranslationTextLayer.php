@@ -4,7 +4,7 @@ namespace App\Modules\Rendering\Layers;
 
 use App\Modules\Rendering\Contracts\RenderLayerInterface;
 use App\Modules\Rendering\Domain\FrameContext;
-
+use App\Modules\Rendering\Domain\TranslationSegment;
 use Illuminate\Support\Facades\Log;
 
 class TranslationTextLayer implements RenderLayerInterface
@@ -107,7 +107,42 @@ class TranslationTextLayer implements RenderLayerInterface
             $activeSegment = $this->getSegmentForArabic($context->arabicSegment);
         }
 
-        if (!$activeSegment || empty($activeSegment->text)) {
+        $translationText = null;
+        if (is_object($segmentOrContext) && isset($segmentOrContext->translation) && !empty(trim((string)$segmentOrContext->translation))) {
+            $translationText = (string) $segmentOrContext->translation;
+        } elseif (is_array($segmentOrContext) && isset($segmentOrContext['translation']) && !empty(trim((string)$segmentOrContext['translation']))) {
+            $translationText = (string) $segmentOrContext['translation'];
+        } elseif ($context && $context->arabicSegment) {
+            if (is_object($context->arabicSegment) && isset($context->arabicSegment->translation) && !empty(trim((string)$context->arabicSegment->translation))) {
+                $translationText = (string) $context->arabicSegment->translation;
+            } elseif (is_array($context->arabicSegment) && isset($context->arabicSegment['translation']) && !empty(trim((string)$context->arabicSegment['translation']))) {
+                $translationText = (string) $context->arabicSegment['translation'];
+            }
+        }
+
+        if ($translationText === null && $context && isset($context->layoutData['translation']) && !empty(trim((string)$context->layoutData['translation']))) {
+            $translationText = (string) $context->layoutData['translation'];
+        }
+
+        if ($translationText === null && $activeSegment) {
+            if (isset($activeSegment->translation) && !empty(trim((string)$activeSegment->translation))) {
+                $translationText = (string) $activeSegment->translation;
+            } elseif (!empty(trim((string)$activeSegment->text))) {
+                $translationText = (string) $activeSegment->text;
+            }
+        }
+
+        if ($translationText === null) {
+            return;
+        }
+
+        // Clean up footnote tags e.g. <sup foot_note=...>, HTML, and brackets
+        $translationText = preg_replace('/<sup\b[^>]*>.*?<\/sup>/is', '', $translationText);
+        $translationText = strip_tags($translationText);
+        $translationText = preg_replace('/\[[^\]]*\]/', '', $translationText);
+        $translationText = trim(preg_replace('/\s+/u', ' ', $translationText));
+
+        if ($translationText === '') {
             return;
         }
 
@@ -137,14 +172,14 @@ class TranslationTextLayer implements RenderLayerInterface
             $fontSize = self::DEFAULT_FONT_SIZE;
             $maxWidth = self::DEFAULT_WIDTH;
 
-            $layoutResult = $this->measureTranslationLayout($activeSegment->text, $fontSize, $fontPath, $maxWidth, $lineHeightMult);
+            $layoutResult = $this->measureTranslationLayout($translationText, $fontSize, $fontPath, $maxWidth, $lineHeightMult);
             $lines = $layoutResult['lines'];
 
             if (count($lines) > self::MAX_TRANSLATION_LINES) {
                 // Step 1: Width Expansion
                 foreach (self::WIDTH_STEPS as $candidateWidth) {
                     if ($candidateWidth > $maxWidth) {
-                        $candidateLayout = $this->measureTranslationLayout($activeSegment->text, $fontSize, $fontPath, $candidateWidth, $lineHeightMult);
+                        $candidateLayout = $this->measureTranslationLayout($translationText, $fontSize, $fontPath, $candidateWidth, $lineHeightMult);
                         if (count($candidateLayout['lines']) <= self::MAX_TRANSLATION_LINES) {
                             $layoutResult = $candidateLayout;
                             $lines = $layoutResult['lines'];
@@ -161,7 +196,7 @@ class TranslationTextLayer implements RenderLayerInterface
                     
                     foreach (self::FONT_STEPS as $candidateFontSize) {
                         if ($candidateFontSize < $fontSize) {
-                            $candidateLayout = $this->measureTranslationLayout($activeSegment->text, $candidateFontSize, $fontPath, $maxWidth, $lineHeightMult);
+                            $candidateLayout = $this->measureTranslationLayout($translationText, $candidateFontSize, $fontPath, $maxWidth, $lineHeightMult);
                             if (count($candidateLayout['lines']) <= self::MAX_TRANSLATION_LINES) {
                                 $layoutResult = $candidateLayout;
                                 $lines = $layoutResult['lines'];
@@ -174,11 +209,11 @@ class TranslationTextLayer implements RenderLayerInterface
                     // Safety Net / final fallback if still exceeding
                     if (count($lines) > self::MAX_TRANSLATION_LINES) {
                         $fontSize = self::MIN_FONT_SIZE;
-                        $layoutResult = $this->measureTranslationLayout($activeSegment->text, $fontSize, $fontPath, $maxWidth, $lineHeightMult);
+                        $layoutResult = $this->measureTranslationLayout($translationText, $fontSize, $fontPath, $maxWidth, $lineHeightMult);
                         $lines = $layoutResult['lines'];
 
                         Log::warning("Translation exceeded maximum line target. Rendering with fallback dimensions while preserving full translation.", [
-                            'text' => $activeSegment->text,
+                            'text' => $translationText,
                             'fontSize' => $fontSize,
                             'width' => $maxWidth,
                             'lineCount' => count($lines),
@@ -188,7 +223,7 @@ class TranslationTextLayer implements RenderLayerInterface
             }
         } else {
             // Render standard layout
-            $layoutResult = $this->measureTranslationLayout($activeSegment->text, $fontSize, $fontPath, $maxWidth, $lineHeightMult);
+            $layoutResult = $this->measureTranslationLayout($translationText, $fontSize, $fontPath, $maxWidth, $lineHeightMult);
             $lines = $layoutResult['lines'];
         }
 
@@ -211,6 +246,7 @@ class TranslationTextLayer implements RenderLayerInterface
             $color = \imagecolorallocate($context->image, 255, 255, 255); // fallback to white
         }
 
+        $renderedBottomY = (int) round($startY);
         foreach ($lines as $idx => $line) {
             $bbox = \imagettfbbox($fontSize, 0, $fontPath, $line);
             $w = abs($bbox[4] - $bbox[0]);
@@ -218,7 +254,15 @@ class TranslationTextLayer implements RenderLayerInterface
             $lineY = (int) ($startY + ($idx * $fontSize * $lineHeightMult));
 
             \imagettftext($context->image, $fontSize, 0, $lineX, $lineY, $color, $fontPath, $line);
+
+            $lineBottom = $lineY + abs($bbox[1]);
+            if ($lineBottom > $renderedBottomY) {
+                $renderedBottomY = $lineBottom;
+            }
         }
+
+        // Store translation bottom boundary in context for downstream layers (e.g. TafsirTextLayer dynamic stacking)
+        $context->layoutData['translationBottomY'] = max($renderedBottomY, (int) round($centerY + ($totalHeight / 2)));
     }
 
     /**

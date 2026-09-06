@@ -4,14 +4,18 @@ namespace App\Modules\Rendering\Layers;
 
 use App\Modules\Rendering\Contracts\RenderLayerInterface;
 use App\Modules\Rendering\Domain\FrameContext;
+use App\Modules\Rendering\Domain\TranslationSegment;
 use ArPHP\I18N\Arabic;
 use Illuminate\Support\Facades\Log;
 
 class TafsirTextLayer implements RenderLayerInterface
 {
-    public const DEFAULT_WIDTH = 760;
-    public const DEFAULT_FONT_SIZE = 28;
-    public const MAX_TAFSIR_LINES = 3;
+    public const DEFAULT_WIDTH = 920;
+    public const DEFAULT_CENTER_X = 540.0;
+    public const DEFAULT_CENTER_Y = 1081.0;
+    public const DEFAULT_FONT_SIZE = 30; // GD points (approx 28-32pt calibrated from 37pt Premiere Pro)
+    public const DEFAULT_LINE_HEIGHT = 44.0; // 42-46px line-height for 2 lines
+    public const MAX_TAFSIR_LINES = 2; // approx 1 to 2 lines max
     public const MIN_FONT_SIZE = 24;
 
     protected array $tafsirSegments;
@@ -38,6 +42,32 @@ class TafsirTextLayer implements RenderLayerInterface
     }
 
     /**
+     * Resolve font path prioritizing Al-Jazeera-Arabic, then Amiri, then Cairo.
+     */
+    public function resolveFontPath(?string $preferredPath = null): string
+    {
+        $candidates = array_filter([
+            $preferredPath,
+            base_path('fonts/Al-Jazeera-Arabic-Regular.ttf'),
+            base_path('fonts/Al-Jazeera-Arabic.ttf'),
+            getenv('LOCALAPPDATA') ? getenv('LOCALAPPDATA') . '/Microsoft/Windows/Fonts/ArbFONTS-Al-Jazeera-Arabic-Regular.ttf' : null,
+            'C:/Users/Lenovo/AppData/Local/Microsoft/Windows/Fonts/ArbFONTS-Al-Jazeera-Arabic-Regular.ttf',
+            base_path('fonts/Amiri-Regular.ttf'),
+            getenv('LOCALAPPDATA') ? getenv('LOCALAPPDATA') . '/Microsoft/Windows/Fonts/Amiri Bold.ttf' : null,
+            'C:/Users/Lenovo/AppData/Local/Microsoft/Windows/Fonts/Amiri Bold.ttf',
+            base_path('fonts/Cairo-Regular.ttf'),
+        ]);
+
+        foreach ($candidates as $path) {
+            if ($path && file_exists($path)) {
+                return $path;
+            }
+        }
+
+        return base_path('fonts/Cairo-Regular.ttf');
+    }
+
+    /**
      * Helper to find Tafsir segment matching timing of an Arabic segment.
      */
     public function getSegmentForArabic(\App\Modules\Segmentation\DTO\Segment $arabicSegment): ?\App\Modules\Rendering\Domain\TranslationSegment
@@ -51,6 +81,17 @@ class TafsirTextLayer implements RenderLayerInterface
     }
 
     /**
+     * Strip Arabic diacritics/tashkeel (Fatha, Damma, Kasra, Tanween, Shadda, Sukun, Superscript Alif)
+     * and Tatweel/Kashida while strictly preserving all Hamza variants (أ, إ, آ, ء, ئ, ؤ) as core letters.
+     */
+    public function stripDiacritics(string $text): string
+    {
+        // Strictly targets Tashkeel/Harakat (U+064B to U+0652, U+0670) without affecting Hamzas
+        $cleaned = preg_replace('/[\x{064B}-\x{0652}\x{0670}]/u', '', $text);
+        return str_replace('ـ', '', $cleaned);
+    }
+
+    /**
      * Measure wrapped Tafsir layout.
      */
     public function measureTafsirLayout(
@@ -58,21 +99,77 @@ class TafsirTextLayer implements RenderLayerInterface
         float $fontSize,
         string $fontPath,
         float $width,
-        float $lineHeightMult = 1.5
+        float $lineHeight = self::DEFAULT_LINE_HEIGHT
     ): array {
-        $lines = $this->wrapText($text, $fontSize, $fontPath, $width);
-        $height = count($lines) * $fontSize * $lineHeightMult;
+        $cleanTafsir = $this->stripDiacritics($text);
+        $lines = $this->wrapText($cleanTafsir, $fontSize, $fontPath, $width);
+        $height = count($lines) * $lineHeight;
         return [
             'lines' => $lines,
             'wrappedText' => implode("\n", $lines),
             'height' => $height,
             'fontSize' => $fontSize,
             'width' => $width,
+            'lineHeight' => $lineHeight,
         ];
     }
 
     /**
+     * Resolve the Tafsir text prioritizing custom segment-level tafsir over bundled Ayah translation text.
+     * Also cleans up any raw footnote tags (e.g. <sup foot_note=...>) and HTML tags,
+     * and strips diacritics while preserving all Hamzas.
+     */
+    public function resolveTafsirText($segmentOrContext, ?FrameContext $context = null, ?TranslationSegment $activeSegment = null): ?string
+    {
+        $candidate = null;
+
+        // 1. Prioritize segment's custom tafsir directly on the passed segment object/array
+        if (is_object($segmentOrContext) && isset($segmentOrContext->tafsir) && !empty(trim((string)$segmentOrContext->tafsir))) {
+            $candidate = (string) $segmentOrContext->tafsir;
+        } elseif (is_array($segmentOrContext) && isset($segmentOrContext['tafsir']) && !empty(trim((string)$segmentOrContext['tafsir']))) {
+            $candidate = (string) $segmentOrContext['tafsir'];
+        }
+
+        // 2. Check context's arabicSegment (Segment DTO)
+        if ($candidate === null && $context && $context->arabicSegment) {
+            if (is_object($context->arabicSegment) && isset($context->arabicSegment->tafsir) && !empty(trim((string)$context->arabicSegment->tafsir))) {
+                $candidate = (string) $context->arabicSegment->tafsir;
+            } elseif (is_array($context->arabicSegment) && isset($context->arabicSegment['tafsir']) && !empty(trim((string)$context->arabicSegment['tafsir']))) {
+                $candidate = (string) $context->arabicSegment['tafsir'];
+            }
+        }
+
+        // 3. Check layout context (layerContext)
+        if ($candidate === null && $context && isset($context->layoutData['tafsir']) && !empty(trim((string)$context->layoutData['tafsir']))) {
+            $candidate = (string) $context->layoutData['tafsir'];
+        }
+
+        // 4. Fallback to activeSegment (TranslationSegment DTO)
+        if ($candidate === null && $activeSegment) {
+            if (isset($activeSegment->tafsir) && !empty(trim((string)$activeSegment->tafsir))) {
+                $candidate = (string) $activeSegment->tafsir;
+            } elseif (!empty(trim((string)$activeSegment->text))) {
+                $candidate = (string) $activeSegment->text;
+            }
+        }
+
+        if ($candidate === null) {
+            return null;
+        }
+
+        // Clean up footnote tags and HTML tags before rendering
+        $cleaned = preg_replace('/<sup\b[^>]*>.*?<\/sup>/is', '', $candidate);
+        $cleaned = strip_tags($cleaned);
+        $cleaned = preg_replace('/\[[^\]]*\]/', '', $cleaned);
+        $cleaned = $this->stripDiacritics($cleaned);
+        $cleaned = trim(preg_replace('/\s+/u', ' ', $cleaned));
+
+        return $cleaned !== '' ? $cleaned : null;
+    }
+
+    /**
      * Render the Tafsir layer on the canvas.
+     * Renders only the Arabic text directly into the bounding box without any background shapes.
      */
     public function render($segmentOrContext, ?FrameContext $context = null): void
     {
@@ -88,76 +185,162 @@ class TafsirTextLayer implements RenderLayerInterface
         }
 
         // 1. Resolve layout bounds
-        $bounds = $context->layoutData['tafsirBounds'] ?? null;
-        if (!$bounds) {
-            // Default fallback bounds for Tafsir if strategy doesn't define it explicitly
-            $bounds = [
-                'y' => ($context->height === 1920) ? 1250 : 880,
-                'width' => ($context->height === 1920) ? 760 : 1300,
-                'fontSize' => 28,
-                'lineHeight' => 1.5,
-                'fontPath' => base_path('fonts/Cairo-Regular.ttf'),
-                'color' => [235, 235, 200],
-            ];
-        }
+        $bounds = $context->layoutData['tafsirBounds'] ?? [];
 
         // 2. Find active Tafsir segment by timing match if not supplied directly
         if ($activeSegment === null) {
             $activeSegment = $this->getSegmentForArabic($context->arabicSegment);
         }
 
-        if (!$activeSegment || empty(trim($activeSegment->text))) {
+        // Resolve Tafsir text prioritizing custom segment-level tafsir
+        $rawTafsir = $this->resolveTafsirText($segmentOrContext, $context, $activeSegment);
+        if ($rawTafsir === null || $rawTafsir === '') {
             return;
         }
 
+        $tafsirText = $this->stripDiacritics($rawTafsir);
+
         // 3. Extract rendering properties
-        $fontPath = $bounds['fontPath'] ?? base_path('fonts/Cairo-Regular.ttf');
-        $fontSize = $bounds['fontSize'] ?? 28;
-        $lineHeightMult = $bounds['lineHeight'] ?? 1.5;
-        $maxWidth = $bounds['width'] ?? 760;
-        $centerY = $bounds['y'] ?? 1250;
-        $colorRGB = $bounds['color'] ?? [235, 235, 200];
+        $fontPath = $this->resolveFontPath($bounds['fontPath'] ?? null);
+        $fontSize = (float) ($bounds['fontSize'] ?? self::DEFAULT_FONT_SIZE);
+        $maxWidth = (float) ($bounds['width'] ?? self::DEFAULT_WIDTH);
+        $centerX = (float) ($bounds['x'] ?? self::DEFAULT_CENTER_X);
+        $centerY = (float) ($bounds['y'] ?? self::DEFAULT_CENTER_Y);
+        $colorRGB = $bounds['color'] ?? [255, 255, 255]; // Pure White #FFFFFF
 
         if (!file_exists($fontPath)) {
-            $fontPath = base_path('fonts/Cairo-Regular.ttf');
-            if (!file_exists($fontPath)) {
-                return;
+            return;
+        }
+
+        // Dynamic stacking: check if translation layer is present and compute tafsirStartY
+        $translationBottomY = $context->layoutData['translationBottomY'] ?? null;
+        if ($translationBottomY === null && isset($context->layoutData['translationBounds'])) {
+            $transText = $context->arabicSegment->translation ?? ($context->layoutData['translation'] ?? null);
+            if ($transText !== null && trim((string)$transText) !== '') {
+                $tBounds = $context->layoutData['translationBounds'];
+                $tCenterY = (float) ($tBounds['y'] ?? 1180.0);
+                $tFontSize = (float) ($tBounds['fontSize'] ?? 27.0);
+                $tLineHeight = (float) ($tBounds['lineHeight'] ?? 1.4);
+                $translationBottomY = $tCenterY + ($tFontSize * $tLineHeight);
             }
         }
 
-        // 4. Measure layout and wrap text into balanced, Arabic-shaped lines
-        $layoutResult = $this->measureTafsirLayout($activeSegment->text, $fontSize, $fontPath, $maxWidth, $lineHeightMult);
-        $lines = $layoutResult['lines'];
+        $dynamicStacking = !empty($bounds['dynamicStacking']) || (!isset($bounds['dynamicStacking']) && $translationBottomY !== null);
+        $stackMargin = (float) ($bounds['stackMargin'] ?? 40.0);
 
-        if (empty($lines)) {
+        $tafsirStartY = null;
+        if ($dynamicStacking && $translationBottomY !== null && $translationBottomY > 0) {
+            $tafsirStartY = (float) ($translationBottomY + $stackMargin);
+        }
+
+        // Resolve line height in pixels
+        $rawLineHeight = $bounds['lineHeight'] ?? self::DEFAULT_LINE_HEIGHT;
+        if ($rawLineHeight < 10) {
+            $lineHeight = (float) ($fontSize * $rawLineHeight);
+        } else {
+            $lineHeight = (float) $rawLineHeight;
+        }
+        if ($lineHeight < 40 || $lineHeight > 52) {
+            $lineHeight = self::DEFAULT_LINE_HEIGHT;
+        }
+
+        // 4. Measure layout and wrap text into balanced, Arabic-shaped lines
+        // If text exceeds MAX_TAFSIR_LINES at standard size, try reducing font size
+        $candidateFontSizes = [$fontSize];
+        if ($fontSize >= 30) {
+            $candidateFontSizes = array_unique([$fontSize, 28, 26, 24]);
+        }
+
+        $lines = [];
+        $actualFontSize = $fontSize;
+        $actualLineHeight = $lineHeight;
+
+        foreach ($candidateFontSizes as $candSize) {
+            $candLineHeight = ($candSize === $fontSize) ? $lineHeight : (float) round($lineHeight * ($candSize / $fontSize));
+            $layoutResult = $this->measureTafsirLayout($tafsirText, $candSize, $fontPath, $maxWidth, $candLineHeight);
+            $lines = $layoutResult['lines'];
+            $actualFontSize = $candSize;
+            $actualLineHeight = $candLineHeight;
+
+            if (count($lines) <= self::MAX_TAFSIR_LINES) {
+                break;
+            }
+        }
+
+        $linesCount = count($lines);
+        if ($linesCount === 0) {
             return;
         }
 
-        $totalHeight = $layoutResult['height'];
-        $startY = $centerY - ($totalHeight / 2) + $fontSize;
-
-        // Allocate color
-        $color = imagecolorallocate($context->image, $colorRGB[0], $colorRGB[1], $colorRGB[2]);
-        if ($color === false) {
-            $color = imagecolorallocate($context->image, 235, 235, 200);
+        // 5. Measure bounding box for each line
+        $bboxes = [];
+        $widths = [];
+        foreach ($lines as $idx => $shapedLine) {
+            $bbox = imagettfbbox($actualFontSize, 0, $fontPath, $shapedLine);
+            $bboxes[$idx] = $bbox;
+            $widths[$idx] = abs($bbox[4] - $bbox[0]);
         }
 
-        foreach ($lines as $idx => $shapedLine) {
-            $bbox = imagettfbbox($fontSize, 0, $fontPath, $shapedLine);
-            $w = abs($bbox[4] - $bbox[0]);
-            $lineX = (int) (($context->width - $w) / 2);
-            $lineY = (int) ($startY + ($idx * $fontSize * $lineHeightMult));
+        // Allocate Pure White color
+        $color = imagecolorallocate($context->image, $colorRGB[0], $colorRGB[1], $colorRGB[2]);
+        if ($color === false) {
+            $color = imagecolorallocate($context->image, 255, 255, 255);
+        }
 
-            imagettftext($context->image, $fontSize, 0, $lineX, $lineY, $color, $fontPath, $shapedLine);
+        // 6. Draw lines with precise horizontal and vertical positioning
+        if ($tafsirStartY !== null) {
+            // Dynamic stacking: Ensure Tafsir starts strictly below translationBottomY with clean margin (tafsirStartY = translationBottomY + 40)
+            $yMin0 = min($bboxes[0][1], $bboxes[0][3], $bboxes[0][5], $bboxes[0][7]);
+            $baseline0 = (int) round($tafsirStartY - $yMin0);
+
+            foreach ($lines as $idx => $shapedLine) {
+                $lineWidth = $widths[$idx];
+                $startX = (int) round($centerX - ($lineWidth / 2.0));
+                $lineY = (int) round($baseline0 + ($idx * $actualLineHeight));
+
+                imagettftext($context->image, $actualFontSize, 0, $startX, $lineY, $color, $fontPath, $shapedLine);
+            }
+        } elseif ($linesCount === 1) {
+            // For 1-line text: Center vertically at Y = 1081 (calibrated capsule center)
+            $bbox = $bboxes[0];
+            $yMin = min($bbox[1], $bbox[3], $bbox[5], $bbox[7]);
+            $yMax = max($bbox[1], $bbox[3], $bbox[5], $bbox[7]);
+            $lineY = (int) round($centerY - ($yMin + $yMax) / 2.0);
+
+            $lineWidth = $widths[0];
+            $startX = (int) round($centerX - ($lineWidth / 2.0));
+
+            imagettftext($context->image, $actualFontSize, 0, $startX, $lineY, $color, $fontPath, $lines[0]);
+        } else {
+            // For 2-line text: Vertically balance around Y = 1081 with appropriate line-height
+            $yMin0 = min($bboxes[0][1], $bboxes[0][3], $bboxes[0][5], $bboxes[0][7]);
+            $yMaxLast = max($bboxes[$linesCount - 1][1], $bboxes[$linesCount - 1][3], $bboxes[$linesCount - 1][5], $bboxes[$linesCount - 1][7]);
+
+            $baseline0 = (int) round($centerY - ((($linesCount - 1) * $actualLineHeight) + $yMin0 + $yMaxLast) / 2.0);
+
+            foreach ($lines as $idx => $shapedLine) {
+                $lineWidth = $widths[$idx];
+                $startX = (int) round($centerX - ($lineWidth / 2.0));
+                $lineY = (int) round($baseline0 + ($idx * $actualLineHeight));
+
+                imagettftext($context->image, $actualFontSize, 0, $startX, $lineY, $color, $fontPath, $shapedLine);
+            }
         }
     }
 
     /**
-     * Wrap text into lines using balanced partitioning with Arabic shaping.
+     * Wrap text into lines using balanced partitioning with Arabic shaping and BiDi RTL handling.
      */
     protected function wrapText(string $text, float $fontSize, string $fontPath, float $maxWidth): array
     {
-        $words = explode(' ', $text);
+        $cleanText = $this->stripDiacritics($text);
+        $cleanText = trim(preg_replace('/\s+/u', ' ', $cleanText));
+        if ($cleanText === '') {
+            return [];
+        }
+
+        $words = explode(' ', $cleanText);
+        $words = array_values(array_filter($words, fn($w) => $w !== ''));
         if (empty($words)) {
             return [];
         }
@@ -169,27 +352,62 @@ class TafsirTextLayer implements RenderLayerInterface
 
         foreach ($words as $word) {
             $testWords = array_merge($currentLogicalWords, [$word]);
-            $testShaped = $arabicConv->utf8Glyphs(implode(' ', $testWords));
+            // Pass max_chars = 1000 to prevent premature artificial wrapping at 50 chars
+            $testShaped = $arabicConv->utf8Glyphs(implode(' ', $testWords), 1000);
 
             $bbox = imagettfbbox($fontSize, 0, $fontPath, $testShaped);
             $width = abs($bbox[4] - $bbox[0]);
 
             if ($width <= $maxWidth) {
-                $currentLogicalWords[] = $word;
+                $currentLogicalWords = $candidateWords ?? $testWords;
             } else {
                 if (!empty($currentLogicalWords)) {
-                    $greedyLines[] = $arabicConv->utf8Glyphs(implode(' ', $currentLogicalWords));
+                    $greedyLines[] = $currentLogicalWords;
                 }
                 $currentLogicalWords = [$word];
             }
         }
         if (!empty($currentLogicalWords)) {
-            $greedyLines[] = $arabicConv->utf8Glyphs(implode(' ', $currentLogicalWords));
+            $greedyLines[] = $currentLogicalWords;
         }
 
         $linesCount = count($greedyLines);
         if ($linesCount <= 1) {
-            return $greedyLines;
+            return [
+                $arabicConv->utf8Glyphs(implode(' ', $greedyLines[0]), 1000)
+            ];
+        }
+
+        // Fast balanced partitioning for 2 lines
+        if ($linesCount === 2) {
+            $totalWords = count($words);
+            $bestSplit = -1;
+            $bestDiff = INF;
+
+            for ($i = 0; $i < $totalWords - 1; $i++) {
+                $slice1 = array_slice($words, 0, $i + 1);
+                $slice2 = array_slice($words, $i + 1);
+
+                $w1 = $this->getSliceWidth($words, 0, $i, $fontSize, $fontPath);
+                $w2 = $this->getSliceWidth($words, $i + 1, $totalWords - 1, $fontSize, $fontPath);
+
+                if ($w1 <= $maxWidth && $w2 <= $maxWidth) {
+                    $diff = abs($w1 - $w2);
+                    if ($diff < $bestDiff) {
+                        $bestDiff = $diff;
+                        $bestSplit = $i;
+                    }
+                }
+            }
+
+            if ($bestSplit !== -1) {
+                $slice1 = array_slice($words, 0, $bestSplit + 1);
+                $slice2 = array_slice($words, $bestSplit + 1);
+                return [
+                    $arabicConv->utf8Glyphs(implode(' ', $slice1), 1000),
+                    $arabicConv->utf8Glyphs(implode(' ', $slice2), 1000),
+                ];
+            }
         }
 
         $this->widthCache = [];
@@ -210,18 +428,22 @@ class TafsirTextLayer implements RenderLayerInterface
         );
 
         if ($result['penalty'] === INF || empty($result['splits'])) {
-            return $greedyLines;
+            $fallbackLines = [];
+            foreach ($greedyLines as $lw) {
+                $fallbackLines[] = $arabicConv->utf8Glyphs(implode(' ', $lw), 1000);
+            }
+            return $fallbackLines;
         }
 
         $balancedLines = [];
         $start = 0;
         foreach ($result['splits'] as $splitIndex) {
             $slice = array_slice($words, $start, $splitIndex - $start + 1);
-            $balancedLines[] = $arabicConv->utf8Glyphs(implode(' ', $slice));
+            $balancedLines[] = $arabicConv->utf8Glyphs(implode(' ', $slice), 1000);
             $start = $splitIndex + 1;
         }
         $slice = array_slice($words, $start);
-        $balancedLines[] = $arabicConv->utf8Glyphs(implode(' ', $slice));
+        $balancedLines[] = $arabicConv->utf8Glyphs(implode(' ', $slice), 1000);
 
         return $balancedLines;
     }
@@ -231,14 +453,14 @@ class TafsirTextLayer implements RenderLayerInterface
      */
     protected function getSliceWidth(array $words, int $start, int $end, float $fontSize, string $fontPath): float
     {
-        $key = $start . '_' . $end;
+        $key = $start . '_' . $end . '_' . (int) $fontSize;
         if (isset($this->widthCache[$key])) {
             return $this->widthCache[$key];
         }
 
         $slice = array_slice($words, $start, $end - $start + 1);
         $logicalText = implode(' ', $slice);
-        $shapedText = $this->getArabicConverter()->utf8Glyphs($logicalText);
+        $shapedText = $this->getArabicConverter()->utf8Glyphs($logicalText, 1000);
 
         $bbox = imagettfbbox($fontSize, 0, $fontPath, $shapedText);
         $width = abs($bbox[4] - $bbox[0]);

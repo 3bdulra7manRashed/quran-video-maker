@@ -34,7 +34,7 @@ class ApprovedSegmentBuilder
             $startMs = $segTimes ? $segTimes['start_ms'] : 0;
             $endMs = $segTimes ? $segTimes['end_ms'] : 0;
 
-            $segments[] = new Segment(
+            $seg = new Segment(
                 $range['segmentOrder'],
                 $range['startWordId'],
                 $range['endWordId'],
@@ -43,6 +43,11 @@ class ApprovedSegmentBuilder
                 $endMs,
                 $words
             );
+
+            $seg->tafsir = $range['tafsir'] ?? null;
+            $seg->translation = $range['translation'] ?? null;
+
+            $segments[] = $seg;
         }
 
         return $segments;

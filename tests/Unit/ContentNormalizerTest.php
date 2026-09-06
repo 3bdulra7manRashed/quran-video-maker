@@ -113,4 +113,16 @@ class ContentNormalizerTest extends TestCase
     {
         $this->assertEquals("ا ب ج", ContentNormalizer::normalizeForMatching("  ا   ب   ج   "));
     }
+
+    public function test_normalize_layl_orthography_variations(): void
+    {
+        $this->assertEquals(
+            ContentNormalizer::normalizeForMatching("وَٱلَّيْلِ إِذَا سَجَىٰ"),
+            ContentNormalizer::normalizeForMatching("وَاللَّيْلِ إِذَا سَجَى")
+        );
+        $this->assertEquals(
+            ContentNormalizer::normalizeForMatching("ٱلَّيْلِ"),
+            ContentNormalizer::normalizeForMatching("الليل")
+        );
+    }
 }

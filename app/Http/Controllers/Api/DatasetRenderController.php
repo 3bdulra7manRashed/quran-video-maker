@@ -89,7 +89,9 @@ class DatasetRenderController
             }
         }
 
-        if ($withTafsir) {
+        $isCustomOrGenerated = $useGeneratedContent || ($customJson !== null && trim($customJson) !== '');
+
+        if ($withTafsir && !$isCustomOrGenerated) {
             $exists = \App\Modules\Quran\Models\AyahTranslation::where('source', $tafsirSource)->exists();
             if (!$exists) {
                 return response()->json([

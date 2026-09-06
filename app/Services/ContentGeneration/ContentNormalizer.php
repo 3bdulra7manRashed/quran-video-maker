@@ -42,6 +42,12 @@ class ContentNormalizer
      */
     public static function normalizeTranslation(string $text): string
     {
+        // 0. Remove footnote tags and their contents e.g. <sup foot_note=1>1</sup>
+        $text = preg_replace('/<sup\b[^>]*>.*?<\/sup>/is', '', $text);
+
+        // 0.1 Strip any remaining HTML tags
+        $text = strip_tags($text);
+
         // 1. Remove bracketed comments "[...]"
         $text = preg_replace('/\[[^\]]*\]/', '', $text);
         
@@ -62,6 +68,9 @@ class ContentNormalizer
      */
     public static function normalizeTafsir(string $text): string
     {
+        // 0. Remove footnote tags and their contents e.g. <sup foot_note=1>1</sup>
+        $text = preg_replace('/<sup\b[^>]*>.*?<\/sup>/is', '', $text);
+
         // 1. Remove HTML tags
         $text = strip_tags($text);
 
@@ -94,6 +103,9 @@ class ContentNormalizer
 
         // 4. Normalize all forms of alif to bare alif (ا)
         $text = preg_replace('/[أإآٱ]/u', 'ا', $text);
+
+        // 4.1 Normalize "الليل" variations (standard Arabic writes double lam "الليل", Uthmani orthography writes single lam "اليل")
+        $text = preg_replace('/(^|[^\p{L}\p{N}])([وفبك]?ا)لل(يل)/u', '$1$2ل$3', $text);
 
         // 5. Normalize Ya forms (ى -> ي)
         $text = preg_replace('/ى/u', 'ي', $text);

@@ -52,12 +52,15 @@ class ReelSingleLineLayoutStrategy
     public function getTafsirBounds(): array
     {
         return [
-            'y' => 1340,              // Center Y coordinate of Tafsir block below translation
-            'width' => 760,           // Safe margin container width for Arabic Tafsir
-            'fontSize' => 26,         // Cairo font size for Arabic commentary
-            'lineHeight' => 1.5,      // Line height spacing for Cairo font
-            'fontPath' => base_path('fonts/Cairo-Regular.ttf'), // Cairo font for Arabic prose
-            'color' => [235, 235, 200], // Soft cream tint to visually distinguish Tafsir
+            'x' => 540,               // Target Center X coordinate from Premiere Pro
+            'y' => 1081,              // Target Center Y coordinate when standalone (matching capsule template)
+            'width' => 920,           // Max text width inside 980px capsule (30px padding on each side)
+            'fontSize' => 30,         // Al-Jazeera-Arabic GD points (calibrated from 37pt Premiere Pro)
+            'lineHeight' => 44,       // Line-height for 2 lines
+            'fontPath' => base_path('fonts/Al-Jazeera-Arabic-Regular.ttf'),
+            'color' => [255, 255, 255], // Pure White #FFFFFF
+            'dynamicStacking' => true, // Stack below translation if translation is present
+            'stackMargin' => 40,      // Margin below translation's bottom boundary (tafsirStartY = translationBottomY + 40)
         ];
     }
 }

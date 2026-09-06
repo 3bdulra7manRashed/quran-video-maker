@@ -98,4 +98,14 @@ class TranslationTextCleanerTest extends TestCase
         $expected = "Indeed, We have granted you, al-Kawthar.";
         $this->assertEquals($expected, TranslationTextCleaner::clean($input));
     }
+
+    public function test_strips_footnote_tags_and_html(): void
+    {
+        $input = 'By the morning brightness<sup foot_note=197778>1</sup> And [by] the night when it covers with darkness,<sup foot_note=197779>2</sup>';
+        $cleaned = TranslationTextCleaner::clean($input);
+        $this->assertStringNotContainsString('foot_note', $cleaned);
+        $this->assertStringNotContainsString('<sup', $cleaned);
+        $this->assertEquals('By the morning brightness And the night when it covers with darkness,', $cleaned);
+    }
 }
+

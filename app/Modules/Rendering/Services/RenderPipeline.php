@@ -94,11 +94,14 @@ class RenderPipeline
         }
 
         if ($withTafsir) {
-            $exists = \App\Modules\Quran\Models\AyahTranslation::where('source', $tafsirSource)->exists();
-            if (!$exists) {
-                throw new \App\Modules\Rendering\Exceptions\TranslationUnavailableException(
-                    "Tafsir source '{$tafsirSource}' has not been imported.\n\nRun:\n\nphp artisan quran:download-tafsir"
-                );
+            $isCustomOrGenerated = $useGeneratedContent || ($renderJob && $renderJob->use_generated_content);
+            if (!$isCustomOrGenerated) {
+                $exists = \App\Modules\Quran\Models\AyahTranslation::where('source', $tafsirSource)->exists();
+                if (!$exists) {
+                    throw new \App\Modules\Rendering\Exceptions\TranslationUnavailableException(
+                        "Tafsir source '{$tafsirSource}' has not been imported.\n\nRun:\n\nphp artisan quran:download-tafsir"
+                    );
+                }
             }
         }
 
@@ -135,6 +138,14 @@ class RenderPipeline
                     // 1. If it contains segments (Reels generated content)
                     if (isset($customJson['segments'])) {
                         $useGeneratedContent = true;
+
+                        // Auto-enable withTafsir if any custom segment has tafsir text
+                        foreach ($customJson['segments'] as $seg) {
+                            if (!empty($seg['tafsir'])) {
+                                $withTafsir = true;
+                                break;
+                            }
+                        }
                         
                         $mockResolver = new class($customJson['segments'], $reciter, $surahNumber) extends \App\Services\ContentGeneration\ApprovedContentResolver {
                             protected array $segments;
@@ -152,9 +163,9 @@ class RenderPipeline
                                     $record->reciter_id = $reciterId;
                                     $record->surah_number = $this->surahNumber;
                                     $record->segment_order = (int)$seg['order'];
-                                    $record->arabic = $seg['arabic'];
-                                    $record->translation = $seg['translation'];
-                                    $record->tafsir = $seg['tafsir'];
+                                    $record->arabic = $seg['arabic'] ?? '';
+                                    $record->translation = $seg['translation'] ?? null;
+                                    $record->tafsir = $seg['tafsir'] ?? null;
                                     $collection->push($record);
                                 }
                                 return $collection;
@@ -322,13 +333,14 @@ class RenderPipeline
         $hasApprovedGeneratedContent = false;
         $alignedRanges = [];
 
-        $resolver = app(\App\Services\ContentGeneration\ApprovedContentResolver::class);
-        $approvedSegmentsData = $resolver->resolve($reciter->id, $surahNumber, $fromAyah, $toAyah, $layout);
+        if ($useGeneratedContent) {
+            $resolver = app(\App\Services\ContentGeneration\ApprovedContentResolver::class);
+            $approvedSegmentsData = $resolver->resolve($reciter->id, $surahNumber, $fromAyah, $toAyah, $layout);
 
-        if ($approvedSegmentsData !== null && !$approvedSegmentsData->isEmpty()) {
-            Log::info('RENDER SOURCE', [
-                'source' => 'approved_generated',
-            ]);
+            if ($approvedSegmentsData !== null && !$approvedSegmentsData->isEmpty()) {
+                Log::info('RENDER SOURCE', [
+                    'source' => 'approved_generated',
+                ]);
 
             $aligner = app(\App\Services\ContentGeneration\GeneratedContentWordAligner::class);
             $segmentBuilder = app(\App\Services\ContentGeneration\ApprovedSegmentBuilder::class);
@@ -345,7 +357,23 @@ class RenderPipeline
 
             $segments = $segmentBuilder->build($alignedRanges, $timeline);
             $hasApprovedGeneratedContent = true;
+
+            // Ensure segment objects carry the custom tafsir & translation text
+            foreach ($segments as $segment) {
+                $genSeg = $approvedSegmentsData->firstWhere('segment_order', $segment->index);
+                if ($genSeg) {
+                    $segment->tafsir = $genSeg->tafsir ?? null;
+                    $segment->translation = $genSeg->translation ?? null;
+                }
+            }
+
             Log::info("[RenderPipeline] Loaded " . count($segments) . " segments from approved generated content using SegmentTimeline.");
+            } else {
+                Log::info('RENDER SOURCE', [
+                    'source' => 'default',
+                ]);
+                $segments = $this->segmentationService->segment($words, $totalDuration, $layout, $maxLines, $reciter, $surahNumber);
+            }
         } else {
             Log::info('RENDER SOURCE', [
                 'source' => 'default',
@@ -373,20 +401,52 @@ class RenderPipeline
         // Build Tafsir Layer if requested
         $tafsirLayer = null;
         if ($withTafsir) {
-            $repository = app(\App\Modules\Rendering\Repositories\TranslationRepository::class);
-            $tafsirProvider = new class($repository, $tafsirSource) implements \App\Modules\Rendering\Contracts\TranslationProviderInterface {
-                protected $repo;
-                protected string $src;
-                public function __construct($repo, string $src) { $this->repo = $repo; $this->src = $src; }
-                public function getAyahTranslation(int $surahNumber, int $ayahNumber): string { return $this->repo->getAyahTranslation($surahNumber, $ayahNumber, $this->src); }
-                public function getAyahTranslations(int $surahNumber): array { return $this->repo->getAyahTranslations($surahNumber, $this->src); }
-                public function source(): string { return $this->src; }
-            };
+            if ($hasApprovedGeneratedContent) {
+                $tafsirSegments = [];
+                foreach ($segments as $segment) {
+                    $genSeg = $approvedSegmentsData->firstWhere('segment_order', $segment->index);
+                    $segTafsir = $segment->tafsir ?? ($genSeg ? $genSeg->tafsir : null);
+                    if ($segTafsir !== null && trim($segTafsir) !== '') {
+                        $cleanTafsir = preg_replace('/<sup\b[^>]*>.*?<\/sup>/is', '', $segTafsir);
+                        $cleanTafsir = strip_tags($cleanTafsir);
+                        $cleanTafsir = preg_replace('/\[[^\]]*\]/', '', $cleanTafsir);
+                        $cleanTafsir = preg_replace('/[\x{064B}-\x{0652}\x{0670}]/u', '', $cleanTafsir);
+                        $cleanTafsir = str_replace('ـ', '', $cleanTafsir);
+                        $cleanTafsir = trim(preg_replace('/\s+/u', ' ', $cleanTafsir));
 
-            $tafsirBuilder = new \App\Modules\Rendering\Services\TranslationSegmentBuilder($tafsirProvider);
-            $tafsirSegments = $tafsirBuilder->build($segments, $surahNumber);
-            $tafsirLayer = new \App\Modules\Rendering\Layers\TafsirTextLayer($tafsirSegments);
-            Log::info("[RenderPipeline] Instantiated TafsirTextLayer with " . count($tafsirSegments) . " segments.");
+                        $firstWord = !empty($segment->words) ? $segment->words[0] : null;
+                        $lastWord = !empty($segment->words) ? end($segment->words) : null;
+                        $fromA = ($firstWord && $firstWord->ayah) ? $firstWord->ayah->ayah_number : 1;
+                        $toA = ($lastWord && $lastWord->ayah) ? $lastWord->ayah->ayah_number : 1;
+
+                        $tafsirSegments[] = new \App\Modules\Rendering\Domain\TranslationSegment(
+                            $surahNumber,
+                            $cleanTafsir,
+                            $fromA,
+                            $toA,
+                            $segment->startMs,
+                            $segment->endMs
+                        );
+                    }
+                }
+                $tafsirLayer = new \App\Modules\Rendering\Layers\TafsirTextLayer($tafsirSegments);
+                Log::info("[RenderPipeline] Instantiated TafsirTextLayer from approved generated content with " . count($tafsirSegments) . " segments.");
+            } else {
+                $repository = app(\App\Modules\Rendering\Repositories\TranslationRepository::class);
+                $tafsirProvider = new class($repository, $tafsirSource) implements \App\Modules\Rendering\Contracts\TranslationProviderInterface {
+                    protected $repo;
+                    protected string $src;
+                    public function __construct($repo, string $src) { $this->repo = $repo; $this->src = $src; }
+                    public function getAyahTranslation(int $surahNumber, int $ayahNumber): string { return $this->repo->getAyahTranslation($surahNumber, $ayahNumber, $this->src); }
+                    public function getAyahTranslations(int $surahNumber): array { return $this->repo->getAyahTranslations($surahNumber, $this->src); }
+                    public function source(): string { return $this->src; }
+                };
+
+                $tafsirBuilder = new \App\Modules\Rendering\Services\TranslationSegmentBuilder($tafsirProvider);
+                $tafsirSegments = $tafsirBuilder->build($segments, $surahNumber);
+                $tafsirLayer = new \App\Modules\Rendering\Layers\TafsirTextLayer($tafsirSegments);
+                Log::info("[RenderPipeline] Instantiated TafsirTextLayer with " . count($tafsirSegments) . " segments.");
+            }
         }
 
         // Populate segment metrics for debug/report output
@@ -437,6 +497,20 @@ class RenderPipeline
 
             $activeStrategy = ($layout === 'youtube') ? $this->youtubeLayoutStrategy : $this->layoutStrategy;
             $layoutData = $activeStrategy->layout($segment, ['reciter' => $reciter]);
+
+            if (!empty($segment->tafsir)) {
+                $layoutData['tafsir'] = $segment->tafsir;
+                if (isset($layoutData['tafsirBounds'])) {
+                    $layoutData['tafsirBounds']['tafsir'] = $segment->tafsir;
+                }
+            }
+
+            if (!empty($segment->translation)) {
+                $layoutData['translation'] = $segment->translation;
+                if (isset($layoutData['translationBounds'])) {
+                    $layoutData['translationBounds']['translation'] = $segment->translation;
+                }
+            }
 
             $translationSegment = null;
             if ($translationLayer) {
@@ -532,10 +606,12 @@ class RenderPipeline
                 'wordCount' => $segment->wordCount,
                 'renderedWidth' => $segment->renderedWidth,
                 'fontSize' => $segment->fontSize,
+                'tafsir' => $segment->tafsir ?? null,
+                'translation' => $segment->translation ?? null,
             ];
         }
 
-        file_put_contents($debugFile, json_encode($debugData, JSON_PRETTY_PRINT));
+        file_put_contents($debugFile, json_encode($debugData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         Log::info("[RenderPipeline] Written segments debug log to {$debugFile}");
     }
 

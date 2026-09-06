@@ -117,6 +117,8 @@ class GeneratedContentWordAligner
                     'endWordId' => end($matchedWords)->id,
                     'wordIds' => $wordIds,
                     'words' => $matchedWords,
+                    'tafsir' => $genSeg->tafsir ?? null,
+                    'translation' => $genSeg->translation ?? null,
                 ];
             } else {
                 // Log ALIGNMENT FAILURE

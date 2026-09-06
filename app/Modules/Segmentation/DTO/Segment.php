@@ -15,6 +15,10 @@ class Segment
     // Loaded Word model collection for rendering convenience
     public array $words = [];
 
+    // Custom segment-level translation and tafsir text
+    public ?string $tafsir = null;
+    public ?string $translation = null;
+
     // Debugging and rendering metrics
     public ?int $renderedWidth = null;
     public ?int $fontSize = null;
