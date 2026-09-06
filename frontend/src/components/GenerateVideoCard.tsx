@@ -20,6 +20,7 @@ interface GenerateVideoCardProps {
   withTafsir: boolean;
   useGeneratedContent: boolean;
   customJsonPayload?: string;
+  useQuranMeTheme?: boolean;
 }
 
 export default function GenerateVideoCard({
@@ -37,6 +38,7 @@ export default function GenerateVideoCard({
   withTafsir,
   useGeneratedContent,
   customJsonPayload,
+  useQuranMeTheme = false,
 }: GenerateVideoCardProps) {
   const { api } = useApi();
   const router = useRouter();
@@ -78,6 +80,7 @@ export default function GenerateVideoCard({
       with_tafsir: withTafsir,
       use_generated_content: useGeneratedContent,
       custom_json: customJsonPayload || undefined,
+      theme: useQuranMeTheme ? 'quran_me' : 'default',
     };
 
     if (scope === 'single') {

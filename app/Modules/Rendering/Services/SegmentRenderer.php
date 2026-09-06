@@ -65,6 +65,8 @@ class SegmentRenderer
 
         // Colors
         $white = imagecolorallocate($im, 255, 255, 255);
+        $ayahColorRGB = $layoutData['ayahColor'] ?? (($layoutData['theme'] ?? '') === 'quran_me' ? [77, 49, 38] : [255, 255, 255]);
+        $ayahColor = imagecolorallocate($im, $ayahColorRGB[0], $ayahColorRGB[1], $ayahColorRGB[2]);
 
         // 3. Draw headers if enabled in layoutData
         $headerConfig = $layoutData['header'] ?? [];
@@ -135,7 +137,12 @@ class SegmentRenderer
                 $textWidth = abs($bbox[4] - $bbox[0]);
                 $lineX = (int) (($width - $textWidth) / 2);
 
-                imagettftext($im, $fontSize, 0, $lineX, $centerY, $white, $fontPath, $lineText);
+                imagettftext($im, $fontSize, 0, $lineX, $centerY, $ayahColor, $fontPath, $lineText);
+
+                $unitBottomY = $centerY + max($bbox[1], $bbox[3]);
+                if (!isset($layoutData['ayahBottomY']) || $unitBottomY > $layoutData['ayahBottomY']) {
+                    $layoutData['ayahBottomY'] = $unitBottomY;
+                }
             }
         }
 
@@ -149,6 +156,7 @@ class SegmentRenderer
                 $segment
             );
             $translationLayer->render($translationSegment, $context);
+            $layoutData = $context->layoutData;
         }
 
         // 4.6. Draw Tafsir Layer if provided

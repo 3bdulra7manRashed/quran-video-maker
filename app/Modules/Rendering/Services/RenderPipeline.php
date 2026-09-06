@@ -81,9 +81,20 @@ class RenderPipeline
         bool $useGeneratedContent = false,
         bool $withTafsir = false,
         string $tafsirSource = 'ar-tafsir-muyassar',
-        ?string $customJson = null
+        ?string $customJson = null,
+        string $theme = 'default'
     ): string {
         $this->cancellationGuard->ensureNotCancelled($renderJob);
+
+        if ($theme === 'default' && $renderJob && !empty($renderJob->theme)) {
+            $theme = $renderJob->theme;
+        }
+        if ($theme === 'default' && $customJson) {
+            $decoded = json_decode($customJson, true);
+            if (isset($decoded['theme'])) {
+                $theme = $decoded['theme'];
+            }
+        }
 
         if ($withTranslation) {
             $exists = \App\Modules\Quran\Models\AyahTranslation::where('source', 'sahih_international')->exists();
@@ -116,6 +127,7 @@ class RenderPipeline
             'translation_source' => $translationSource,
             'with_tafsir' => $withTafsir,
             'tafsir_source' => $tafsirSource,
+            'theme' => $theme,
         ]);
 
         // 1. Select Surah
@@ -650,7 +662,7 @@ class RenderPipeline
         Log::info("[RenderPipeline] Segmented Surah {$surahNumber} into " . count($segments) . " segments.");
 
         // 7. Generate debug segment JSON file
-        $this->writeDebugSegmentsJson($surahNumber, $segments, $reciterSlug, $fromAyah, $toAyah, $layout);
+        $this->writeDebugSegmentsJson($surahNumber, $segments, $reciterSlug, $fromAyah, $toAyah, $layout, $theme);
 
         // Checkpoint 2: Before frame rendering starts
         $this->cancellationGuard->ensureNotCancelled($renderJob);
@@ -671,10 +683,18 @@ class RenderPipeline
             if ($layout === 'youtube') {
                 $rangeDir .= '_youtube';
             }
+            if ($theme === 'quran_me') {
+                $rangeDir .= '_quran_me';
+            }
             $segmentPath = $this->pathResolver->renderedSegments("surah_{$surahNumber}_{$reciterSlug}{$rangeDir}/segment_{$paddedIndex}.png");
 
             $activeStrategy = ($layout === 'youtube') ? $this->youtubeLayoutStrategy : $this->layoutStrategy;
-            $layoutData = $activeStrategy->layout($segment, ['reciter' => $reciter]);
+            $layoutData = $activeStrategy->layout($segment, [
+                'reciter' => $reciter,
+                'theme' => $theme,
+                'with_translation' => $withTranslation,
+                'with_tafsir' => $withTafsir,
+            ]);
 
             if (!empty($segment->tafsir)) {
                 $layoutData['tafsir'] = $segment->tafsir;
@@ -727,6 +747,9 @@ class RenderPipeline
         if ($layout === 'youtube') {
             $suffix .= '_youtube';
         }
+        if ($theme === 'quran_me') {
+            $suffix .= '_quran_me';
+        }
 
         $outputVideoPath = $this->pathResolver->videos("surah_{$surahNumber}{$suffix}.mp4");
         
@@ -762,7 +785,8 @@ class RenderPipeline
         string $reciterSlug,
         ?int $fromAyah = null,
         ?int $toAyah = null,
-        string $layout = 'reels'
+        string $layout = 'reels',
+        string $theme = 'default'
     ): void {
         $suffix = $reciterSlug === 'yasser-al-dosari' ? '' : "_{$reciterSlug}";
         if ($fromAyah !== null && $toAyah !== null) {
@@ -770,6 +794,9 @@ class RenderPipeline
         }
         if ($layout === 'youtube') {
             $suffix .= '_youtube';
+        }
+        if ($theme === 'quran_me') {
+            $suffix .= '_quran_me';
         }
         
         $debugFile = $this->pathResolver->debug("segments/surah_{$surahNumber}{$suffix}_segments.json");

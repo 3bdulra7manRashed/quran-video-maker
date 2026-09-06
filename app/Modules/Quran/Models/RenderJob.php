@@ -25,6 +25,7 @@ class RenderJob extends Model
         'progress',
         'duration',
         'layout',
+        'theme',
         'max_lines',
         'with_translation',
         'translation_source',

@@ -37,6 +37,8 @@ class DatasetRenderController
             'translation_source' => 'sometimes|string',
             'with_tafsir'        => 'sometimes|boolean',
             'tafsir_source'      => 'sometimes|string|nullable',
+            'theme'              => 'sometimes|string|in:default,quran_me',
+            'theme_color_mode'   => 'sometimes|string|in:default,quran_me',
             'use_generated_content' => 'sometimes|boolean',
             'custom_json'        => 'sometimes|string|nullable',
         ]);
@@ -104,12 +106,15 @@ class DatasetRenderController
             }
         }
 
+        $theme = $request->input('theme') ?? $request->input('theme_color_mode', 'default');
+
         // Create the RenderJob model record
         $renderJob = RenderJob::create([
             'status'             => 'pending',
             'reciter_id'         => $reciter->id,
             'surah_number'       => $surah->number,
             'layout'             => $layout,
+            'theme'              => $theme,
             'max_lines'          => $maxLines,
             'from_ayah'          => $fromAyah,
             'to_ayah'            => $toAyah,
@@ -161,6 +166,7 @@ class DatasetRenderController
         $response = [
             'uuid'               => $job->uuid,
             'status'             => $status,
+            'theme'              => $job->theme ?? 'default',
             'progress'           => $job->progress,
             'with_translation'   => (bool) ($job->with_translation ?? false),
             'translation_source' => $job->translation_source,

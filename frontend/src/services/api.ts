@@ -178,6 +178,8 @@ export class ApiService {
     tafsir_source?: string;
     use_generated_content?: boolean;
     custom_json?: string;
+    theme?: string;
+    theme_color_mode?: string;
   }): Promise<{ uuid: string; status: string }> {
     const res = await fetch(`${this.baseUrl}/api/renders`, {
       method: 'POST',

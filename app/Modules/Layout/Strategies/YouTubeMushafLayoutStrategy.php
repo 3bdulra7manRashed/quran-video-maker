@@ -17,6 +17,13 @@ class YouTubeMushafLayoutStrategy
     {
         $reciter = $context['reciter'] ?? null;
         $reciterNameArabic = $reciter ? $reciter->name_arabic : '';
+        $theme = $context['theme'] ?? 'default';
+
+        $ayahColor = ($theme === 'quran_me') ? [77, 49, 38] : [255, 255, 255];
+        $translationBounds = $this->getTranslationBounds();
+        if ($theme === 'quran_me') {
+            $translationBounds['color'] = [77, 49, 38];
+        }
 
         // Group the words in this segment by their page and line composite key to draw them on separate lines
         $grouped = [];
@@ -50,6 +57,8 @@ class YouTubeMushafLayoutStrategy
             'layoutType' => 'youtube',
             'maxMushafLines' => $linesCount,
             'fontSize' => $fontSize,
+            'theme' => $theme,
+            'ayahColor' => $ayahColor,
             'header' => [
                 'show' => true,
                 'surahY' => 150,
@@ -57,7 +66,7 @@ class YouTubeMushafLayoutStrategy
                 'reciterText' => $reciterNameArabic,
             ],
             'renderUnits' => $renderUnits,
-            'translationBounds' => $this->getTranslationBounds(),
+            'translationBounds' => $translationBounds,
             'tafsirBounds' => $this->getTafsirBounds(),
         ];
     }
@@ -83,7 +92,7 @@ class YouTubeMushafLayoutStrategy
             'fontSize' => 28,         // Cairo font size for landscape Arabic commentary
             'lineHeight' => 1.5,      // Line height spacing for Cairo font
             'fontPath' => base_path('fonts/Cairo-Regular.ttf'), // Cairo font for Arabic prose
-            'color' => [235, 235, 200], // Soft cream tint matching Reels style
+            'color' => [255, 255, 255], // Strictly Pure White #FFFFFF
         ];
     }
 }

@@ -73,7 +73,9 @@ class GenerateVideoJob implements ShouldQueue
                 $this->renderJob,
                 (bool) ($this->renderJob->use_generated_content ?? false),
                 (bool) ($this->renderJob->with_tafsir ?? false),
-                $this->renderJob->tafsir_source ?? 'ar-tafsir-muyassar'
+                $this->renderJob->tafsir_source ?? 'ar-tafsir-muyassar',
+                null,
+                $this->renderJob->theme ?? 'default'
             );
 
             // Probe duration via ffprobe

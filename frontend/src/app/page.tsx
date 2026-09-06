@@ -70,6 +70,9 @@ export default function ConsolePage() {
   const [translationSource, setTranslationSource] = useState<string>('sahih_international');
   const [withTafsir, setWithTafsir] = useState<boolean>(false);
 
+  // Theme state
+  const [useQuranMeTheme, setUseQuranMeTheme] = useState<boolean>(false);
+
   // Guide accordion state
   const [guideOpen, setGuideOpen] = useState<boolean>(false);
 
@@ -737,6 +740,8 @@ export default function ConsolePage() {
               onUseGeneratedContentChange={setUseGeneratedContent}
               persistToDatabase={persistToDatabase}
               onPersistToDatabaseChange={setPersistToDatabase}
+              useQuranMeTheme={useQuranMeTheme}
+              onUseQuranMeThemeChange={setUseQuranMeTheme}
             />
 
             {/* PROGRESSIVE DISCLOSURE: Render AI Operations Dynamically from Config */}
@@ -889,6 +894,7 @@ export default function ConsolePage() {
                 withTafsir={withTafsir}
                 useGeneratedContent={useGeneratedContent}
                 customJsonPayload={lastSegTimJson || undefined}
+                useQuranMeTheme={useQuranMeTheme}
               />
             )}
           </div>

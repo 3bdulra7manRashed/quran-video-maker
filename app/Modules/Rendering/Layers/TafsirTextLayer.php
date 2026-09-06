@@ -206,7 +206,7 @@ class TafsirTextLayer implements RenderLayerInterface
         $maxWidth = (float) ($bounds['width'] ?? self::DEFAULT_WIDTH);
         $centerX = (float) ($bounds['x'] ?? self::DEFAULT_CENTER_X);
         $centerY = (float) ($bounds['y'] ?? self::DEFAULT_CENTER_Y);
-        $colorRGB = $bounds['color'] ?? [255, 255, 255]; // Pure White #FFFFFF
+        $colorRGB = [255, 255, 255]; // Tafsir text remains strictly Pure White #FFFFFF
 
         if (!file_exists($fontPath)) {
             return;
@@ -218,15 +218,15 @@ class TafsirTextLayer implements RenderLayerInterface
             $transText = $context->arabicSegment->translation ?? ($context->layoutData['translation'] ?? null);
             if ($transText !== null && trim((string)$transText) !== '') {
                 $tBounds = $context->layoutData['translationBounds'];
-                $tCenterY = (float) ($tBounds['y'] ?? 1180.0);
+                $tCenterY = (float) ($tBounds['y'] ?? 942.0);
                 $tFontSize = (float) ($tBounds['fontSize'] ?? 27.0);
                 $tLineHeight = (float) ($tBounds['lineHeight'] ?? 1.4);
-                $translationBottomY = $tCenterY + ($tFontSize * $tLineHeight);
+                $translationBottomY = $tCenterY + ($tFontSize * $tLineHeight / 2.0);
             }
         }
 
-        $dynamicStacking = !empty($bounds['dynamicStacking']) || (!isset($bounds['dynamicStacking']) && $translationBottomY !== null);
-        $stackMargin = (float) ($bounds['stackMargin'] ?? 40.0);
+        $dynamicStacking = !empty($bounds['dynamicStacking']);
+        $stackMargin = (float) ($bounds['stackMargin'] ?? 60.0);
 
         $tafsirStartY = null;
         if ($dynamicStacking && $translationBottomY !== null && $translationBottomY > 0) {

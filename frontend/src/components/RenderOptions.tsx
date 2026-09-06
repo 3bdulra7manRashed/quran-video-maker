@@ -20,6 +20,8 @@ interface RenderOptionsProps {
   onUseGeneratedContentChange: (val: boolean) => void;
   persistToDatabase?: boolean;
   onPersistToDatabaseChange?: (val: boolean) => void;
+  useQuranMeTheme?: boolean;
+  onUseQuranMeThemeChange?: (val: boolean) => void;
   disabled: boolean;
 }
 
@@ -38,6 +40,8 @@ export default function RenderOptions({
   onUseGeneratedContentChange,
   persistToDatabase = true,
   onPersistToDatabaseChange,
+  useQuranMeTheme = false,
+  onUseQuranMeThemeChange,
   disabled,
 }: RenderOptionsProps) {
   const t = useT();
@@ -180,6 +184,26 @@ export default function RenderOptions({
               />
             </div>
           )}
+
+          {/* Quran.me Theme Toggle */}
+          <div className="border-t border-slate-100 dark:border-slate-800/60 pt-3 flex items-center justify-between">
+            <div className="flex flex-col">
+              <label htmlFor="useQuranMeTheme" className="text-xs text-slate-700 dark:text-slate-350 font-semibold cursor-pointer">
+                {isAr ? 'قالب Quran.me (ثيم مخصص)' : 'Quran.me Theme (Custom Theme)'}
+              </label>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                {isAr ? 'تلوين الآية القرآنية والترجمة باللون #4D3126 مع إبقاء التفسير بالأبيض النقي.' : 'Render Ayah and Translation text in #4D3126 while keeping Tafsir pure white.'}
+              </span>
+            </div>
+            <input
+              id="useQuranMeTheme"
+              type="checkbox"
+              disabled={disabled}
+              checked={useQuranMeTheme}
+              onChange={(e) => onUseQuranMeThemeChange?.(e.target.checked)}
+              className="w-4 h-4 accent-emerald-600 rounded bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 cursor-pointer disabled:opacity-40"
+            />
+          </div>
         </div>
 
         {/* Force Pre-generated Content Settings */}

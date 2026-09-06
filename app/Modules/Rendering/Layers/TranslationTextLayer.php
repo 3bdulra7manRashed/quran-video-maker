@@ -151,8 +151,11 @@ class TranslationTextLayer implements RenderLayerInterface
         $fontSize = $bounds['fontSize'] ?? 38;
         $lineHeightMult = $bounds['lineHeight'] ?? 1.4;
         $maxWidth = $bounds['width'] ?? 920;
-        $centerY = $bounds['y'] ?? 1150;
+        $centerY = $bounds['y'] ?? 942;
         $colorRGB = $bounds['color'] ?? [230, 230, 230];
+        if (($context->layoutData['theme'] ?? '') === 'quran_me') {
+            $colorRGB = [77, 49, 38];
+        }
 
         if (!file_exists($fontPath)) {
             // Defensive check
@@ -237,6 +240,11 @@ class TranslationTextLayer implements RenderLayerInterface
         $totalHeight = $layoutResult['height'];
 
         // 5. Draw lines centered vertically around centerY
+        if (!empty($bounds['dynamicStacking']) && isset($context->layoutData['ayahBottomY'])) {
+            $gap = (float) ($bounds['stackMargin'] ?? 70.0);
+            $centerY = (float) $context->layoutData['ayahBottomY'] + $gap + ($totalHeight / 2.0);
+        }
+
         // The first line baseline Y (imagettftext positions text by the baseline)
         $startY = $centerY - ($totalHeight / 2) + $fontSize;
 

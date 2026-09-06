@@ -22,7 +22,9 @@ class RenderVideoCommand extends Command
                             {--layout=reels : Layout type (reels or youtube)}
                             {--max-lines=1 : Maximum Mushaf lines per screen (only used for youtube layout)}
                             {--with-translation : Enable translation rendering (default: false)}
-                            {--translation-source=sahih_international : The translation source (default: sahih_international)}';
+                            {--translation-source=sahih_international : The translation source (default: sahih_international)}
+                            {--theme=default : The theme mode (default or quran_me)}
+                            {--with-quran-me-theme : Shortcut to enable quran_me theme}';
 
     protected $description = 'Render a video for a given Surah using static QCF glyphs and audio.';
 
@@ -34,6 +36,10 @@ class RenderVideoCommand extends Command
         $maxLines = (int) $this->option('max-lines');
         $withTranslation = $this->option('with-translation');
         $translationSource = $this->option('translation-source');
+        $theme = (string) ($this->option('theme') ?? 'default');
+        if ($this->option('with-quran-me-theme')) {
+            $theme = 'quran_me';
+        }
 
         if (!in_array($layout, ['reels', 'youtube'])) {
             $this->error('The --layout option must be either reels or youtube.');
@@ -59,7 +65,7 @@ class RenderVideoCommand extends Command
             $toAyah = $ayah;
         }
 
-        $this->info("Initializing rendering pipeline for Surah {$surahNumber} and reciter '{$reciterSlug}' using layout '{$layout}'...");
+        $this->info("Initializing rendering pipeline for Surah {$surahNumber} and reciter '{$reciterSlug}' using layout '{$layout}', theme '{$theme}'...");
 
         try {
             $this->validatePrerequisites($surahNumber, $reciterSlug, $fromAyah, $toAyah, $fontResolver, $pathResolver);
@@ -69,7 +75,22 @@ class RenderVideoCommand extends Command
         }
 
         try {
-            $outputPath = $pipeline->render($surahNumber, $reciterSlug, $fromAyah, $toAyah, $layout, $maxLines, $withTranslation, $translationSource);
+            $outputPath = $pipeline->render(
+                $surahNumber,
+                $reciterSlug,
+                $fromAyah,
+                $toAyah,
+                $layout,
+                $maxLines,
+                $withTranslation,
+                $translationSource,
+                null,
+                false,
+                false,
+                'ar-tafsir-muyassar',
+                null,
+                $theme
+            );
             $this->info("Successfully generated video!");
             $this->line("Output Path: {$outputPath}");
             return self::SUCCESS;

@@ -18,6 +18,44 @@ class ReelSingleLineLayoutStrategy
         $fontSize = config('layouts.reels.font_size', 56);
         $reciter = $context['reciter'] ?? null;
         $reciterNameArabic = $reciter ? $reciter->name_arabic : '';
+        $theme = $context['theme'] ?? 'default';
+
+        $hasTranslation = !empty($segment->translation)
+            || !empty($context['with_translation'])
+            || !empty($context['translation']);
+
+        $hasTafsir = !empty($segment->tafsir)
+            || !empty($context['with_tafsir'])
+            || !empty($context['tafsir']);
+
+        // Determine vertical baseline coordinates to maintain comfortable, generous spacing:
+        // - Gap between Ayah & Translation: 65px - 75px (prevents collisions with diacritics & descenders)
+        // - Gap between Translation & Tafsir: 55px - 65px (clean breathing room above capsule at Y = 1081)
+        if ($hasTranslation && $hasTafsir) {
+            $ayahY = 815;
+            $translationY = 942;
+            $tafsirY = 1081;
+        } elseif ($hasTranslation) {
+            $ayahY = 900;
+            $translationY = 1005;
+            $tafsirY = 1081;
+        } elseif ($hasTafsir) {
+            $ayahY = 920;
+            $translationY = 942;
+            $tafsirY = 1081;
+        } else {
+            $ayahY = 960;
+            $translationY = 942;
+            $tafsirY = 1081;
+        }
+
+        $ayahColor = ($theme === 'quran_me') ? [77, 49, 38] : [255, 255, 255];
+        $translationBounds = $this->getTranslationBounds($translationY);
+        if ($theme === 'quran_me') {
+            $translationBounds['color'] = [77, 49, 38];
+        }
+
+        $tafsirBounds = $this->getTafsirBounds($tafsirY);
 
         return [
             'width' => 1080,
@@ -25,42 +63,45 @@ class ReelSingleLineLayoutStrategy
             'fontSize' => $fontSize,
             'maxVisibleLines' => 1,
             'reciterNameArabic' => $reciterNameArabic,
+            'theme' => $theme,
+            'ayahColor' => $ayahColor,
             'renderUnits' => [
                 [
                     'words' => $segment->words,
-                    'y' => 960,
+                    'y' => $ayahY,
                 ]
             ],
-            'translationBounds' => $this->getTranslationBounds(),
-            'tafsirBounds' => $this->getTafsirBounds(),
+            'translationBounds' => $translationBounds,
+            'tafsirBounds' => $tafsirBounds,
         ];
     }
 
-    public function getTranslationBounds(): array
+    public function getTranslationBounds(int $y = 942): array
     {
         return [
-            'y' => 1180,              // Center Y coordinate of translation block (below Arabic at 960)
+            'y' => $y,                // Center Y coordinate of translation block (comfortably between Ayah and Tafsir)
             'width' => 620,           // Reduced container width (focused translation layout)
             'margin' => 230,          // Balanced safe margin bounds (centered inside 1080px canvas)
-            'fontSize' => 27,         // Slightly smaller Georgia serif size (down by 3px) for visual subordination
+            'fontSize' => 27,         // Slightly smaller Georgia serif size for visual subordination
             'lineHeight' => 1.4,      // Tighter but comfortable line height spacing for Georgia
             'fontPath' => base_path('fonts/georgia.ttf'), // Publication-grade Georgia font for English prose
             'color' => [225, 225, 225], // Slightly brighter off-white to enhance clarity and sharpness
+            'stackMargin' => 70,      // Gap from Ayah bottom when dynamic stacking is used (65px - 75px)
         ];
     }
 
-    public function getTafsirBounds(): array
+    public function getTafsirBounds(int $y = 1081): array
     {
         return [
             'x' => 540,               // Target Center X coordinate from Premiere Pro
-            'y' => 1081,              // Target Center Y coordinate when standalone (matching capsule template)
+            'y' => $y,                // Target Center Y coordinate matching capsule template
             'width' => 920,           // Max text width inside 980px capsule (30px padding on each side)
             'fontSize' => 30,         // Al-Jazeera-Arabic GD points (calibrated from 37pt Premiere Pro)
             'lineHeight' => 44,       // Line-height for 2 lines
             'fontPath' => base_path('fonts/Al-Jazeera-Arabic-Regular.ttf'),
             'color' => [255, 255, 255], // Pure White #FFFFFF
-            'dynamicStacking' => true, // Stack below translation if translation is present
-            'stackMargin' => 40,      // Margin below translation's bottom boundary (tafsirStartY = translationBottomY + 40)
+            'dynamicStacking' => false, // Maintain fixed capsule coordinate alignment at Y = 1081
+            'stackMargin' => 60,      // Clean margin (55px - 65px) below translation if dynamic stacking is used
         ];
     }
 }
