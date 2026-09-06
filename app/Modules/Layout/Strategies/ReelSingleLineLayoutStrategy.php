@@ -118,19 +118,21 @@ class ReelSingleLineLayoutStrategy
             'show' => true,
             'x' => 540,
             'color' => [77, 49, 38], // #4D3126
+            'top' => 1220,
+            'bottom' => 1430,
             'surah' => [
-                'y' => 1200,
+                'y' => 1260,
                 'fontSize' => 45, // ~40-50pt
                 'fontPath' => base_path('fonts/QCF_BSML.ttf'),
             ],
             'reciter' => [
-                'y' => 1275,
+                'y' => 1345,
                 'fontSize' => 28, // ~26-30pt
                 'fontPath' => base_path('fonts/Al-Jazeera-Arabic-Regular.ttf'),
             ],
             'watermark' => [
                 'text' => 'equran.me',
-                'y' => 1335,
+                'y' => 1415,
                 'fontSize' => 24, // ~24pt
                 'fontPath' => base_path('fonts/georgia.ttf'),
             ],

@@ -9,11 +9,11 @@ use ArPHP\I18N\Arabic;
 class FooterLayer implements RenderLayerInterface
 {
     public const DEFAULT_COLOR = [77, 49, 38]; // #4D3126
-    public const DEFAULT_SURAH_Y = 1200;
+    public const DEFAULT_SURAH_Y = 1260;
     public const DEFAULT_SURAH_SIZE = 45; // ~40-50pt
-    public const DEFAULT_RECITER_Y = 1275;
+    public const DEFAULT_RECITER_Y = 1345;
     public const DEFAULT_RECITER_SIZE = 28; // ~26-30pt
-    public const DEFAULT_WATERMARK_Y = 1335;
+    public const DEFAULT_WATERMARK_Y = 1415;
     public const DEFAULT_WATERMARK_SIZE = 24; // ~24pt
     public const DEFAULT_WATERMARK_TEXT = 'equran.me';
     public const DEFAULT_CENTER_X = 540;

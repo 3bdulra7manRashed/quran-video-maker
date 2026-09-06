@@ -100,9 +100,9 @@ class QuranMeThemeTest extends TestCase
         $this->assertArrayHasKey('footerBounds', $layout);
         $this->assertEquals(540, $layout['footerBounds']['x']);
         $this->assertEquals([77, 49, 38], $layout['footerBounds']['color']);
-        $this->assertEquals(1200, $layout['footerBounds']['surah']['y']);
-        $this->assertEquals(1275, $layout['footerBounds']['reciter']['y']);
-        $this->assertEquals(1335, $layout['footerBounds']['watermark']['y']);
+        $this->assertEquals(1260, $layout['footerBounds']['surah']['y']);
+        $this->assertEquals(1345, $layout['footerBounds']['reciter']['y']);
+        $this->assertEquals(1415, $layout['footerBounds']['watermark']['y']);
         $this->assertEquals('equran.me', $layout['footerBounds']['watermark']['text']);
     }
 
