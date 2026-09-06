@@ -18,12 +18,40 @@ class BackgroundFactory
      * Apply the configured background to the given GD canvas.
      *
      * @param \GdImage $im
+     * @param array $layoutData
      * @return void
      */
-    public function apply(\GdImage $im): void
+    public function apply(\GdImage $im, array $layoutData = []): void
     {
         $width = imagesx($im);
         $height = imagesy($im);
+        $theme = $layoutData['theme'] ?? '';
+
+        // When theme is quran_me, mount the static background template
+        if ($theme === 'quran_me') {
+            $candidatePaths = [
+                function_exists('public_path') ? public_path('templates/quran_me_bg.jpg') : null,
+                function_exists('storage_path') ? storage_path('app/public/templates/quran_me_bg.jpg') : null,
+                base_path('public/templates/quran_me_bg.jpg'),
+                base_path('storage/app/public/templates/quran_me_bg.jpg'),
+            ];
+
+            foreach ($candidatePaths as $bgPath) {
+                if ($bgPath && file_exists($bgPath)) {
+                    $baseImage = @imagecreatefromjpeg($bgPath);
+                    if (!$baseImage) {
+                        $baseImage = @imagecreatefrompng($bgPath);
+                    }
+                    if ($baseImage) {
+                        imagecopyresampled($im, $baseImage, 0, 0, 0, 0, $width, $height, imagesx($baseImage), imagesy($baseImage));
+                        imagedestroy($baseImage);
+                        return;
+                    }
+                }
+            }
+
+            Log::warning("[BackgroundFactory] quran_me template background image not found. Falling back to default background.");
+        }
 
         // Load configuration
         $config = config('layouts.reels.background', [

@@ -17,7 +17,7 @@ class ReelSingleLineLayoutStrategy
     {
         $fontSize = config('layouts.reels.font_size', 56);
         $reciter = $context['reciter'] ?? null;
-        $reciterNameArabic = $reciter ? $reciter->name_arabic : '';
+        $reciterNameArabic = $reciter ? ($reciter->name_arabic ?? '') : ($context['reciterNameArabic'] ?? '');
         $theme = $context['theme'] ?? 'default';
 
         $hasTranslation = !empty($segment->translation)

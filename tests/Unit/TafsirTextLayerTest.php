@@ -346,6 +346,73 @@ class TafsirTextLayerTest extends TestCase
         // Verify horizontal center is aligned with X = 540
         $this->assertEqualsWithDelta(540.0, $centerX, 3.0, "Tafsir must remain horizontally centered at X = 540");
     }
+
+    public function test_renders_dynamic_pill_capsule_for_quran_me_theme(): void
+    {
+        $layer = new TafsirTextLayer();
+
+        $width = 1080;
+        $height = 1920;
+        $im = imagecreatetruecolor($width, $height);
+        // Fill canvas with black
+        imagefilledrectangle($im, 0, 0, $width, $height, imagecolorallocate($im, 0, 0, 0));
+
+        $arabicSegment = new Segment(1, 1, 5, [1, 2, 3, 4, 5], 0, 1000);
+        $tafsirSegment = new TranslationSegment(1, "أقسم الله بأول النهار حين ترتفع الشمس", 1, 1, 0, 1000);
+
+        $layoutData = [
+            'theme' => 'quran_me',
+            'tafsirBounds' => [
+                'x' => 540,
+                'y' => 1081,
+                'width' => 920,
+                'fontSize' => 30,
+                'lineHeight' => 44,
+                'fontPath' => $this->fontPath,
+                'color' => [255, 255, 255],
+            ],
+        ];
+
+        $context = new FrameContext($im, $width, $height, $layoutData, $arabicSegment);
+        $layer->render($tafsirSegment, $context);
+
+        // Check context recorded capsule bounds
+        $this->assertArrayHasKey('tafsirCapsuleBounds', $context->layoutData);
+        $capsuleBounds = $context->layoutData['tafsirCapsuleBounds'];
+        $expectedRadius = floor($capsuleBounds['height'] / 2.0);
+        $this->assertEquals($expectedRadius, $capsuleBounds['radius'], "Radius must equal half the capsule height (full pill)");
+        $this->assertEquals([77, 49, 38], $capsuleBounds['color'], "Capsule color must be #4D3126");
+        $this->assertEquals(51, $capsuleBounds['alpha'], "Capsule alpha must be 51 for 60% opacity");
+        $this->assertEquals(0.60, $capsuleBounds['opacity']);
+        $this->assertLessThanOrEqual(940.0, $capsuleBounds['width']);
+        $this->assertEqualsWithDelta(540.0, ($capsuleBounds['x1'] + $capsuleBounds['x2']) / 2.0, 1.0);
+        $this->assertEqualsWithDelta(1081.0, ($capsuleBounds['y1'] + $capsuleBounds['y2']) / 2.0, 1.0);
+
+        // Check for capsule color pixels (#4D3126 at 60% opacity over black: R~46, G~29, B~23)
+        $capsulePixelsX = [];
+        $capsulePixelsY = [];
+        for ($y = 1030; $y <= 1130; $y++) {
+            for ($x = 0; $x < $width; $x++) {
+                $rgb = imagecolorat($im, $x, $y);
+                $r = ($rgb >> 16) & 0xFF;
+                $g = ($rgb >> 8) & 0xFF;
+                $b = $rgb & 0xFF;
+                if ($r >= 44 && $r <= 48 && $g >= 27 && $g <= 31 && $b >= 21 && $b <= 25) {
+                    $capsulePixelsX[] = $x;
+                    $capsulePixelsY[] = $y;
+                }
+            }
+        }
+
+        $this->assertNotEmpty($capsulePixelsX, "Capsule pixels (#4D3126 at 60% opacity) should be rendered");
+        $centerX = (min($capsulePixelsX) + max($capsulePixelsX)) / 2.0;
+        $centerY = (min($capsulePixelsY) + max($capsulePixelsY)) / 2.0;
+
+        $this->assertEqualsWithDelta(540.0, $centerX, 2.0, "Capsule must center horizontally at X = 540");
+        $this->assertEqualsWithDelta(1081.0, $centerY, 2.0, "Capsule must center vertically around Y = 1081");
+
+        imagedestroy($im);
+    }
 }
 
 

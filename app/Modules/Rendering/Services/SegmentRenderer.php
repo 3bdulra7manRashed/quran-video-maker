@@ -67,7 +67,7 @@ class SegmentRenderer
         $im = imagecreatetruecolor($width, $height);
 
         // 2. Draw background
-        $this->backgroundFactory->apply($im);
+        $this->backgroundFactory->apply($im, $layoutData);
 
         // Colors
         $white = imagecolorallocate($im, 255, 255, 255);

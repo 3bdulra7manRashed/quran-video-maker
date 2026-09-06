@@ -281,49 +281,106 @@ class TafsirTextLayer implements RenderLayerInterface
             $widths[$idx] = abs($bbox[4] - $bbox[0]);
         }
 
-        // Allocate Pure White color
+        if ($linesCount === 1) {
+            $bbox = $bboxes[0];
+            $yMin = min($bbox[1], $bbox[3], $bbox[5], $bbox[7]);
+            $yMax = max($bbox[1], $bbox[3], $bbox[5], $bbox[7]);
+            $textWidth = (float) $widths[0];
+            $textHeight = (float) abs($yMax - $yMin);
+
+            if ($tafsirStartY !== null) {
+                $lineY = (int) round($tafsirStartY - $yMin);
+                $tafsirCenterY = $lineY + ($yMin + $yMax) / 2.0;
+            } else {
+                $tafsirCenterY = $centerY;
+                $lineY = (int) round($centerY - ($yMin + $yMax) / 2.0);
+            }
+        } else {
+            $yMin0 = min($bboxes[0][1], $bboxes[0][3], $bboxes[0][5], $bboxes[0][7]);
+            $yMaxLast = max($bboxes[$linesCount - 1][1], $bboxes[$linesCount - 1][3], $bboxes[$linesCount - 1][5], $bboxes[$linesCount - 1][7]);
+            $textWidth = (float) max($widths);
+            $textHeight = (float) ((($linesCount - 1) * $actualLineHeight) + ($yMaxLast - $yMin0));
+
+            if ($tafsirStartY !== null) {
+                $baseline0 = (int) round($tafsirStartY - $yMin0);
+                $tafsirCenterY = $baseline0 + ((($linesCount - 1) * $actualLineHeight) + $yMin0 + $yMaxLast) / 2.0;
+            } else {
+                $tafsirCenterY = $centerY;
+                $baseline0 = (int) round($centerY - ((($linesCount - 1) * $actualLineHeight) + $yMin0 + $yMaxLast) / 2.0);
+            }
+        }
+
+        // 6. Draw dynamic pill capsule background if enabled (quran_me theme or explicit capsule bound)
+        $isCapsuleEnabled = (($context->layoutData['theme'] ?? '') === 'quran_me')
+            || !empty($bounds['capsule'])
+            || isset($bounds['capsulePaddingX']);
+
+        if ($isCapsuleEnabled) {
+            $paddingX = (float) ($bounds['capsulePaddingX'] ?? 50.0);
+            $paddingY = (float) ($bounds['capsulePaddingY'] ?? 18.0);
+            $maxPillWidth = (float) ($bounds['maxCapsuleWidth'] ?? 940.0);
+
+            $pillWidth = min($textWidth + ($paddingX * 2.0), $maxPillWidth);
+            $pillHeight = $textHeight + ($paddingY * 2.0);
+
+            // Full pill rounding where corner radius strictly equals half the capsule height
+            $defaultRadius = (float) floor($pillHeight / 2.0);
+            $radius = (float) ($bounds['capsuleRadius'] ?? $defaultRadius);
+
+            $capsuleColorRGB = $bounds['capsuleColor'] ?? [77, 49, 38]; // #4D3126 matching Ayah & translation
+            $capsuleOpacity = (float) ($bounds['capsuleOpacity'] ?? 0.60); // 60% opacity (40% transparent)
+            $alpha = (int) round(127 * (1.0 - $capsuleOpacity)); // ~51
+
+            $pillX1 = $centerX - ($pillWidth / 2.0);
+            $pillY1 = $tafsirCenterY - ($pillHeight / 2.0);
+            $pillX2 = $centerX + ($pillWidth / 2.0);
+            $pillY2 = $tafsirCenterY + ($pillHeight / 2.0);
+
+            imagealphablending($context->image, true);
+            imagesavealpha($context->image, true);
+            $pillColor = imagecolorallocatealpha(
+                $context->image,
+                $capsuleColorRGB[0],
+                $capsuleColorRGB[1],
+                $capsuleColorRGB[2],
+                $alpha
+            );
+            if ($pillColor === false) {
+                $pillColor = imagecolorallocatealpha($context->image, 77, 49, 38, 51);
+            }
+
+            $this->drawRoundedRectangle($context->image, $pillX1, $pillY1, $pillX2, $pillY2, $radius, $pillColor);
+
+            $context->layoutData['tafsirCapsuleBounds'] = [
+                'x1' => $pillX1,
+                'y1' => $pillY1,
+                'x2' => $pillX2,
+                'y2' => $pillY2,
+                'width' => $pillWidth,
+                'height' => $pillHeight,
+                'radius' => $radius,
+                'color' => $capsuleColorRGB,
+                'alpha' => $alpha,
+                'opacity' => $capsuleOpacity,
+            ];
+        }
+
+        // 7. Allocate Pure White color and render text lines
         $color = imagecolorallocate($context->image, $colorRGB[0], $colorRGB[1], $colorRGB[2]);
         if ($color === false) {
             $color = imagecolorallocate($context->image, 255, 255, 255);
         }
 
-        // 6. Draw lines with precise horizontal and vertical positioning
-        if ($tafsirStartY !== null) {
-            // Dynamic stacking: Ensure Tafsir starts strictly below translationBottomY with clean margin (tafsirStartY = translationBottomY + 40)
-            $yMin0 = min($bboxes[0][1], $bboxes[0][3], $bboxes[0][5], $bboxes[0][7]);
-            $baseline0 = (int) round($tafsirStartY - $yMin0);
-
-            foreach ($lines as $idx => $shapedLine) {
-                $lineWidth = $widths[$idx];
-                $startX = (int) round($centerX - ($lineWidth / 2.0));
-                $lineY = (int) round($baseline0 + ($idx * $actualLineHeight));
-
-                imagettftext($context->image, $actualFontSize, 0, $startX, $lineY, $color, $fontPath, $shapedLine);
-            }
-        } elseif ($linesCount === 1) {
-            // For 1-line text: Center vertically at Y = 1081 (calibrated capsule center)
-            $bbox = $bboxes[0];
-            $yMin = min($bbox[1], $bbox[3], $bbox[5], $bbox[7]);
-            $yMax = max($bbox[1], $bbox[3], $bbox[5], $bbox[7]);
-            $lineY = (int) round($centerY - ($yMin + $yMax) / 2.0);
-
+        if ($linesCount === 1) {
             $lineWidth = $widths[0];
             $startX = (int) round($centerX - ($lineWidth / 2.0));
-
             imagettftext($context->image, $actualFontSize, 0, $startX, $lineY, $color, $fontPath, $lines[0]);
         } else {
-            // For 2-line text: Vertically balance around Y = 1081 with appropriate line-height
-            $yMin0 = min($bboxes[0][1], $bboxes[0][3], $bboxes[0][5], $bboxes[0][7]);
-            $yMaxLast = max($bboxes[$linesCount - 1][1], $bboxes[$linesCount - 1][3], $bboxes[$linesCount - 1][5], $bboxes[$linesCount - 1][7]);
-
-            $baseline0 = (int) round($centerY - ((($linesCount - 1) * $actualLineHeight) + $yMin0 + $yMaxLast) / 2.0);
-
             foreach ($lines as $idx => $shapedLine) {
                 $lineWidth = $widths[$idx];
                 $startX = (int) round($centerX - ($lineWidth / 2.0));
-                $lineY = (int) round($baseline0 + ($idx * $actualLineHeight));
-
-                imagettftext($context->image, $actualFontSize, 0, $startX, $lineY, $color, $fontPath, $shapedLine);
+                $curLineY = (int) round($baseline0 + ($idx * $actualLineHeight));
+                imagettftext($context->image, $actualFontSize, 0, $startX, $curLineY, $color, $fontPath, $shapedLine);
             }
         }
     }
@@ -520,5 +577,72 @@ class TafsirTextLayer implements RenderLayerInterface
         }
         
         return ['penalty' => $bestPenalty, 'splits' => $bestSplits];
+    }
+
+    /**
+     * Draw a filled rounded rectangle on the GD canvas with seamless alpha blending support.
+     */
+    public function drawRoundedRectangle(
+        $im,
+        float $x1,
+        float $y1,
+        float $x2,
+        float $y2,
+        float $radius,
+        int $color
+    ): void {
+        $x1 = (int) round($x1);
+        $y1 = (int) round($y1);
+        $x2 = (int) round($x2);
+        $y2 = (int) round($y2);
+
+        $width = $x2 - $x1;
+        $height = $y2 - $y1;
+        if ($width <= 0 || $height <= 0) {
+            return;
+        }
+
+        $r = (int) round($radius);
+        if ($r * 2 > $width) {
+            $r = (int) ($width / 2);
+        }
+        if ($r * 2 > $height) {
+            $r = (int) ($height / 2);
+        }
+
+        if ($r <= 0) {
+            imagefilledrectangle($im, $x1, $y1, $x2, $y2, $color);
+            return;
+        }
+
+        // Render on a temporary canvas with imagealphablending = false
+        // to prevent any internal overlapping seam artifacts when using alpha colors
+        $temp = imagecreatetruecolor($width, $height);
+        imagealphablending($temp, false);
+        imagesavealpha($temp, true);
+        $transparent = imagecolorallocatealpha($temp, 0, 0, 0, 127);
+        imagefilledrectangle($temp, 0, 0, $width, $height, $transparent);
+
+        // Fill horizontal center
+        imagefilledrectangle($temp, $r, 0, $width - $r - 1, $height - 1, $color);
+
+        // If radius is less than half height, fill the vertical sides between corner arcs
+        if ($height - $r - 1 >= $r) {
+            imagefilledrectangle($temp, 0, $r, $r - 1, $height - $r - 1, $color);
+            imagefilledrectangle($temp, $width - $r, $r, $width - 1, $height - $r - 1, $color);
+        }
+
+        // Fill 4 corner arcs
+        $d = $r * 2;
+        imagefilledarc($temp, $r, $r, $d, $d, 180, 270, $color, IMG_ARC_PIE);
+        imagefilledarc($temp, $width - $r - 1, $r, $d, $d, 270, 360, $color, IMG_ARC_PIE);
+        imagefilledarc($temp, $width - $r - 1, $height - $r - 1, $d, $d, 0, 90, $color, IMG_ARC_PIE);
+        imagefilledarc($temp, $r, $height - $r - 1, $d, $d, 90, 180, $color, IMG_ARC_PIE);
+
+        // Copy onto target canvas with alpha blending enabled
+        imagealphablending($im, true);
+        imagesavealpha($im, true);
+        imagecopy($im, $temp, $x1, $y1, 0, 0, $width, $height);
+        imagedestroy($temp);
     }
 }

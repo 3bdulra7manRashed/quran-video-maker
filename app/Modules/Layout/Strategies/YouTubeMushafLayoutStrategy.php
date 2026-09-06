@@ -16,7 +16,7 @@ class YouTubeMushafLayoutStrategy
     public function layout(Segment $segment, array $context = []): array
     {
         $reciter = $context['reciter'] ?? null;
-        $reciterNameArabic = $reciter ? $reciter->name_arabic : '';
+        $reciterNameArabic = $reciter ? ($reciter->name_arabic ?? '') : ($context['reciterNameArabic'] ?? '');
         $theme = $context['theme'] ?? 'default';
 
         $ayahColor = ($theme === 'quran_me') ? [77, 49, 38] : [255, 255, 255];
