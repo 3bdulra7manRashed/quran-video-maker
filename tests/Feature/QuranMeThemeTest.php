@@ -101,6 +101,7 @@ class QuranMeThemeTest extends TestCase
         $this->assertEquals(540, $layout['footerBounds']['x']);
         $this->assertEquals([77, 49, 38], $layout['footerBounds']['color']);
         $this->assertEquals(1260, $layout['footerBounds']['surah']['y']);
+        $this->assertEquals(-18, $layout['footerBounds']['surah']['opticalOffsetX']);
         $this->assertEquals(1345, $layout['footerBounds']['reciter']['y']);
         $this->assertEquals(1415, $layout['footerBounds']['watermark']['y']);
         $this->assertEquals('equran.me', $layout['footerBounds']['watermark']['text']);
@@ -119,9 +120,55 @@ class QuranMeThemeTest extends TestCase
         $this->assertNotNull($glyph1);
         $this->assertEquals(mb_chr(0xFB8D, 'UTF-8') . mb_chr(0xFB8C, 'UTF-8'), $glyph1);
 
+        // Surah 18 (Al-Kahf): U+FB9E U+FB8C (0xFB8C + 18 = 0xFB9E)
+        $glyph18 = $footerLayer->resolveSurahGlyph(18);
+        $this->assertNotNull($glyph18);
+        $this->assertEquals(mb_chr(0xFB9E, 'UTF-8') . mb_chr(0xFB8C, 'UTF-8'), $glyph18);
+
         // Surah 93: U+FC0A U+FB8C
         $glyph93 = $footerLayer->resolveSurahGlyph(93);
         $this->assertNotNull($glyph93);
         $this->assertEquals(mb_chr(0xFC0A, 'UTF-8') . mb_chr(0xFB8C, 'UTF-8'), $glyph93);
+    }
+
+    public function test_footer_layer_renders_surah_al_kahf_with_optical_centering_offset(): void
+    {
+        $footerLayer = new \App\Modules\Rendering\Layers\FooterLayer();
+        $im = imagecreatetruecolor(1080, 1920);
+
+        $segment = new Segment(1, 18, 1, [1], 0, 1000, []);
+        $layoutData = [
+            'theme' => 'quran_me',
+            'surahNumber' => 18, // Surah Al-Kahf
+            'reciterNameArabic' => 'مشاري راشد العفاسي',
+            'footerBounds' => [
+                'show' => true,
+                'x' => 540,
+                'color' => [77, 49, 38],
+                'surah' => [
+                    'y' => 1260,
+                    'fontSize' => 45,
+                    'fontPath' => $footerLayer->resolveBsmlFont(),
+                    'opticalOffsetX' => -18,
+                ],
+                'reciter' => [
+                    'y' => 1345,
+                    'fontSize' => 28,
+                    'fontPath' => $footerLayer->resolveArabicFont(),
+                ],
+                'watermark' => [
+                    'text' => 'equran.me',
+                    'y' => 1415,
+                    'fontSize' => 24,
+                    'fontPath' => $footerLayer->resolveGeorgiaFont(),
+                ],
+            ],
+        ];
+
+        $context = new \App\Modules\Rendering\Domain\FrameContext($im, 1080, 1920, $layoutData, $segment);
+        $footerLayer->render($context);
+
+        $this->assertNotNull($im);
+        imagedestroy($im);
     }
 }

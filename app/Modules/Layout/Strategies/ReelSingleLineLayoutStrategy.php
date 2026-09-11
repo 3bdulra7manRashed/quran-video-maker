@@ -124,6 +124,7 @@ class ReelSingleLineLayoutStrategy
                 'y' => 1260,
                 'fontSize' => 45, // ~40-50pt
                 'fontPath' => base_path('fonts/QCF_BSML.ttf'),
+                'opticalOffsetX' => -18,
             ],
             'reciter' => [
                 'y' => 1345,

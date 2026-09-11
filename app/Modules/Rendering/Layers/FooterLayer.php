@@ -17,6 +17,7 @@ class FooterLayer implements RenderLayerInterface
     public const DEFAULT_WATERMARK_SIZE = 24; // ~24pt
     public const DEFAULT_WATERMARK_TEXT = 'equran.me';
     public const DEFAULT_CENTER_X = 540;
+    public const DEFAULT_SURAH_OPTICAL_OFFSET_X = -18;
 
     protected ?Arabic $arabic = null;
 
@@ -152,12 +153,14 @@ class FooterLayer implements RenderLayerInterface
                 $bsmlFont = $footerConfig['surah']['fontPath'] ?? $this->resolveBsmlFont();
                 $surahSize = $footerConfig['surah']['fontSize'] ?? self::DEFAULT_SURAH_SIZE;
                 $surahY = $footerConfig['surah']['y'] ?? self::DEFAULT_SURAH_Y;
+                $surahOpticalOffsetX = (int) ($footerConfig['surah']['opticalOffsetX'] ?? self::DEFAULT_SURAH_OPTICAL_OFFSET_X);
 
                 if (file_exists($bsmlFont)) {
                     $bbox = imagettfbbox($surahSize, 0, $bsmlFont, $surahGlyph);
-                    $textWidth = abs($bbox[4] - $bbox[0]);
-                    $x = (int) ($centerX - ($textWidth / 2));
-                    imagettftext($im, $surahSize, 0, $x, $surahY, $color, $bsmlFont, $surahGlyph);
+                    $surahWidth = abs($bbox[4] - $bbox[0]);
+                    // Optical compensation: shift left by ~18px to counteract the right-heavy font bearing
+                    $surahX = (int) (round($centerX - ($surahWidth / 2)) + $surahOpticalOffsetX);
+                    imagettftext($im, $surahSize, 0, $surahX, $surahY, $color, $bsmlFont, $surahGlyph);
                 }
             }
         }
