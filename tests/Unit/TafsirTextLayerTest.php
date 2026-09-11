@@ -379,16 +379,16 @@ class TafsirTextLayerTest extends TestCase
         // Check context recorded capsule bounds
         $this->assertArrayHasKey('tafsirCapsuleBounds', $context->layoutData);
         $capsuleBounds = $context->layoutData['tafsirCapsuleBounds'];
-        $this->assertEquals(110.0, $capsuleBounds['height'], "Capsule height must be locked to exactly 110px");
-        $this->assertEquals(55.0, $capsuleBounds['radius'], "Radius must be 55px for full pill rounding");
+        $this->assertEquals(104.0, $capsuleBounds['height'], "Capsule height must be locked to exactly 104px");
+        $this->assertEquals(52.0, $capsuleBounds['radius'], "Radius must be 52px for full pill rounding");
         $this->assertEquals([77, 49, 38], $capsuleBounds['color'], "Capsule color must be #4D3126");
         $this->assertEquals(51, $capsuleBounds['alpha'], "Capsule alpha must be 51 for 60% opacity");
         $this->assertEquals(0.60, $capsuleBounds['opacity']);
         $this->assertLessThanOrEqual(940.0, $capsuleBounds['width']);
         $this->assertEqualsWithDelta(540.0, ($capsuleBounds['x1'] + $capsuleBounds['x2']) / 2.0, 1.0);
         $this->assertEqualsWithDelta(1081.0, ($capsuleBounds['y1'] + $capsuleBounds['y2']) / 2.0, 1.0);
-        $this->assertEqualsWithDelta(1026.0, $capsuleBounds['y1'], 1.0);
-        $this->assertEqualsWithDelta(1136.0, $capsuleBounds['y2'], 1.0);
+        $this->assertEqualsWithDelta(1029.0, $capsuleBounds['y1'], 1.0);
+        $this->assertEqualsWithDelta(1133.0, $capsuleBounds['y2'], 1.0);
 
         // Check for capsule color pixels (#4D3126 at 60% opacity over black: R~46, G~29, B~23)
         $capsulePixelsX = [];
@@ -416,7 +416,7 @@ class TafsirTextLayerTest extends TestCase
         imagedestroy($im);
     }
 
-    public function test_capsule_height_remains_identically_110px_across_single_and_two_line_tafsir(): void
+    public function test_capsule_height_remains_identically_104px_across_single_and_two_line_tafsir(): void
     {
         $layer = new TafsirTextLayer();
         $width = 1080;
@@ -443,8 +443,8 @@ class TafsirTextLayerTest extends TestCase
         $layer->render($tafsirSeg1, $ctx1);
 
         $bounds1 = $ctx1->layoutData['tafsirCapsuleBounds'];
-        $this->assertEquals(110.0, $bounds1['height'], "1-line capsule height must be exactly 110px");
-        $this->assertEquals(55.0, $bounds1['radius'], "1-line capsule radius must be exactly 55px");
+        $this->assertEquals(104.0, $bounds1['height'], "1-line capsule height must be exactly 104px");
+        $this->assertEquals(52.0, $bounds1['radius'], "1-line capsule radius must be exactly 52px");
         $this->assertGreaterThanOrEqual(200.0, $bounds1['width']);
         $this->assertLessThanOrEqual(940.0, $bounds1['width']);
         imagedestroy($im1);
@@ -471,8 +471,8 @@ class TafsirTextLayerTest extends TestCase
         $layer->render($tafsirSeg2, $ctx2);
 
         $bounds2 = $ctx2->layoutData['tafsirCapsuleBounds'];
-        $this->assertEquals(110.0, $bounds2['height'], "2-line capsule height must also be exactly 110px");
-        $this->assertEquals(55.0, $bounds2['radius'], "2-line capsule radius must also be exactly 55px");
+        $this->assertEquals(104.0, $bounds2['height'], "2-line capsule height must also be exactly 104px");
+        $this->assertEquals(52.0, $bounds2['radius'], "2-line capsule radius must also be exactly 52px");
         $this->assertGreaterThanOrEqual(200.0, $bounds2['width']);
         $this->assertLessThanOrEqual(940.0, $bounds2['width']);
         imagedestroy($im2);
@@ -482,8 +482,139 @@ class TafsirTextLayerTest extends TestCase
         // Center coordinates are identical
         $this->assertEqualsWithDelta($bounds1['y1'], $bounds2['y1'], 0.1);
         $this->assertEqualsWithDelta($bounds1['y2'], $bounds2['y2'], 0.1);
-        $this->assertEqualsWithDelta(1026.0, $bounds1['y1'], 0.1);
-        $this->assertEqualsWithDelta(1136.0, $bounds1['y2'], 0.1);
+        $this->assertEqualsWithDelta(1029.0, $bounds1['y1'], 0.1);
+        $this->assertEqualsWithDelta(1133.0, $bounds1['y2'], 0.1);
+    }
+
+    public function test_two_tier_single_line_capsule_stays_within_standard_max_width_720px(): void
+    {
+        $layer = new TafsirTextLayer();
+        $width = 1080;
+        $height = 1920;
+        $im = imagecreatetruecolor($width, $height);
+
+        $arabicSeg = new Segment(1, 1, 1, [1], 0, 1000);
+        $shortText = "أقسم الله بوقت الضحى";
+        $tafsirSeg = new TranslationSegment(1, $shortText, 1, 1, 0, 1000);
+
+        $layoutData = [
+            'theme' => 'quran_me',
+            'tafsirBounds' => [
+                'x' => 540,
+                'y' => 1081,
+                'fontSize' => 30,
+                'lineHeight' => 44,
+                'fontPath' => $this->fontPath,
+                'color' => [255, 255, 255],
+            ],
+        ];
+
+        $ctx = new FrameContext($im, $width, $height, $layoutData, $arabicSeg);
+        $layer->render($tafsirSeg, $ctx);
+
+        $bounds = $ctx->layoutData['tafsirCapsuleBounds'];
+        $this->assertEquals(1, $bounds['tier'], "Short Tafsir must select Tier 1");
+        $this->assertLessThanOrEqual(TafsirTextLayer::STANDARD_MAX_WIDTH, $bounds['width'], "Single-line pill must not exceed STANDARD_MAX_WIDTH (720px)");
+        $this->assertGreaterThanOrEqual(200.0, $bounds['width']);
+
+        imagedestroy($im);
+    }
+
+    public function test_text_exceeding_600px_single_line_wraps_into_balanced_two_lines_within_720px(): void
+    {
+        $layer = new TafsirTextLayer();
+        $width = 1080;
+        $height = 1920;
+        $im = imagecreatetruecolor($width, $height);
+
+        $arabicSeg = new Segment(1, 1, 2, [1, 2], 0, 1000);
+        // Text that would exceed 600px if kept on 1 line (~700-800px on 1 line at 30pt)
+        $text = "أقسم الله بأول النهار حين ترتفع الشمس وبالليل إذا اشتد ظلامه وسكن";
+        $tafsirSeg = new TranslationSegment(1, $text, 1, 2, 0, 1000);
+
+        $layoutData = [
+            'theme' => 'quran_me',
+            'tafsirBounds' => [
+                'x' => 540,
+                'y' => 1081,
+                'fontSize' => 30,
+                'lineHeight' => 44,
+                'fontPath' => $this->fontPath,
+                'color' => [255, 255, 255],
+            ],
+        ];
+
+        $ctx = new FrameContext($im, $width, $height, $layoutData, $arabicSeg);
+        $layer->render($tafsirSeg, $ctx);
+
+        $bounds = $ctx->layoutData['tafsirCapsuleBounds'];
+        $this->assertEquals(1, $bounds['tier'], "Standard wrapping must remain in Tier 1");
+        $this->assertLessThanOrEqual(TafsirTextLayer::STANDARD_MAX_WIDTH, $bounds['width'], "Standard 2-line pill must not exceed STANDARD_MAX_WIDTH (720px)");
+
+        imagedestroy($im);
+    }
+
+    public function test_extensive_tafsir_expands_to_tier_2_emergency_ceiling_up_to_940px(): void
+    {
+        $layer = new TafsirTextLayer();
+        $width = 1080;
+        $height = 1920;
+        $im = imagecreatetruecolor($width, $height);
+
+        $arabicSeg = new Segment(1, 1, 5, [1, 2, 3, 4, 5], 0, 1000);
+        // Very extensive Tafsir that cannot fit in 2 lines at 600px width even at 24pt
+        $extensiveText = "الذي خلق لكم ما في الأرض جميعا من المنافع والنعم لتنتفعوا بها وتعتبروا ثم استوى إلى السماء فخلقهن سبع سماوات محكمات وهو بكل شيء عليم";
+        $tafsirSeg = new TranslationSegment(1, $extensiveText, 1, 5, 0, 1000);
+
+        $layoutData = [
+            'theme' => 'quran_me',
+            'tafsirBounds' => [
+                'x' => 540,
+                'y' => 1081,
+                'fontSize' => 30,
+                'lineHeight' => 44,
+                'fontPath' => $this->fontPath,
+                'color' => [255, 255, 255],
+            ],
+        ];
+
+        $ctx = new FrameContext($im, $width, $height, $layoutData, $arabicSeg);
+        $layer->render($tafsirSeg, $ctx);
+
+        $bounds = $ctx->layoutData['tafsirCapsuleBounds'];
+        $this->assertEquals(2, $bounds['tier'], "Extensive Tafsir must select Tier 2 emergency ceiling");
+        $this->assertGreaterThan(TafsirTextLayer::STANDARD_TEXT_MAX_WIDTH, $bounds['width'] - 120, "Tier 2 text width exceeds standard text max");
+        $this->assertLessThanOrEqual(TafsirTextLayer::ABSOLUTE_MAX_WIDTH, $bounds['width'], "Emergency pill must strictly stay within ABSOLUTE_MAX_WIDTH (940px)");
+
+        imagedestroy($im);
+    }
+
+    public function test_measure_two_tier_layout_returns_correct_tier_and_balanced_lines(): void
+    {
+        $layer = new TafsirTextLayer();
+
+        // 1. Short text -> Tier 1, 1 line
+        $short = $layer->measureTwoTierLayout("الحمد لله رب العالمين", 30, $this->fontPath);
+        $this->assertEquals(1, $short['tier']);
+        $this->assertCount(1, $short['lines']);
+
+        // 2. Medium text -> Tier 1, 2 lines
+        $medium = $layer->measureTwoTierLayout(
+            "أقسم الله بأول النهار حين ترتفع الشمس وبالليل إذا سكن",
+            30,
+            $this->fontPath
+        );
+        $this->assertEquals(1, $medium['tier']);
+        $this->assertCount(2, $medium['lines']);
+
+        // 3. Extensive text (18 words) -> Exceeds Tier 1 (takes 3 lines at 600px), fits in Tier 2 (2 lines at 820px)
+        $extensive = $layer->measureTwoTierLayout(
+            "الذي خلق لكم ما في الأرض جميعا من المنافع والنعم لتنتفعوا بها وتعتبروا ثم استوى إلى السماء",
+            30,
+            $this->fontPath
+        );
+        $this->assertEquals(2, $extensive['tier'], "Must select Tier 2 for extensive text");
+        $this->assertCount(2, $extensive['lines'], "Must fit into 2 lines in Tier 2");
     }
 }
 

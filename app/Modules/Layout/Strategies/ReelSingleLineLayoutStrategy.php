@@ -103,8 +103,8 @@ class ReelSingleLineLayoutStrategy
             'x' => 540,               // Target Center X coordinate from Premiere Pro
             'y' => $y,                // Target Center Y coordinate matching capsule template
             'width' => 920,           // Max text width inside 980px capsule (30px padding on each side)
-            'fontSize' => 30,         // Al-Jazeera-Arabic GD points (calibrated from 37pt Premiere Pro)
-            'lineHeight' => 44,       // Line-height for 2 lines
+            'fontSize' => 26.5,       // Al-Jazeera-Arabic GD points (reduced by 3.5pt from 30pt for sleeker look)
+            'lineHeight' => 40,       // Line-height for 2 lines
             'fontPath' => base_path('fonts/Al-Jazeera-Arabic-Regular.ttf'),
             'color' => [255, 255, 255], // Pure White #FFFFFF
             'dynamicStacking' => false, // Maintain fixed capsule coordinate alignment at Y = 1081

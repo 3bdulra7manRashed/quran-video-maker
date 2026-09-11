@@ -13,12 +13,17 @@ class TafsirTextLayer implements RenderLayerInterface
     public const DEFAULT_WIDTH = 920;
     public const DEFAULT_CENTER_X = 540.0;
     public const DEFAULT_CENTER_Y = 1081.0;
-    public const DEFAULT_FONT_SIZE = 30; // GD points (approx 28-32pt calibrated from 37pt Premiere Pro)
-    public const DEFAULT_LINE_HEIGHT = 44.0; // 42-46px line-height for 2 lines
+    public const DEFAULT_FONT_SIZE = 26.5; // GD points (26.5pt, reduced by 3.5pt from 30pt)
+    public const DEFAULT_LINE_HEIGHT = 40.0; // Line-height for 2 lines
     public const MAX_TAFSIR_LINES = 2; // approx 1 to 2 lines max
-    public const MIN_FONT_SIZE = 24;
-    public const FIXED_CAPSULE_HEIGHT = 110.0; // Fixed 110px height for all segments
-    public const DEFAULT_CAPSULE_PADDING_X = 50.0; // 50px on each side
+    public const MIN_FONT_SIZE = 20.5; // Reduced by 3.5pt from 24pt
+    public const FIXED_CAPSULE_HEIGHT = 104.0; // Fixed 104px height for all segments (reduced from 110px)
+    public const STANDARD_MAX_WIDTH = 720.0;
+    public const ABSOLUTE_MAX_WIDTH = 940.0;
+    public const SAFE_PADDING_X = 60.0; // 60px padding on each curved side (radius = 52px)
+    public const DEFAULT_CAPSULE_PADDING_X = 60.0; // 60px safe padding on each curved side
+    public const STANDARD_TEXT_MAX_WIDTH = 600.0; // ~600px text area ($standardPillMax - $safePaddingX * 2)
+    public const ABSOLUTE_TEXT_MAX_WIDTH = 820.0; // ~820px text area ($absolutePillMax - $safePaddingX * 2)
 
     protected array $tafsirSegments;
     protected array $widthCache = [];
@@ -117,6 +122,75 @@ class TafsirTextLayer implements RenderLayerInterface
     }
 
     /**
+     * Measure wrapped Tafsir layout using the two-tier max width system.
+     *
+     * Tier 1: standardMaxWidth (default 600px text, pill max 720px) for 1-line and standard 2-line wraps.
+     * Tier 2: absoluteMaxWidth (default 820px text, pill max 940px) emergency ceiling ONLY for extensive 2-line wraps.
+     */
+    public function measureTwoTierLayout(
+        string $text,
+        float $fontSize,
+        string $fontPath,
+        float $standardMaxWidth = self::STANDARD_TEXT_MAX_WIDTH,
+        float $absoluteMaxWidth = self::ABSOLUTE_TEXT_MAX_WIDTH,
+        float $lineHeight = self::DEFAULT_LINE_HEIGHT
+    ): array {
+        $cleanTafsir = $this->stripDiacritics($text);
+        
+        $rawFontSize = $fontSize;
+        if ($rawFontSize >= 28.0) {
+            $fontSize = $rawFontSize - 3.5;
+        }
+
+        $candidateFontSizes = [$fontSize];
+        if ($fontSize >= 24.0) {
+            $candidateFontSizes = array_unique([
+                $fontSize,
+                max(self::MIN_FONT_SIZE, $fontSize - 2.0),
+                max(self::MIN_FONT_SIZE, $fontSize - 4.0),
+                self::MIN_FONT_SIZE
+            ]);
+        }
+
+        $selectedTier = 1;
+        $chosenLayout = null;
+
+        // Tier 1: Standard max width ($standardMaxWidth = 600px)
+        // Check if text fits in standard width at base font size (1 or 2 balanced lines)
+        $standardLayout = $this->measureTafsirLayout($cleanTafsir, $fontSize, $fontPath, $standardMaxWidth, $lineHeight);
+        if (count($standardLayout['lines']) <= self::MAX_TAFSIR_LINES) {
+            $chosenLayout = $standardLayout;
+            $selectedTier = 1;
+        }
+
+        // Tier 2: Absolute emergency ceiling ($absoluteMaxWidth = 820px)
+        // Allowed ONLY for extensive 2-line Tafsir that cannot fit in standard width
+        if ($chosenLayout === null) {
+            foreach ($candidateFontSizes as $candSize) {
+                $candLineHeight = ($candSize === $fontSize) ? $lineHeight : (float) round($lineHeight * ($candSize / $fontSize));
+                $layout = $this->measureTafsirLayout($cleanTafsir, $candSize, $fontPath, $absoluteMaxWidth, $candLineHeight);
+                if (count($layout['lines']) <= self::MAX_TAFSIR_LINES) {
+                    $chosenLayout = $layout;
+                    $selectedTier = 2;
+                    break;
+                }
+            }
+
+            if ($chosenLayout === null) {
+                $candSize = (float) min($candidateFontSizes);
+                $candLineHeight = (float) round($lineHeight * ($candSize / $fontSize));
+                $chosenLayout = $this->measureTafsirLayout($cleanTafsir, $candSize, $fontPath, $absoluteMaxWidth, $candLineHeight);
+                $selectedTier = 2;
+            }
+        }
+
+        $chosenLayout['tier'] = $selectedTier;
+        $chosenLayout['standardMaxWidth'] = $standardMaxWidth;
+        $chosenLayout['absoluteMaxWidth'] = $absoluteMaxWidth;
+        return $chosenLayout;
+    }
+
+    /**
      * Resolve the Tafsir text prioritizing custom segment-level tafsir over bundled Ayah translation text.
      * Also cleans up any raw footnote tags (e.g. <sup foot_note=...>) and HTML tags,
      * and strips diacritics while preserving all Hamzas.
@@ -204,14 +278,33 @@ class TafsirTextLayer implements RenderLayerInterface
 
         // 3. Extract rendering properties
         $fontPath = $this->resolveFontPath($bounds['fontPath'] ?? null);
-        $fontSize = (float) ($bounds['fontSize'] ?? self::DEFAULT_FONT_SIZE);
-        $maxWidth = (float) ($bounds['width'] ?? self::DEFAULT_WIDTH);
+        $rawFontSize = (float) ($bounds['fontSize'] ?? self::DEFAULT_FONT_SIZE);
+        $fontSize = ($rawFontSize >= 28.0) ? ($rawFontSize - 3.5) : $rawFontSize;
         $centerX = (float) ($bounds['x'] ?? self::DEFAULT_CENTER_X);
         $centerY = (float) ($bounds['y'] ?? self::DEFAULT_CENTER_Y);
         $colorRGB = [255, 255, 255]; // Tafsir text remains strictly Pure White #FFFFFF
 
         if (!file_exists($fontPath)) {
             return;
+        }
+
+        // Determine if pill capsule background is enabled (quran_me theme or explicit capsule bound)
+        $isCapsuleEnabled = (($context->layoutData['theme'] ?? '') === 'quran_me')
+            || !empty($bounds['capsule'])
+            || isset($bounds['capsulePaddingX']);
+
+        // Width constraints
+        $safePaddingX = (float) ($bounds['capsulePaddingX'] ?? self::SAFE_PADDING_X);
+        $standardPillMax = (float) ($bounds['standardCapsuleWidth'] ?? self::STANDARD_MAX_WIDTH);
+        $absolutePillMax = (float) ($bounds['maxCapsuleWidth'] ?? ($bounds['absoluteCapsuleWidth'] ?? self::ABSOLUTE_MAX_WIDTH));
+
+        if ($isCapsuleEnabled) {
+            $standardTextMax = (float) ($bounds['standardTextWidth'] ?? ($standardPillMax - ($safePaddingX * 2.0)));
+            $absoluteTextMax = (float) ($bounds['absoluteTextWidth'] ?? ($absolutePillMax - ($safePaddingX * 2.0)));
+        } else {
+            $maxWidth = (float) ($bounds['width'] ?? self::DEFAULT_WIDTH);
+            $standardTextMax = $maxWidth;
+            $absoluteTextMax = $maxWidth;
         }
 
         // Dynamic stacking: check if translation layer is present and compute tafsirStartY
@@ -240,32 +333,63 @@ class TafsirTextLayer implements RenderLayerInterface
         if ($rawLineHeight < 10) {
             $lineHeight = (float) ($fontSize * $rawLineHeight);
         } else {
-            $lineHeight = (float) $rawLineHeight;
+            $lineHeight = (float) ($rawLineHeight >= 44 ? round($rawLineHeight * ($fontSize / 30.0)) : $rawLineHeight);
         }
-        if ($lineHeight < 40 || $lineHeight > 52) {
+        if ($lineHeight < 36 || $lineHeight > 52) {
             $lineHeight = self::DEFAULT_LINE_HEIGHT;
         }
 
         // 4. Measure layout and wrap text into balanced, Arabic-shaped lines
-        // If text exceeds MAX_TAFSIR_LINES at standard size, try reducing font size
-        $candidateFontSizes = [$fontSize];
-        if ($fontSize >= 30) {
-            $candidateFontSizes = array_unique([$fontSize, 28, 26, 24]);
-        }
-
-        $lines = [];
-        $actualFontSize = $fontSize;
-        $actualLineHeight = $lineHeight;
-
-        foreach ($candidateFontSizes as $candSize) {
-            $candLineHeight = ($candSize === $fontSize) ? $lineHeight : (float) round($lineHeight * ($candSize / $fontSize));
-            $layoutResult = $this->measureTafsirLayout($tafsirText, $candSize, $fontPath, $maxWidth, $candLineHeight);
+        // Tier 1: STANDARD_MAX_WIDTH (text width <= 600px, pill width <= 720px) for 1-line & standard 2-line wraps
+        // Tier 2: ABSOLUTE_MAX_WIDTH (text width <= 820px, pill width <= 940px) emergency ceiling ONLY for extensive 2-line Tafsir
+        if ($isCapsuleEnabled) {
+            $layoutResult = $this->measureTwoTierLayout(
+                $tafsirText,
+                $fontSize,
+                $fontPath,
+                $standardTextMax,
+                $absoluteTextMax,
+                $lineHeight
+            );
             $lines = $layoutResult['lines'];
-            $actualFontSize = $candSize;
-            $actualLineHeight = $candLineHeight;
+            $actualFontSize = $layoutResult['fontSize'];
+            $actualLineHeight = $layoutResult['lineHeight'];
+            $selectedTier = $layoutResult['tier'];
+        } else {
+            $candidateFontSizes = [$fontSize];
+            if ($fontSize >= 24.0) {
+                $candidateFontSizes = array_unique([
+                    $fontSize,
+                    max(self::MIN_FONT_SIZE, $fontSize - 2.0),
+                    max(self::MIN_FONT_SIZE, $fontSize - 4.0),
+                    self::MIN_FONT_SIZE
+                ]);
+            }
 
-            if (count($lines) <= self::MAX_TAFSIR_LINES) {
-                break;
+            $lines = [];
+            $actualFontSize = $fontSize;
+            $actualLineHeight = $lineHeight;
+            $selectedTier = 1;
+
+            foreach ($candidateFontSizes as $candSize) {
+                $candLineHeight = ($candSize === $fontSize) ? $lineHeight : (float) round($lineHeight * ($candSize / $fontSize));
+                $layoutResult = $this->measureTafsirLayout($tafsirText, $candSize, $fontPath, $standardTextMax, $candLineHeight);
+                $lines = $layoutResult['lines'];
+                $actualFontSize = $candSize;
+                $actualLineHeight = $candLineHeight;
+
+                if (count($lines) <= self::MAX_TAFSIR_LINES) {
+                    break;
+                }
+            }
+
+            if (empty($lines)) {
+                $candSize = (float) min($candidateFontSizes);
+                $candLineHeight = (float) round($lineHeight * ($candSize / $fontSize));
+                $layoutResult = $this->measureTafsirLayout($tafsirText, $candSize, $fontPath, $standardTextMax, $candLineHeight);
+                $lines = $layoutResult['lines'];
+                $actualFontSize = $candSize;
+                $actualLineHeight = $candLineHeight;
             }
         }
 
@@ -313,20 +437,16 @@ class TafsirTextLayer implements RenderLayerInterface
         }
 
         // 6. Draw dynamic pill capsule background if enabled (quran_me theme or explicit capsule bound)
-        $isCapsuleEnabled = (($context->layoutData['theme'] ?? '') === 'quran_me')
-            || !empty($bounds['capsule'])
-            || isset($bounds['capsulePaddingX']);
-
         if ($isCapsuleEnabled) {
-            $paddingX = (float) ($bounds['capsulePaddingX'] ?? self::DEFAULT_CAPSULE_PADDING_X);
-            $maxPillWidth = (float) ($bounds['maxCapsuleWidth'] ?? 940.0);
             $minPillWidth = (float) ($bounds['minCapsuleWidth'] ?? 200.0);
             $fixedPillHeight = (float) ($bounds['capsuleHeight'] ?? self::FIXED_CAPSULE_HEIGHT);
 
-            $pillWidth = min(max($textWidth + ($paddingX * 2.0), $minPillWidth), $maxPillWidth);
+            // In Tier 1, cap pill at $standardPillMax (720px). In Tier 2, allow up to $absolutePillMax (940px).
+            $maxPillWidthForTier = ($selectedTier === 1) ? $standardPillMax : $absolutePillMax;
+            $pillWidth = min(max($textWidth + ($safePaddingX * 2.0), $minPillWidth), $maxPillWidthForTier);
             $pillHeight = $fixedPillHeight;
 
-            // Full pill rounding where corner radius strictly equals half the fixed capsule height (55.0 for 110px)
+            // Full pill rounding where corner radius strictly equals half the fixed capsule height (52.0 for 104px)
             $defaultRadius = (float) floor($fixedPillHeight / 2.0);
             $radius = (float) ($bounds['capsuleRadius'] ?? $defaultRadius);
 
@@ -365,6 +485,7 @@ class TafsirTextLayer implements RenderLayerInterface
                 'color' => $capsuleColorRGB,
                 'alpha' => $alpha,
                 'opacity' => $capsuleOpacity,
+                'tier' => $selectedTier,
             ];
         }
 
@@ -419,7 +540,7 @@ class TafsirTextLayer implements RenderLayerInterface
             $width = abs($bbox[4] - $bbox[0]);
 
             if ($width <= $maxWidth) {
-                $currentLogicalWords = $candidateWords ?? $testWords;
+                $currentLogicalWords = $testWords;
             } else {
                 if (!empty($currentLogicalWords)) {
                     $greedyLines[] = $currentLogicalWords;
