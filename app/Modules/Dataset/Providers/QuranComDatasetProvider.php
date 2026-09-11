@@ -164,7 +164,6 @@ class QuranComDatasetProvider implements DatasetProvider
             'id' => 725,
             'audio_base_url' => 'https://server11.mp3quran.net/download/hazza/',
         ],
-        ''
     ];
 
     public function __construct(
