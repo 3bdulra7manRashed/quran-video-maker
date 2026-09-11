@@ -12,10 +12,17 @@ class ReciterSeeder extends Seeder
      */
     public function run(): void
     {
-        // 1. Remove the test reciter safely without touching any other records
+        // 1. Remove the test reciter and legacy redundant duplicate slugs safely
         Reciter::where('name_arabic', 'like', '%القارئ 3%')
             ->orWhere('name_english', 'like', '%Test Reciter 3%')
-            ->orWhere('slug', 'test-reciter-3')
+            ->orWhereIn('slug', [
+                'test-reciter-3',
+                'mishari-rashid-al-afasy',
+                'abdulbaset-abdulsamad',
+                'mahmoud-khalil-al-husary',
+                'abdur-rahman-as-sudais',
+                'mohamed-siddiq-al-minshawi-kids-repeat',
+            ])
             ->delete();
 
         // 2. Verified reciters with full Word-by-Word timing & audio support
@@ -269,6 +276,13 @@ class ReciterSeeder extends Seeder
                 'name_arabic' => 'هزاع البلوشي',
                 'name_english' => 'Hazzaa Al-Baloushi',
                 'slug' => 'hazzaa-al-baloushi',
+                'is_default' => false,
+                'source' => 'quran_com',
+            ],
+            [
+                'name_arabic' => 'منصور السالمي',
+                'name_english' => 'Mansour Al-Salimi',
+                'slug' => 'mansour-al-salimi',
                 'is_default' => false,
                 'source' => 'quran_com',
             ],

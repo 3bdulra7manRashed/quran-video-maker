@@ -164,6 +164,10 @@ class QuranComDatasetProvider implements DatasetProvider
             'id' => 725,
             'audio_base_url' => 'https://server11.mp3quran.net/download/hazza/',
         ],
+        'mansour-al-salimi' => [
+            'id' => 726,
+            'audio_base_url' => 'https://server14.mp3quran.net/download/mansor/',
+        ],
     ];
 
     public function __construct(
