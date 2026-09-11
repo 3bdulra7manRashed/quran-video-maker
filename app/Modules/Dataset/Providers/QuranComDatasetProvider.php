@@ -26,7 +26,7 @@ class QuranComDatasetProvider implements DatasetProvider
         ],
         'ali-jaber' => [
             'id' => 404,
-            'audio_base_url' => 'https://download.quranicaudio.com/quran/ali_jaber/',
+            'audio_base_url' => 'https://server11.mp3quran.net/download/a_jbr/',
         ],
         'mishari-al-afasy' => [
             'id' => 7,
@@ -48,6 +48,123 @@ class QuranComDatasetProvider implements DatasetProvider
             'id' => 12,
             'audio_base_url' => 'https://server12.mp3quran.net/maher/',
         ],
+        'nasser-al-qatami' => [
+            'id' => 21,
+            'audio_base_url' => 'https://server6.mp3quran.net/qtm/',
+        ],
+        'wadee-al-yamani' => [
+            'id' => 30,
+            'audio_base_url' => 'https://server6.mp3quran.net/wdee3/',
+        ],
+        'ahmed-an-nafees' => [
+            'id' => 461,
+            'audio_base_url' => 'https://server16.mp3quran.net/download/nufais/Rewayat-Hafs-A-n-Assem/',
+        ],
+        'ahmed-taleb-bin-humaid' => [
+            'id' => 700,
+            'audio_base_url' => 'https://server16.mp3quran.net/download/a_binhameed/Rewayat-Hafs-A-n-Assem/',
+        ],
+        'ahmed-al-ajmi' => [
+            'id' => 701,
+            'audio_base_url' => 'https://server10.mp3quran.net/download/ajm/',
+        ],
+        'idrees-abbkar' => [
+            'id' => 702,
+            'audio_base_url' => 'https://server6.mp3quran.net/download/abkr/',
+        ],
+        'ahmed-huthayfi' => [
+            'id' => 703,
+            'audio_base_url' => 'https://server8.mp3quran.net/download/ahmad_huth/',
+        ],
+        'badr-al-turaiqi' => [
+            'id' => 704,
+            'audio_base_url' => 'https://server10.mp3quran.net/download/bader/Rewayat-Hafs-A-n-Assem/',
+        ],
+        'bandar-balilah' => [
+            'id' => 705,
+            'audio_base_url' => 'https://server6.mp3quran.net/download/balilah/',
+        ],
+        'khaled-al-jalil' => [
+            'id' => 706,
+            'audio_base_url' => 'https://server10.mp3quran.net/download/jleel/',
+        ],
+        'raad-al-kurdi' => [
+            'id' => 707,
+            'audio_base_url' => 'https://server6.mp3quran.net/download/kurdi/',
+        ],
+        'zaki-daghistani' => [
+            'id' => 708,
+            'audio_base_url' => 'https://server9.mp3quran.net/download/zaki/',
+        ],
+        'saad-al-ghamdi' => [
+            'id' => 709,
+            'audio_base_url' => 'https://server7.mp3quran.net/download/s_gmd/',
+        ],
+        'saud-al-shuraim' => [
+            'id' => 710,
+            'audio_base_url' => 'https://server7.mp3quran.net/download/shur/',
+        ],
+        'shirazad-taher' => [
+            'id' => 711,
+            'audio_base_url' => 'https://server12.mp3quran.net/download/taher/',
+        ],
+        'saleh-al-taleb' => [
+            'id' => 712,
+            'audio_base_url' => 'https://server9.mp3quran.net/download/tlb/',
+        ],
+        'abdulrahman-al-sudais' => [
+            'id' => 713,
+            'audio_base_url' => 'https://server11.mp3quran.net/download/sds/',
+        ],
+        'abdullah-al-khalaf' => [
+            'id' => 714,
+            'audio_base_url' => 'https://server14.mp3quran.net/download/khalf/',
+        ],
+        'abdullah-almatroud' => [
+            'id' => 715,
+            'audio_base_url' => 'https://server8.mp3quran.net/download/mtrod/',
+        ],
+        'abdullah-al-qurafi' => [
+            'id' => 716,
+            'audio_base_url' => 'https://server16.mp3quran.net/download/a_alqrafi/Rewayat-Hafs-A-n-Assem/',
+        ],
+        'abdullah-al-juhani' => [
+            'id' => 717,
+            'audio_base_url' => 'https://server13.mp3quran.net/download/jhn/',
+        ],
+        'abdullah-kamel' => [
+            'id' => 718,
+            'audio_base_url' => 'https://server16.mp3quran.net/download/kamel/Rewayat-Hafs-A-n-Assem/',
+        ],
+        'abdulwali-al-ardkani' => [
+            'id' => 719,
+            'audio_base_url' => 'https://server6.mp3quran.net/download/arkani/',
+        ],
+        'fares-abbad' => [
+            'id' => 720,
+            'audio_base_url' => 'https://server8.mp3quran.net/download/frs_a/',
+        ],
+        'mohammed-ayyoub' => [
+            'id' => 721,
+            'audio_base_url' => 'https://server16.mp3quran.net/download/ayyoub2/Rewayat-Hafs-A-n-Assem/',
+        ],
+        'mohammed-al-luhaidan' => [
+            'id' => 722,
+            'audio_base_url' => 'https://server8.mp3quran.net/download/lhdan/',
+        ],
+        'haitham-al-dukhain' => [
+            'id' => 723,
+            'audio_base_url' => 'https://server16.mp3quran.net/download/h_dukhain/Rewayat-Hafs-A-n-Assem/',
+        ],
+        'hiatham-al-jidaani' => [
+            'id' => 724,
+            'audio_base_url' => 'https://server16.mp3quran.net/download/hitham/Rewayat-Hafs-A-n-Assem/',
+        ],
+        'hazzaa-al-baloushi' => [
+            'id' => 725,
+            'audio_base_url' => 'https://server11.mp3quran.net/download/hazza/',
+        ],
+        ''
     ];
 
     public function __construct(
