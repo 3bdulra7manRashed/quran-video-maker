@@ -153,69 +153,86 @@ export default function AITaskCard({
     }
 
     return (
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col gap-4 font-sans">
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <span>{icon}</span>
-            <span>{title}</span>
-          </h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-sans">
-            {description}
-          </p>
+      <div className="bg-surface-container rounded-xl border border-surface-variant/40 p-5 flex flex-col gap-4 shadow-sm font-sans">
+        <div className="flex items-center justify-between border-b border-surface-variant/30 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="p-1 rounded bg-primary/10 text-primary text-base font-bold">{icon}</span>
+            <div>
+              <h3 className="text-xs font-bold text-on-surface flex items-center gap-1.5">
+                <span>{title}</span>
+              </h3>
+              <p className="text-[10px] text-on-surface-variant">
+                {description}
+              </p>
+            </div>
+          </div>
+          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/15 text-primary border border-primary/30 font-semibold">
+            {isAr ? 'مزامنة صوتية' : 'Audio Sync'}
+          </span>
         </div>
 
         {approvedSegments && approvedSegments.length > 0 ? (
-          <div className="flex flex-col gap-3 border-t border-slate-100 dark:border-slate-800/60 pt-4">
+          <div className="flex flex-col gap-3">
             <button
               type="button"
               onClick={() => setIsRecording(true)}
-              className="w-full bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-semibold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-primary text-on-primary hover:bg-tertiary shadow-[0_0_12px_rgba(242,202,80,0.25)] flex items-center justify-center gap-2 cursor-pointer transition-all"
             >
-              🎙️ Open Segment Timing Recorder
+              <span className="material-symbols-outlined text-[18px]">mic</span>
+              <span>{isAr ? 'فتح مسجل التوقيت التفاعلي (Live Timing Recorder)' : 'Open Segment Timing Recorder'}</span>
             </button>
 
             {validationSuccessMessage && (
-              <div className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 border border-emerald-250 dark:border-emerald-900 p-3 rounded-xl text-xs font-semibold font-mono">
-                {validationSuccessMessage}
+              <div className="bg-secondary/10 text-secondary border border-secondary/30 p-3 rounded-xl text-xs font-semibold font-mono flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                <span>{validationSuccessMessage}</span>
               </div>
             )}
             {errorMessage && (
-              <div className="bg-red-50 text-red-750 dark:bg-red-950/20 dark:text-red-400 border border-red-200 dark:border-red-900/50 p-3 rounded-xl text-xs font-semibold">
-                {errorMessage}
+              <div className="bg-red-500/10 text-red-400 border border-red-500/30 p-3 rounded-xl text-xs font-semibold flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px]">error</span>
+                <span>{errorMessage}</span>
               </div>
             )}
 
             {jsonInput && (
-              <div className="flex flex-col gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/60">
+              <div className="flex flex-col gap-2 pt-2 border-t border-surface-variant/20">
                 <button
                   type="button"
                   onClick={() => onValidateJson?.(jsonInput)}
                   disabled={isValidating}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer transition shadow-md shadow-emerald-950/20"
+                  className="w-full bg-secondary text-on-secondary hover:bg-secondary/90 disabled:opacity-50 font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer transition shadow-[0_0_12px_rgba(69,223,164,0.25)]"
                 >
                   {isValidating ? (
-                    <span>⏳ {isAr ? 'جاري الحفظ والتثبيت...' : 'Saving & Persisting...'}</span>
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-on-secondary border-t-transparent rounded-full animate-spin"></div>
+                      <span>{isAr ? 'جاري الحفظ والتثبيت...' : 'Saving & Persisting...'}</span>
+                    </>
                   ) : (
-                    <span>💾 {isAr ? 'حفظ وتثبيت التوقيت في قاعدة البيانات' : 'Save & Persist to Database'}</span>
+                    <>
+                      <span className="material-symbols-outlined text-[16px]">save</span>
+                      <span>{isAr ? 'حفظ وتثبيت التوقيت في قاعدة البيانات' : 'Save & Persist to Database'}</span>
+                    </>
                   )}
                 </button>
 
                 <details className="mt-1">
-                  <summary className="text-xs text-slate-400 cursor-pointer select-none hover:text-slate-300">
-                    {isAr ? 'عرض وتعديل صياغة JSON للتوقيت' : 'View & Edit Timing JSON'}
+                  <summary className="text-[11px] text-on-surface-variant cursor-pointer select-none hover:text-on-surface flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">code</span>
+                    <span>{isAr ? 'عرض وتعديل صياغة JSON للتوقيت' : 'View & Edit Timing JSON'}</span>
                   </summary>
                   <div className="mt-2 flex flex-col gap-2">
                     <textarea
                       rows={6}
                       value={jsonInput}
                       onChange={(e) => onJsonInputChange?.(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 text-slate-300 p-3 rounded-xl font-mono text-xs focus:outline-none focus:border-emerald-500"
+                      className="w-full bg-surface-container-lowest border border-surface-variant/40 text-on-surface p-3 rounded-xl font-mono text-xs focus:outline-none focus:border-primary"
                     />
                     <button
                       type="button"
                       onClick={() => onValidateJson?.(jsonInput)}
                       disabled={isValidating}
-                      className="self-end bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold py-1.5 px-3 rounded-lg cursor-pointer"
+                      className="self-end bg-surface-container-high hover:bg-surface-bright text-on-surface text-xs font-bold py-1.5 px-3 rounded-lg border border-surface-variant/40 cursor-pointer"
                     >
                       {isAr ? 'حفظ واستيراد' : 'Save & Import'}
                     </button>
@@ -225,11 +242,16 @@ export default function AITaskCard({
             )}
           </div>
         ) : (
-          <div className="border-t border-slate-100 dark:border-slate-800/60 pt-4 flex flex-col gap-3">
-            <div className="bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50 p-4 rounded-xl text-xs flex flex-col gap-2 font-mono">
-              <span className="font-bold">⚠️ Warning:</span>
-              <span>No approved segment definitions found. Please generate and approve segments first.</span>
-            </div>
+          <div className="p-3 rounded-xl bg-primary/10 border border-primary/30 text-xs flex flex-col gap-1 text-primary">
+            <span className="font-bold flex items-center gap-1">
+              <span className="material-symbols-outlined text-[16px]">info</span>
+              <span>{isAr ? 'تنبيه:' : 'Notice:'}</span>
+            </span>
+            <span>
+              {isAr
+                ? 'لم يتم العثور على مقاطع معتمدة بعد. يرجى توليد وتأكيد المقاطع البصرية أولاً في الخطوة السابقة.'
+                : 'No approved segments found. Please generate and approve segments first in the previous step.'}
+            </span>
           </div>
         )}
       </div>
@@ -237,25 +259,32 @@ export default function AITaskCard({
   }
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col gap-4 font-sans">
+    <div className="bg-surface-container rounded-xl border border-surface-variant/40 p-5 flex flex-col gap-4 shadow-sm font-sans">
       {/* Header */}
-      <div>
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-          <span>{icon}</span>
-          <span>{title}</span>
-        </h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-sans">
-          {description}
-        </p>
+      <div className="flex items-center justify-between border-b border-surface-variant/30 pb-3">
+        <div className="flex items-center gap-2">
+          <span className="p-1 rounded bg-primary/10 text-primary text-base font-bold">{icon}</span>
+          <div>
+            <h3 className="text-xs font-bold text-on-surface flex items-center gap-1.5">
+              <span>{title}</span>
+            </h3>
+            <p className="text-[10px] text-on-surface-variant">
+              {description}
+            </p>
+          </div>
+        </div>
+        <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-secondary/15 text-secondary border border-secondary/30 font-semibold">
+          AI
+        </span>
       </div>
 
       {/* Inputs Section */}
       {(requiresMarkers || requiresMushafLineInfo) && (
-        <div className="flex flex-col gap-4 border-t border-slate-100 dark:border-slate-800/60 pt-4">
+        <div className="flex flex-col gap-3 border-t border-surface-variant/20 pt-3">
           {requiresMushafLineInfo && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-semibold text-on-surface-variant">
                   {isAr ? 'صفحة البدء *' : 'Start Page *'}
                 </label>
                 <input
@@ -264,13 +293,13 @@ export default function AITaskCard({
                   value={startPage}
                   onChange={(e) => onStartPageChange?.(e.target.value)}
                   placeholder="e.g. 578"
-                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-xl focus:outline-none focus:border-slate-450 dark:focus:border-slate-700 font-mono text-sm"
+                  className="w-full bg-surface-container-lowest border border-surface-variant/40 text-on-surface px-3 py-1.5 rounded-lg focus:outline-none focus:border-primary font-mono text-xs"
                   required
                 />
               </div>
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-semibold text-on-surface-variant">
                   {isAr ? 'سطر البدء *' : 'Start Line *'}
                 </label>
                 <input
@@ -280,7 +309,7 @@ export default function AITaskCard({
                   value={startLine}
                   onChange={(e) => onStartLineChange?.(e.target.value)}
                   placeholder="e.g. 12"
-                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-xl focus:outline-none focus:border-slate-450 dark:focus:border-slate-700 font-mono text-sm"
+                  className="w-full bg-surface-container-lowest border border-surface-variant/40 text-on-surface px-3 py-1.5 rounded-lg focus:outline-none focus:border-primary font-mono text-xs"
                   required
                 />
               </div>
@@ -288,20 +317,20 @@ export default function AITaskCard({
           )}
 
           {requiresMarkers && (
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-semibold text-on-surface-variant">
                 {isAr ? 'علامات أدوبي أودیشن *' : 'Adobe Audition Markers *'}
               </label>
               <textarea
-                rows={4}
+                rows={3}
                 value={markers}
                 onChange={(e) => onMarkersChange?.(e.target.value)}
                 placeholder={"0:00.000\n0:12.034\n0:27.177"}
-                className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-xl focus:outline-none focus:border-slate-450 dark:focus:border-slate-700 font-mono text-xs leading-relaxed"
+                className="w-full bg-surface-container-lowest border border-surface-variant/40 text-on-surface px-3 py-2 rounded-lg focus:outline-none focus:border-primary font-mono text-xs leading-relaxed"
                 required
               />
-              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-sans">
-                {isAr ? 'الصق علامات Adobe Audition تمامًا كما تم تصديرها.' : 'Paste Adobe Audition markers exactly as exported.'}
+              <span className="text-[10px] text-on-surface-variant/70">
+                {isAr ? 'الصق علامات Adobe Audition تمامًا كما تم تصديرها من البرنامج.' : 'Paste Adobe Audition markers exactly as exported.'}
               </span>
             </div>
           )}
@@ -314,53 +343,61 @@ export default function AITaskCard({
           type="button"
           onClick={onGeneratePrompt}
           disabled={generatingPrompt}
-          className="w-full bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-semibold py-2.5 px-4 rounded-xl text-xs disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer"
+          className="w-full py-2 px-3 rounded-lg bg-primary text-on-primary font-bold text-xs flex items-center justify-center gap-2 shadow-[0_0_12px_rgba(242,202,80,0.25)] hover:bg-tertiary transition-all cursor-pointer disabled:opacity-40"
         >
-          {generatingPrompt ? (isAr ? 'جاري التوليد...' : 'Generating Prompt...') : (isAr ? 'توليد موجه الذكاء الاصطناعي' : 'Generate AI Prompt')}
+          {generatingPrompt ? (
+            <>
+              <div className="w-3.5 h-3.5 border-2 border-on-primary border-t-transparent rounded-full animate-spin"></div>
+              <span>{isAr ? 'جاري توليد الموجه...' : 'Generating Prompt...'}</span>
+            </>
+          ) : (
+            <>
+              <span className="material-symbols-outlined text-[16px]">smart_toy</span>
+              <span>{isAr ? 'توليد موجه الذكاء الاصطناعي (Generate AI Prompt)' : 'Generate AI Prompt'}</span>
+            </>
+          )}
         </button>
       </div>
 
       {/* Prompt Block */}
       {generatedPrompt && (
-        <div className="border-t border-slate-100 dark:border-slate-800/60 pt-4 flex flex-col gap-3">
+        <div className="bg-surface-container-lowest rounded-xl p-3 border border-surface-variant/40 flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-700 dark:text-slate-350">
-              {isAr ? 'الموجه المولد' : 'Generated Prompt'}
+            <span className="text-[11px] font-medium text-on-surface-variant flex items-center gap-1">
+              <span className="material-symbols-outlined text-[14px] text-primary">terminal</span>
+              <span>{isAr ? 'الموجه المولد (System Prompt)' : 'Generated Prompt'}</span>
             </span>
             <button
               type="button"
               onClick={onCopyPrompt}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold border ${
-                isCopied
-                  ? 'bg-emerald-50 border-emerald-250 text-emerald-700 dark:bg-emerald-950/20 dark:border-emerald-900 dark:text-emerald-400'
-                  : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-750 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
+              className="flex items-center gap-1 text-[11px] text-primary hover:text-tertiary font-semibold px-2 py-0.5 rounded bg-primary/10 hover:bg-primary/20 transition-colors cursor-pointer"
             >
-              {isCopied ? (isAr ? 'تم النسخ' : 'Copied') : (isAr ? 'نسخ الموجه' : 'Copy prompt')}
+              <span className="material-symbols-outlined text-[14px]">
+                {isCopied ? 'check' : 'content_copy'}
+              </span>
+              <span>{isCopied ? (isAr ? 'تم النسخ ✓' : 'Copied ✓') : (isAr ? 'نسخ الموجه' : 'Copy')}</span>
             </button>
           </div>
-          <textarea
-            readOnly
-            rows={8}
-            value={generatedPrompt}
-            className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-400 px-3 py-2 rounded-xl focus:outline-none font-mono text-[11px] leading-relaxed resize-y"
-          />
+          <div className="bg-black/60 rounded-lg p-2.5 font-mono text-[11px] text-emerald-400/90 leading-relaxed max-h-36 overflow-y-auto border border-surface-variant/20" dir="ltr">
+            <pre className="whitespace-pre-wrap font-mono">{generatedPrompt}</pre>
+          </div>
         </div>
       )}
 
       {/* JSON Payload Input Block */}
       {generatedPrompt && (
-        <div className="border-t border-slate-100 dark:border-slate-800/60 pt-4 flex flex-col gap-4">
-          <div>
-            <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-350">
-              {isAr ? 'استجابة الذكاء الاصطناعي (JSON)' : 'AI Response JSON'}
-            </h4>
-            <p className="text-[10px] text-slate-400 dark:text-slate-500">
-              {isAr ? 'الصق كود JSON الناتج من الذكاء الاصطناعي أو ارفع ملف.' : 'Paste the JSON returned by the AI or upload it as a file.'}
-            </p>
+        <div className="border-t border-surface-variant/20 pt-3 flex flex-col gap-3">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="font-semibold text-on-surface flex items-center gap-1">
+              <span className="material-symbols-outlined text-[14px] text-secondary">data_object</span>
+              <span>{isAr ? 'استجابة الذكاء الاصطناعي (JSON Result)' : 'AI Response JSON'}</span>
+            </span>
+            <span className="text-[10px] text-on-surface-variant">
+              {isAr ? 'الصق الكود أو ارفع الملف' : 'Paste or upload JSON file'}
+            </span>
           </div>
 
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2.5">
             {/* File Upload Trigger */}
             <div className="flex items-center gap-2">
               <input
@@ -373,10 +410,10 @@ export default function AITaskCard({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex-1 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-350 text-xs font-semibold px-3 py-2.5 rounded-xl text-left truncate flex items-center justify-between cursor-pointer"
+                className="w-full border border-dashed border-surface-variant/60 rounded-lg p-2 bg-surface-container-lowest flex items-center justify-center gap-2 text-xs text-on-surface-variant hover:border-primary cursor-pointer transition-colors"
               >
-                <span>{isAr ? 'رفع ملف استجابة JSON...' : 'Upload JSON response file...'}</span>
-                <span>📁</span>
+                <span className="material-symbols-outlined text-primary text-[18px]">folder_open</span>
+                <span>{isAr ? 'رفع ملف استجابة JSON...' : 'Upload JSON file...'}</span>
               </button>
             </div>
 
@@ -386,20 +423,22 @@ export default function AITaskCard({
               value={jsonInput}
               onChange={(e) => onJsonInputChange(e.target.value)}
               placeholder={isAr ? 'الصق استجابة JSON هنا...' : 'Paste response JSON here...'}
-              className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-xl focus:outline-none focus:border-slate-400 dark:focus:border-slate-700 font-mono text-[11px] leading-relaxed resize-y"
+              className="w-full bg-surface-container-lowest border border-surface-variant/40 rounded-lg p-2 text-xs text-on-surface font-mono placeholder:text-on-surface-variant/40 focus:border-primary focus:ring-0 resize-y"
+              dir="ltr"
             />
 
             {/* Validation messages */}
             {errorMessage && (
-              <div className="bg-red-50 text-red-750 dark:bg-red-950/20 dark:text-red-400 border border-red-200 dark:border-red-900/50 p-3 rounded-xl text-xs font-semibold">
-                {errorMessage}
+              <div className="bg-red-500/10 text-red-400 border border-red-500/30 p-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[14px]">error</span>
+                <span>{errorMessage}</span>
               </div>
             )}
 
             {validationErrors.length > 0 && (
-              <div className="bg-red-50 text-red-750 dark:bg-red-950/20 dark:text-red-400 border border-red-200 dark:border-red-900/50 p-4 rounded-xl text-xs flex flex-col gap-2 font-mono">
+              <div className="bg-red-500/10 text-red-400 border border-red-500/30 p-3 rounded-lg text-xs flex flex-col gap-1 font-mono">
                 <span className="font-bold">{isAr ? 'أخطاء التحقق:' : 'Validation Errors:'}</span>
-                <ul className="list-disc list-inside space-y-1">
+                <ul className="list-disc list-inside space-y-0.5">
                   {validationErrors.map((err, i) => (
                     <li key={i}>{err}</li>
                   ))}
@@ -408,9 +447,9 @@ export default function AITaskCard({
             )}
 
             {validationWarnings.length > 0 && (
-              <div className="bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50 p-4 rounded-xl text-xs flex flex-col gap-2 font-mono">
+              <div className="bg-amber-500/10 text-amber-400 border border-amber-500/30 p-3 rounded-lg text-xs flex flex-col gap-1 font-mono">
                 <span className="font-bold">{isAr ? 'تحذيرات:' : 'Warnings:'}</span>
-                <ul className="list-disc list-inside space-y-1">
+                <ul className="list-disc list-inside space-y-0.5">
                   {validationWarnings.map((wrn, i) => (
                     <li key={i}>{wrn}</li>
                   ))}
@@ -419,8 +458,9 @@ export default function AITaskCard({
             )}
 
             {validationSuccessMessage && (
-              <div className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 border border-emerald-250 dark:border-emerald-900 p-3 rounded-xl text-xs font-semibold font-mono">
-                {validationSuccessMessage}
+              <div className="bg-secondary/10 text-secondary border border-secondary/30 p-2.5 rounded-lg text-xs font-semibold font-mono flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                <span>{validationSuccessMessage}</span>
               </div>
             )}
 
@@ -429,9 +469,19 @@ export default function AITaskCard({
               type="button"
               onClick={() => onValidateJson()}
               disabled={isValidating || !jsonInput.trim()}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:bg-emerald-700/20 disabled:text-emerald-500/50 disabled:cursor-not-allowed text-white font-semibold py-2.5 px-4 rounded-xl text-xs transition-none flex items-center justify-center gap-2 cursor-pointer"
+              className="py-2 px-3 rounded-lg bg-secondary/15 hover:bg-secondary/25 text-secondary border border-secondary/40 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40"
             >
-              {isValidating ? (isAr ? 'جاري التحقق...' : 'Validating...') : (isAr ? 'التحقق والاستيراد' : 'Validate & Import')}
+              {isValidating ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-secondary border-t-transparent rounded-full animate-spin"></div>
+                  <span>{isAr ? 'جاري التحقق...' : 'Validating...'}</span>
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-[16px]">check</span>
+                  <span>{isAr ? 'التحقق واستيراد المقاطع (Validate & Import)' : 'Validate & Import'}</span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -439,35 +489,36 @@ export default function AITaskCard({
 
       {/* Segmentation Preview & Approval Section */}
       {isSegmentation && segmentsPreview && segmentsPreview.length > 0 && (
-        <div className="border-t border-slate-100 dark:border-slate-800/60 pt-4 flex flex-col gap-4">
+        <div className="border-t border-surface-variant/20 pt-3 flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-350">
-              {isAr ? 'معاينة المقاطع البصرية' : 'Segments Preview'}
-            </h4>
+            <span className="text-[11px] font-bold text-on-surface flex items-center gap-1">
+              <span className="material-symbols-outlined text-[14px] text-primary">view_list</span>
+              <span>{isAr ? 'معاينة المقاطع البصرية المعتمدة' : 'Approved Segments Preview'}</span>
+            </span>
             {isRepaired && (
-              <span className="bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-400 px-2.5 py-0.5 rounded text-[10px] font-semibold border border-amber-200 dark:border-amber-900/60">
-                {isAr ? 'مصلح تلقائيًا' : 'Auto-Repaired'}
+              <span className="bg-amber-500/15 text-amber-400 px-2 py-0.5 rounded text-[10px] font-semibold border border-amber-500/30">
+                {isAr ? 'مصلح تلقائيًا ✓' : 'Auto-Repaired ✓'}
               </span>
             )}
           </div>
 
-          <div className="max-h-[300px] overflow-y-auto border border-slate-100 dark:border-slate-800/60 rounded-xl">
-            <table className="w-full text-left border-collapse text-xs font-sans">
+          <div className="max-h-[280px] overflow-y-auto border border-surface-variant/30 rounded-xl bg-surface-container-lowest">
+            <table className="w-full text-start border-collapse text-xs font-sans">
               <thead>
-                <tr className="bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-850/60 text-slate-500 dark:text-slate-400 font-semibold">
-                  <th className="p-2 w-12 text-center">#</th>
-                  <th className="p-2 text-right">النص العربي</th>
-                  <th className="p-2">Translation</th>
-                  <th className="p-2">Tafsir</th>
+                <tr className="bg-surface-container-high/60 border-b border-surface-variant/30 text-on-surface-variant font-semibold text-[10px] uppercase">
+                  <th className="p-2 w-10 text-center">#</th>
+                  <th className="p-2 text-start">{isAr ? 'النص القرآني' : 'Arabic Text'}</th>
+                  <th className="p-2 text-start">{isAr ? 'الترجمة' : 'Translation'}</th>
+                  <th className="p-2 text-start">{isAr ? 'التفسير' : 'Tafsir'}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50 dark:divide-slate-850/30 text-slate-750 dark:text-slate-300">
+              <tbody className="divide-y divide-surface-variant/15 text-on-surface">
                 {segmentsPreview.map((seg) => (
-                  <tr key={seg.order} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/50">
-                    <td className="p-2 text-center font-mono text-[10px] text-slate-400">{seg.order}</td>
-                    <td className="p-2 text-right font-semibold font-sans text-slate-900 dark:text-slate-100 text-sm" dir="rtl">{seg.arabic}</td>
-                    <td className="p-2 leading-relaxed text-[11px]">{seg.translation}</td>
-                    <td className="p-2 leading-relaxed text-[10px] text-slate-400">{seg.tafsir}</td>
+                  <tr key={seg.order} className="hover:bg-surface-container-high/40 transition-colors">
+                    <td className="p-2 text-center font-mono text-[10px] text-primary font-bold">{seg.order}</td>
+                    <td className="p-2 font-quran text-sm font-semibold text-primary leading-relaxed" dir="rtl">{seg.arabic}</td>
+                    <td className="p-2 text-[11px] text-on-surface-variant leading-relaxed">{seg.translation}</td>
+                    <td className="p-2 text-[10px] text-on-surface-variant/70 leading-relaxed">{seg.tafsir}</td>
                   </tr>
                 ))}
               </tbody>
@@ -475,42 +526,42 @@ export default function AITaskCard({
           </div>
 
           {/* Generator metadata & Approval */}
-          <div className="flex flex-col gap-4 border-t border-slate-100 dark:border-slate-850/40 pt-4">
-            <div className="grid grid-cols-3 gap-3">
+          <div className="flex flex-col gap-3 border-t border-surface-variant/20 pt-3">
+            <div className="grid grid-cols-3 gap-2">
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">{isAr ? 'نوع المولد' : 'Generator Type'}</label>
+                <label className="text-[10px] font-semibold text-on-surface-variant">{isAr ? 'نوع المولد' : 'Generator'}</label>
                 <select
                   value={generatorType}
                   onChange={(e) => onGeneratorTypeChange?.(e.target.value)}
-                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 px-2 py-1.5 rounded-lg text-xs"
+                  className="w-full bg-surface-container-lowest border border-surface-variant/40 text-on-surface px-2 py-1.5 rounded-lg text-xs focus:border-primary"
                 >
-                  <option value="gemini">Gemini</option>
-                  <option value="openai">OpenAI</option>
-                  <option value="anthropic">Anthropic</option>
-                  <option value="deepseek">DeepSeek</option>
-                  <option value="manual">Manual</option>
+                  <option value="gemini" className="bg-zinc-900 text-white">Gemini</option>
+                  <option value="openai" className="bg-zinc-900 text-white">OpenAI</option>
+                  <option value="anthropic" className="bg-zinc-900 text-white">Anthropic</option>
+                  <option value="deepseek" className="bg-zinc-900 text-white">DeepSeek</option>
+                  <option value="manual" className="bg-zinc-900 text-white">Manual</option>
                 </select>
               </div>
 
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">{isAr ? 'الموديل' : 'Generator Model'}</label>
+                <label className="text-[10px] font-semibold text-on-surface-variant">{isAr ? 'الموديل' : 'Model'}</label>
                 <input
                   type="text"
                   value={generatorModel}
                   onChange={(e) => onGeneratorModelChange?.(e.target.value)}
-                  placeholder="e.g. gemini-2.5-pro"
-                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 px-2 py-1.5 rounded-lg text-xs"
+                  placeholder="gemini-2.5-pro"
+                  className="w-full bg-surface-container-lowest border border-surface-variant/40 text-on-surface px-2 py-1.5 rounded-lg text-xs focus:border-primary font-mono"
                 />
               </div>
 
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">{isAr ? 'الزمن المستغرق (ملي ثانية)' : 'Latency (ms)'}</label>
+                <label className="text-[10px] font-semibold text-on-surface-variant">{isAr ? 'الزمن (ملي ثانية)' : 'Latency (ms)'}</label>
                 <input
                   type="number"
                   value={latencyMs}
                   onChange={(e) => onLatencyMsChange?.(e.target.value)}
-                  placeholder="e.g. 1500"
-                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 px-2 py-1.5 rounded-lg text-xs"
+                  placeholder="1500"
+                  className="w-full bg-surface-container-lowest border border-surface-variant/40 text-on-surface px-2 py-1.5 rounded-lg text-xs focus:border-primary font-mono"
                 />
               </div>
             </div>
@@ -519,9 +570,19 @@ export default function AITaskCard({
               type="button"
               onClick={onApproveJson}
               disabled={saving}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-4 rounded-xl text-xs cursor-pointer"
+              className="w-full py-2.5 px-4 rounded-xl bg-secondary text-on-secondary hover:bg-secondary/90 font-bold text-xs shadow-[0_0_12px_rgba(69,223,164,0.25)] flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50"
             >
-              {saving ? (isAr ? 'جاري الحفظ...' : 'Saving...') : (isAr ? 'تأكيد وحفظ المقاطع البصرية' : 'Approve & Save Segments')}
+              {saving ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-on-secondary border-t-transparent rounded-full animate-spin"></div>
+                  <span>{isAr ? 'جاري الحفظ...' : 'Saving...'}</span>
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-[16px]">verified</span>
+                  <span>{isAr ? 'تأكيد وحفظ المقاطع البصرية في قاعدة البيانات' : 'Approve & Save Segments'}</span>
+                </>
+              )}
             </button>
           </div>
         </div>

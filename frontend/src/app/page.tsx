@@ -548,45 +548,133 @@ export default function ConsolePage() {
 
   const currentLayoutConfig = LAYOUTS[layout];
 
+  // Determine active workflow step
+  let currentStep = 1;
+  if (selectedReciter && selectedSurah !== '') {
+    if (!status?.approved_segments || status.approved_segments.length === 0) {
+      currentStep = 2;
+    } else if (status?.timings?.mode === 'none' && !lastSegTimJson) {
+      currentStep = 3;
+    } else {
+      currentStep = 4;
+    }
+  }
+
+  const selectedSurahObj = surahs.find((s) => s.number === selectedSurah);
+  const selectedReciterObj = reciters.find((r) => r.slug === selectedReciter);
+
   return (
     <div className="flex flex-col gap-6">
-      {/* Title */}
-      <div className="border-b border-slate-200 dark:border-slate-800 pb-4">
-        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 flex items-center justify-between">
-          <span>{t('render.pageTitle')}</span>
-        </h1>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-          {t('render.pageDescription')}
-        </p>
+      {/* WORKFLOW STEPPER PIPELINE & ACTIVE STATUS BAR */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-surface-container rounded-xl p-3.5 border border-surface-variant/40 shadow-sm">
+        {/* Stepper Pipeline */}
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0 scrollbar-none text-xs">
+          <button
+            type="button"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition-all ${
+              currentStep === 1
+                ? 'bg-primary/20 text-primary border border-primary/50 shadow-sm font-bold'
+                : 'text-secondary bg-surface-container-high/60 border border-secondary/30'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[16px]">database</span>
+            <span>{isAr ? '1. إعداد البيانات' : '1. Dataset Setup'}</span>
+          </button>
+          <span className="material-symbols-outlined text-xs text-on-surface-variant/50 rtl:rotate-180">chevron_right</span>
+
+          <button
+            type="button"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition-all ${
+              currentStep === 2
+                ? 'bg-primary/20 text-primary border border-primary/50 shadow-sm font-bold'
+                : currentStep > 2
+                ? 'text-secondary bg-surface-container-high/60 border border-secondary/30'
+                : 'text-on-surface-variant hover:text-on-surface'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[16px]">auto_fix_high</span>
+            <span>{isAr ? '2. تقسيم المقاطع بالذكاء' : '2. AI Segments'}</span>
+          </button>
+          <span className="material-symbols-outlined text-xs text-on-surface-variant/50 rtl:rotate-180">chevron_right</span>
+
+          <button
+            type="button"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition-all ${
+              currentStep === 3
+                ? 'bg-primary/20 text-primary border border-primary/50 shadow-sm font-bold'
+                : currentStep > 3
+                ? 'text-secondary bg-surface-container-high/60 border border-secondary/30'
+                : 'text-on-surface-variant hover:text-on-surface'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[16px]">timer</span>
+            <span>{isAr ? '3. مزامنة التوقيت' : '3. Audio Timings'}</span>
+          </button>
+          <span className="material-symbols-outlined text-xs text-on-surface-variant/50 rtl:rotate-180">chevron_right</span>
+
+          <button
+            type="button"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition-all ${
+              currentStep >= 4
+                ? 'bg-primary/20 text-primary border border-primary/50 shadow-sm font-bold'
+                : 'text-on-surface-variant hover:text-on-surface'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[16px]">rocket_launch</span>
+            <span>{isAr ? '4. خيارات التصدير والرندرة' : '4. Render & Export'}</span>
+          </button>
+        </div>
+
+        {/* Selected Surah & Reciter Indicator */}
+        {selectedSurah && selectedReciter && (
+          <div className="flex items-center gap-2 bg-surface-container-lowest px-3 py-1 rounded-lg border border-surface-variant/30 text-xs self-start md:self-auto">
+            <span className="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+            <span className="text-primary font-bold">
+              {selectedSurahObj?.name_arabic || `سورة ${selectedSurah}`}
+            </span>
+            <span className="text-on-surface-variant/60">•</span>
+            <span className="text-on-surface-variant">
+              {isAr ? selectedReciterObj?.name_arabic : selectedReciterObj?.name_english}
+            </span>
+            {status?.approved_segments && status.approved_segments.length > 0 && (
+              <span className="px-1.5 py-0.5 rounded bg-surface-container text-[10px] text-secondary font-mono">
+                {status.approved_segments.length} {isAr ? 'مقطع' : 'segs'}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Collapsible Accordion Guide */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 text-xs flex flex-col gap-2 transition-all">
+      <div className="bg-surface-container border border-surface-variant/40 rounded-xl p-3.5 text-xs flex flex-col gap-2 transition-all">
         <button
           onClick={() => setGuideOpen(!guideOpen)}
           suppressHydrationWarning
-          className="flex items-center justify-between w-full font-semibold text-slate-900 dark:text-slate-100 focus:outline-none cursor-pointer"
+          className="flex items-center justify-between w-full font-semibold text-on-surface focus:outline-none cursor-pointer"
         >
-          <span>{isAr ? '📖 طريقة العمل' : '📖 How it works'}</span>
-          <span className="text-slate-450 dark:text-slate-500">{guideOpen ? '▲' : '▼'}</span>
+          <span className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary text-[18px]">help_outline</span>
+            <span>{isAr ? 'دليل مسار العمل في استوديو القرآن' : 'Quran Video Studio Workflow Guide'}</span>
+          </span>
+          <span className="text-on-surface-variant">{guideOpen ? '▲' : '▼'}</span>
         </button>
         {guideOpen && (
-          <ol className="list-decimal list-inside space-y-1 text-slate-500 dark:text-slate-400 mt-2 border-t border-slate-100 dark:border-slate-800/60 pt-2">
-            <li>{isAr ? 'اختر القارئ' : 'Select a reciter'}</li>
-            <li>{isAr ? 'اختر التخطيط' : 'Select a layout'}</li>
-            <li>{isAr ? 'اختر السورة ومدى الآيات' : 'Choose Surah and Ayahs'}</li>
-            <li>{isAr ? 'اختياري: ولد أو الصق ملف JSON' : 'Optionally generate or paste JSON'}</li>
-            <li>{isAr ? 'اضغط على تصدير الفيديو' : 'Click Render Video'}</li>
+          <ol className="list-decimal list-inside space-y-1.5 text-on-surface-variant mt-2 border-t border-surface-variant/20 pt-2.5 leading-relaxed">
+            <li>{isAr ? 'اختر القارئ للمصدر الصوتي والتوقيت من القائمة.' : 'Select a reciter for audio and timings source.'}</li>
+            <li>{isAr ? 'اختر السورة القرآنية وحدد نطاق الآيات (كاملة، آية واحدة، أو مدى محدد).' : 'Choose Surah and set Ayah scope (full, single, or range).'}</li>
+            <li>{isAr ? 'اختر تخطيط الفيديو (📱 ريلز 9:16 أو ▶️ يوتيوب 16:9).' : 'Choose video layout (9:16 Reels or 16:9 YouTube).'}</li>
+            <li>{isAr ? 'ولد موجه الذكاء الاصطناعي لتقسيم المقاطع البصرية أو استورد توقيتات Audition.' : 'Generate AI prompt for segmenting verses or sync Audition markers.'}</li>
+            <li>{isAr ? 'تأكد من استيفاء قائمة الفحص المسبق ثم اضغط على "بدء التصدير 🎬".' : 'Verify pre-flight checklist and click "Start Video Render 🎬".'}</li>
           </ol>
         )}
       </div>
 
       {errorMsg && (
-        <div className="bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-400 border border-red-200 dark:border-red-900/50 px-4 py-3 rounded-xl text-sm font-mono flex items-center justify-between">
+        <div className="bg-red-500/10 text-red-400 border border-red-500/30 px-4 py-3 rounded-xl text-xs font-mono flex items-center justify-between">
           <span>{errorMsg}</span>
           <button 
             onClick={() => window.location.reload()} 
-            className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 px-2 py-1 rounded text-xs text-slate-700 dark:text-slate-350 hover:text-slate-900 dark:hover:text-slate-100"
+            className="bg-surface-container-high hover:bg-surface-bright border border-surface-variant/40 px-2.5 py-1 rounded text-xs text-on-surface"
           >
             {t('common.retryConnection')}
           </button>
@@ -595,8 +683,8 @@ export default function ConsolePage() {
 
       {loadingPrereqs ? (
         <div className="flex flex-col items-center justify-center min-h-[30vh]">
-          <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full"></div>
-          <span className="text-xs text-slate-500 dark:text-slate-400 mt-3 font-mono">{t('common.connectingToApi')}</span>
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-xs text-on-surface-variant mt-3 font-mono">{t('common.connectingToApi')}</span>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -604,16 +692,8 @@ export default function ConsolePage() {
           <div className="lg:col-span-7 flex flex-col gap-6">
             
             {/* Required Selections Grid: Reciter & Surah */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
-              <div className="flex flex-col gap-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                    {isAr ? 'القارئ' : 'Reciter'}
-                  </h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-sans">
-                    {isAr ? 'اختر القارئ للمصدر الصوتي والتوقيت.' : 'Choose the reciter for audio and timings.'}
-                  </p>
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-surface-container rounded-xl border border-surface-variant/40 p-5 shadow-sm">
+              <div className="flex flex-col gap-3">
                 <ReciterSelect
                   reciters={reciters}
                   selectedSlug={selectedReciter}
@@ -622,17 +702,8 @@ export default function ConsolePage() {
                 />
               </div>
 
-              <div className="flex flex-col gap-4 border-t md:border-t-0 md:border-l border-slate-100 dark:border-slate-800/60 pt-4 md:pt-0 md:pl-6 rtl:md:pl-0 rtl:md:pr-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                    {isAr ? 'اختيار القرآن' : 'Quran Selection'}
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-sans">
-                    {isAr ? 'اختر السورة ومدى الآيات لتصدير الفيديو.' : 'Select the Surah and Ayah range.'}
-                  </p>
-                </div>
-                
-                <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-3 border-t md:border-t-0 md:border-l border-surface-variant/20 pt-4 md:pt-0 md:pl-5 rtl:md:pl-0 rtl:md:pr-5">
+                <div className="flex flex-col gap-3">
                   <SurahSelect
                     surahs={surahs}
                     selectedNumber={selectedSurah}
@@ -641,18 +712,18 @@ export default function ConsolePage() {
                   />
 
                   {selectedSurah !== '' && (
-                    <div className="flex flex-col gap-3 border-t border-slate-100 dark:border-slate-800/60 pt-4">
-                      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                        {isAr ? 'اختر النطاق' : 'Select Scope'}
+                    <div className="flex flex-col gap-2 border-t border-surface-variant/20 pt-3">
+                      <label className="text-[11px] font-semibold text-on-surface-variant">
+                        {isAr ? 'اختر النطاق القرآني' : 'Select Quran Scope'}
                       </label>
-                      <div className="grid grid-cols-3 gap-2 bg-slate-50 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
+                      <div className="grid grid-cols-3 gap-1.5 bg-surface-container-lowest p-1 rounded-xl border border-surface-variant/30">
                         <button
                           type="button"
                           onClick={() => setScope('full')}
-                          className={`py-1.5 px-3 rounded-lg text-xs font-semibold ${
+                          className={`py-1.5 px-2 rounded-lg text-xs font-semibold transition-all ${
                             scope === 'full'
-                              ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700'
-                              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                              ? 'bg-primary text-on-primary shadow-sm font-bold'
+                              : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
                           }`}
                         >
                           {t('render.scopeFull')}
@@ -660,10 +731,10 @@ export default function ConsolePage() {
                         <button
                           type="button"
                           onClick={() => setScope('single')}
-                          className={`py-1.5 px-3 rounded-lg text-xs font-semibold ${
+                          className={`py-1.5 px-2 rounded-lg text-xs font-semibold transition-all ${
                             scope === 'single'
-                              ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700'
-                              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                              ? 'bg-primary text-on-primary shadow-sm font-bold'
+                              : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
                           }`}
                         >
                           {t('render.scopeSingle')}
@@ -671,10 +742,10 @@ export default function ConsolePage() {
                         <button
                           type="button"
                           onClick={() => setScope('range')}
-                          className={`py-1.5 px-3 rounded-lg text-xs font-semibold ${
+                          className={`py-1.5 px-2 rounded-lg text-xs font-semibold transition-all ${
                             scope === 'range'
-                              ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700'
-                              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                              ? 'bg-primary text-on-primary shadow-sm font-bold'
+                              : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
                           }`}
                         >
                           {t('render.scopeRange')}
@@ -685,41 +756,41 @@ export default function ConsolePage() {
 
                   {/* Conditional Inputs */}
                   {selectedSurah !== '' && scope === 'single' && (
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t('render.ayahNumberLabel', { max: maxAyahs })}</label>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[11px] font-semibold text-on-surface-variant">{t('render.ayahNumberLabel', { max: maxAyahs })}</label>
                       <input
                         type="number"
                         min={1}
                         max={maxAyahs}
                         value={ayahNumber}
                         onChange={(e) => setAyahNumber(Math.max(1, Math.min(maxAyahs, Number(e.target.value))))}
-                        className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 px-3 py-1.5 rounded-xl focus:outline-none focus:border-slate-450 dark:focus:border-slate-700 text-sm font-mono"
+                        className="w-full bg-surface-container-lowest border border-surface-variant/40 text-on-surface px-3 py-1.5 rounded-lg focus:outline-none focus:border-primary text-xs font-mono"
                       />
                     </div>
                   )}
 
                   {selectedSurah !== '' && scope === 'range' && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t('render.fromLabel')}</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[11px] font-semibold text-on-surface-variant">{t('render.fromLabel')}</label>
                         <input
                           type="number"
                           min={1}
                           max={toAyah}
                           value={fromAyah}
                           onChange={(e) => setFromAyah(Math.max(1, Math.min(toAyah, Number(e.target.value))))}
-                          className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 px-3 py-1.5 rounded-xl focus:outline-none focus:border-slate-450 dark:focus:border-slate-700 text-sm font-mono"
+                          className="w-full bg-surface-container-lowest border border-surface-variant/40 text-on-surface px-3 py-1.5 rounded-lg focus:outline-none focus:border-primary text-xs font-mono"
                         />
                       </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t('render.toLabel', { max: maxAyahs })}</label>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[11px] font-semibold text-on-surface-variant">{t('render.toLabel', { max: maxAyahs })}</label>
                         <input
                           type="number"
                           min={fromAyah}
                           max={maxAyahs}
                           value={toAyah}
                           onChange={(e) => setToAyah(Math.max(fromAyah, Math.min(maxAyahs, Number(e.target.value))))}
-                          className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 px-3 py-1.5 rounded-xl focus:outline-none focus:border-slate-450 dark:focus:border-slate-700 text-sm font-mono"
+                          className="w-full bg-surface-container-lowest border border-surface-variant/40 text-on-surface px-3 py-1.5 rounded-lg focus:outline-none focus:border-primary text-xs font-mono"
                         />
                       </div>
                     </div>
@@ -730,7 +801,7 @@ export default function ConsolePage() {
 
             {/* Layout Selection Card */}
             <RenderOptions
-              disabled={selectedSurah === ''}
+              disabled={false}
               layout={layout}
               onLayoutChange={setLayout}
               maxLines={maxLines}

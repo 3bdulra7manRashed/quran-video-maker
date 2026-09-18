@@ -51,102 +51,146 @@ export default function RenderOptions({
   const currentLayoutConfig = LAYOUTS[layout];
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col gap-4">
-      <div>
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-          {isAr ? 'تخطيط الفيديو' : 'Layout Selection'}
-        </h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-sans">
-          {isAr ? 'اختر طريقة عرض النص القرآني على الشاشة.' : 'Choose how the Quran text will be displayed.'}
-        </p>
+    <div className="bg-surface-container rounded-xl border border-surface-variant/40 p-5 flex flex-col gap-4 shadow-sm">
+      <div className="flex items-center justify-between border-b border-surface-variant/30 pb-3">
+        <div className="flex items-center gap-2">
+          <span className="p-1 rounded bg-primary/10 text-primary material-symbols-outlined text-[18px]">aspect_ratio</span>
+          <div>
+            <h3 className="text-xs font-bold text-on-surface">
+              {isAr ? 'تخطيط الفيديو وخيارات الإنتاج' : 'Video Layout & Production Options'}
+            </h3>
+            <p className="text-[10px] text-on-surface-variant">
+              {isAr ? 'أبعاد الفيديو، الترجمة، التفسير، والقالب المخصص' : 'Aspect ratio, translation, tafsir, and theme'}
+            </p>
+          </div>
+        </div>
+        <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/15 text-primary border border-primary/30 font-bold uppercase">
+          {layout === 'reels' ? '9:16' : '16:9'}
+        </span>
       </div>
 
       <div className="flex flex-col gap-4">
-        {/* Layout Cards (Rendered Dynamically from Config) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {Object.values(LAYOUTS).map((cfg) => {
-            const isSelected = layout === cfg.id;
-            return (
-              <button
-                key={cfg.id}
-                type="button"
-                disabled={disabled}
-                onClick={() => onLayoutChange(cfg.id)}
-                className={`p-4 rounded-xl border text-left flex flex-col gap-1 cursor-pointer transition-none ${
-                  isSelected
-                    ? 'border-emerald-500 dark:border-emerald-400 bg-emerald-50/10 dark:bg-emerald-950/20'
-                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700'
-                }`}
-              >
-                <span className="font-semibold text-slate-900 dark:text-slate-100">
-                  {isAr ? cfg.nameAr : cfg.nameEn}
+        {/* Layout Cards */}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[11px] font-semibold text-on-surface-variant">
+            {isAr ? 'تنسيق العرض والأبعاد' : 'Aspect Ratio & Format'}
+          </span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+            {/* Reels Option */}
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => onLayoutChange('reels')}
+              className={`p-3 rounded-xl bg-surface-container-lowest border-2 text-start transition-all cursor-pointer flex flex-col gap-1.5 ${
+                layout === 'reels'
+                  ? 'border-secondary shadow-[0_0_12px_rgba(69,223,164,0.15)] bg-surface-container-high/40'
+                  : 'border-surface-variant/30 hover:border-surface-variant/60 opacity-70 hover:opacity-100'
+              }`}
+            >
+              <div className="flex items-center justify-between w-full">
+                <span className="text-xs font-bold text-secondary flex items-center gap-1.5">
+                  📱 {isAr ? 'ريلز (9:16 Reels)' : 'Reels (9:16)'}
                 </span>
-                <span className="text-xs text-slate-500 dark:text-slate-400">
-                  {isAr ? cfg.descriptionAr : cfg.descriptionEn}
+                {layout === 'reels' ? (
+                  <span className="material-symbols-outlined text-[18px] text-secondary">check_circle</span>
+                ) : (
+                  <span className="w-3.5 h-3.5 rounded-full border border-surface-variant/60"></span>
+                )}
+              </div>
+              <span className="text-[10px] text-on-surface-variant leading-relaxed">
+                {isAr ? 'فيديوهات رأسية قصيرة مخصصة لمنصات التواصل الاجتماعي (TikTok / Instagram / Shorts)' : 'Short vertical videos optimized for social media platforms.'}
+              </span>
+            </button>
+
+            {/* YouTube Option */}
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => onLayoutChange('youtube')}
+              className={`p-3 rounded-xl bg-surface-container-lowest border-2 text-start transition-all cursor-pointer flex flex-col gap-1.5 ${
+                layout === 'youtube'
+                  ? 'border-primary shadow-[0_0_12px_rgba(242,202,80,0.15)] bg-surface-container-high/40'
+                  : 'border-surface-variant/30 hover:border-surface-variant/60 opacity-70 hover:opacity-100'
+              }`}
+            >
+              <div className="flex items-center justify-between w-full">
+                <span className="text-xs font-bold text-primary flex items-center gap-1.5">
+                  ▶️ {isAr ? 'يوتيوب (16:9 YouTube)' : 'YouTube (16:9)'}
                 </span>
-              </button>
-            );
-          })}
+                {layout === 'youtube' ? (
+                  <span className="material-symbols-outlined text-[18px] text-primary">check_circle</span>
+                ) : (
+                  <span className="w-3.5 h-3.5 rounded-full border border-surface-variant/60"></span>
+                )}
+              </div>
+              <span className="text-[10px] text-on-surface-variant leading-relaxed">
+                {isAr ? 'عرض صفحة المصحف كاملة والتلاوات الطويلة الأفقية بدقة عالية' : 'Full Mushaf page display and horizontal long-form recitations.'}
+              </span>
+            </button>
+          </div>
         </div>
 
-        {/* Max lines (Conditional based on Config) */}
+        {/* Max lines (Conditional for YouTube) */}
         {currentLayoutConfig?.maxLinesSupport && (
-          <div className="flex flex-col gap-1.5 border-t border-slate-100 dark:border-slate-800/60 pt-4">
-            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t('render.maxLinesLabel')}</label>
-            <div className="grid grid-cols-2 gap-2 bg-slate-50 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
+          <div className="flex flex-col gap-1.5 border-t border-surface-variant/20 pt-3">
+            <label className="text-[11px] font-semibold text-on-surface-variant">{t('render.maxLinesLabel')}</label>
+            <div className="grid grid-cols-2 gap-2 bg-surface-container-lowest p-1 rounded-xl border border-surface-variant/30">
               <button
                 type="button"
                 disabled={disabled}
                 onClick={() => onMaxLinesChange(1)}
-                className={`py-2 px-3 rounded-lg text-xs font-semibold ${
+                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   maxLines === 1
-                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                    ? 'bg-[#f2ca50] text-[#131a18] shadow-md font-bold ring-1 ring-[#f2ca50]'
+                    : 'text-[#94a3b8] hover:text-[#dde4e0] hover:bg-[#1a211f]'
                 }`}
               >
-                {t('render.oneLinePerScreen')}
+                {maxLines === 1 && <span className="w-1.5 h-1.5 rounded-full bg-[#131a18]"></span>}
+                <span>{t('render.oneLinePerScreen')}</span>
               </button>
               <button
                 type="button"
                 disabled={disabled}
                 onClick={() => onMaxLinesChange(2)}
-                className={`py-2 px-3 rounded-lg text-xs font-semibold ${
+                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   maxLines === 2
-                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                    ? 'bg-[#f2ca50] text-[#131a18] shadow-md font-bold ring-1 ring-[#f2ca50]'
+                    : 'text-[#94a3b8] hover:text-[#dde4e0] hover:bg-[#1a211f]'
                 }`}
               >
-                {t('render.twoLinesPerScreen')}
+                {maxLines === 2 && <span className="w-1.5 h-1.5 rounded-full bg-[#131a18]"></span>}
+                <span>{t('render.twoLinesPerScreen')}</span>
               </button>
             </div>
           </div>
         )}
 
         {/* Translation and Tafsir Settings */}
-        <div className="border-t border-slate-100 dark:border-slate-800/60 pt-4 flex flex-col gap-4">
-          {/* Translation Switch (Conditional) */}
+        <div className="border-t border-surface-variant/20 pt-3 flex flex-col gap-3">
+          {/* Translation Switch */}
           {currentLayoutConfig?.translationSupport && (
-            <>
-              <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2">
+              <label className="flex items-center justify-between p-2.5 rounded-xl bg-surface-container-lowest border border-surface-variant/30 cursor-pointer hover:border-surface-variant/60 transition-colors">
                 <div className="flex flex-col">
-                  <label htmlFor="withTranslation" className="text-xs text-slate-700 dark:text-slate-350 font-semibold cursor-pointer">
-                    {isAr ? '☑ تضمين الترجمة' : '☑ Include Translation'}
-                  </label>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400">{t('render.includeTranslationDesc')}</span>
+                  <span className="text-xs font-semibold text-on-surface">
+                    {isAr ? 'تضمين الترجمة الإنجليزية' : 'Include English Translation'}
+                  </span>
+                  <span className="text-[10px] text-on-surface-variant">
+                    {t('render.includeTranslationDesc')}
+                  </span>
                 </div>
                 <input
-                  id="withTranslation"
                   type="checkbox"
                   disabled={disabled}
                   checked={withTranslation}
                   onChange={(e) => onWithTranslationChange(e.target.checked)}
-                  className="w-4 h-4 accent-emerald-600 rounded bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 cursor-pointer disabled:opacity-40"
+                  className="w-4 h-4 rounded border-surface-variant text-primary focus:ring-0 bg-surface-container cursor-pointer"
                 />
-              </div>
+              </label>
 
               {withTranslation && (
-                <div className="flex flex-col gap-1.5 pl-4 rtl:pr-4">
-                  <label htmlFor="translationSource" className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase">
+                <div className="flex flex-col gap-1 px-2">
+                  <label htmlFor="translationSource" className="text-[10px] font-semibold text-on-surface-variant uppercase">
                     {t('render.translationSourceLabel')}
                   </label>
                   <select
@@ -154,94 +198,95 @@ export default function RenderOptions({
                     disabled={disabled}
                     value={translationSource}
                     onChange={(e) => onTranslationSourceChange(e.target.value)}
-                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 px-3 py-1.5 rounded-xl focus:outline-none focus:border-slate-450 dark:focus:border-slate-700 font-sans text-xs cursor-pointer"
+                    className="w-full bg-surface-container-lowest border border-surface-variant/40 text-on-surface px-3 py-1.5 rounded-lg focus:outline-none focus:border-primary text-xs cursor-pointer"
                   >
                     <option value="sahih_international">{t('render.sahihInternational')}</option>
                   </select>
                 </div>
               )}
-            </>
+            </div>
           )}
 
-          {/* Tafsir Switch (Conditional) */}
+          {/* Tafsir Switch */}
           {currentLayoutConfig?.tafsirSupport && (
-            <div className="border-t border-slate-100 dark:border-slate-800/60 pt-3 flex items-center justify-between">
+            <label className="flex items-center justify-between p-2.5 rounded-xl bg-surface-container-lowest border border-surface-variant/30 cursor-pointer hover:border-surface-variant/60 transition-colors">
               <div className="flex flex-col">
-                <label htmlFor="withTafsir" className="text-xs text-slate-700 dark:text-slate-350 font-semibold cursor-pointer">
-                  {isAr ? '☐ تضمين التفسير' : '☐ Include Tafsir'}
-                </label>
-                <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                  {isAr ? 'تضمين نص التفسير للآيات المختارة.' : 'Include the commentary/tafsir text for selected Ayahs.'}
+                <span className="text-xs font-semibold text-on-surface">
+                  {isAr ? 'تضمين التفسير الميسر' : 'Include Simplified Tafsir'}
+                </span>
+                <span className="text-[10px] text-on-surface-variant">
+                  {isAr ? 'إدراج نص التفسير للآيات المختارة أسفل الآية' : 'Include the commentary text for selected Ayahs'}
                 </span>
               </div>
               <input
-                id="withTafsir"
                 type="checkbox"
                 disabled={disabled}
                 checked={withTafsir}
                 onChange={(e) => onWithTafsirChange(e.target.checked)}
-                className="w-4 h-4 accent-emerald-600 rounded bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 cursor-pointer disabled:opacity-40"
+                className="w-4 h-4 rounded border-surface-variant text-primary focus:ring-0 bg-surface-container cursor-pointer"
               />
-            </div>
+            </label>
           )}
 
           {/* Quran.me Theme Toggle */}
-          <div className="border-t border-slate-100 dark:border-slate-800/60 pt-3 flex items-center justify-between">
+          <label className="flex items-center justify-between p-2.5 rounded-xl bg-surface-container-lowest border border-surface-variant/30 cursor-pointer hover:border-primary/50 transition-colors">
             <div className="flex flex-col">
-              <label htmlFor="useQuranMeTheme" className="text-xs text-slate-700 dark:text-slate-350 font-semibold cursor-pointer">
-                {isAr ? 'قالب Quran.me (ثيم مخصص)' : 'Quran.me Theme (Custom Theme)'}
-              </label>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                {isAr ? 'تلوين الآية القرآنية والترجمة باللون #4D3126 مع إبقاء التفسير بالأبيض النقي.' : 'Render Ayah and Translation text in #4D3126 while keeping Tafsir pure white.'}
+              <span className="text-xs font-semibold text-primary">
+                {isAr ? 'قالب Quran.me (ثيم مخصص)' : 'Quran.me Theme (Custom)'}
+              </span>
+              <span className="text-[10px] text-on-surface-variant">
+                {isAr ? 'تلوين الآية القرآنية باللون #4D3126 مع إبقاء التفسير بالأبيض النقي' : 'Render Ayah text in #4D3126 while keeping Tafsir pure white'}
               </span>
             </div>
             <input
-              id="useQuranMeTheme"
               type="checkbox"
               disabled={disabled}
               checked={useQuranMeTheme}
               onChange={(e) => onUseQuranMeThemeChange?.(e.target.checked)}
-              className="w-4 h-4 accent-emerald-600 rounded bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 cursor-pointer disabled:opacity-40"
+              className="w-4 h-4 rounded border-surface-variant text-primary focus:ring-0 bg-surface-container cursor-pointer"
             />
-          </div>
+          </label>
         </div>
 
-        {/* Force Pre-generated Content Settings */}
-        <div className="border-t border-slate-100 dark:border-slate-800/60 pt-4 flex items-center justify-between">
-          <div className="flex flex-col">
-            <label htmlFor="useGeneratedContent" className="text-xs text-slate-700 dark:text-slate-350 font-semibold cursor-pointer">
-              {t('render.useGeneratedContent')}
-            </label>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400">{t('render.useGeneratedContentDesc')}</span>
-          </div>
-          <input
-            id="useGeneratedContent"
-            type="checkbox"
-            disabled={disabled}
-            checked={useGeneratedContent}
-            onChange={(e) => onUseGeneratedContentChange(e.target.checked)}
-            className="w-4 h-4 accent-emerald-600 rounded bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 cursor-pointer disabled:opacity-40"
-          />
-        </div>
+        {/* Advanced Options Section */}
+        <div className="border-t border-surface-variant/20 pt-3 flex flex-col gap-2">
+          {/* Pre-generated Content */}
+          <label className="flex items-center justify-between p-2 rounded-lg bg-surface-container-lowest/60 border border-surface-variant/20 cursor-pointer hover:bg-surface-container-lowest transition-colors">
+            <div className="flex flex-col">
+              <span className="text-xs font-medium text-on-surface">
+                {t('render.useGeneratedContent')}
+              </span>
+              <span className="text-[10px] text-on-surface-variant">
+                {t('render.useGeneratedContentDesc')}
+              </span>
+            </div>
+            <input
+              type="checkbox"
+              disabled={disabled}
+              checked={useGeneratedContent}
+              onChange={(e) => onUseGeneratedContentChange(e.target.checked)}
+              className="w-4 h-4 rounded border-surface-variant text-primary focus:ring-0 bg-surface-container cursor-pointer"
+            />
+          </label>
 
-        {/* Persist Segments to Database Toggle */}
-        <div className="border-t border-slate-100 dark:border-slate-800/60 pt-4 flex items-center justify-between">
-          <div className="flex flex-col">
-            <label htmlFor="persistToDatabase" className="text-xs text-slate-700 dark:text-slate-350 font-semibold cursor-pointer">
-              {isAr ? 'حفظ كقالب معتمد في قاعدة البيانات' : 'Save permanently to Database'}
-            </label>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400">
-              {isAr ? 'حفظ المقاطع والتوقيت كقالب دائم في قاعدة البيانات بدلاً من الجلسة الحالية فقط.' : 'Permanently save segment templates in DB instead of current run only.'}
-            </span>
-          </div>
-          <input
-            id="persistToDatabase"
-            type="checkbox"
-            disabled={disabled}
-            checked={persistToDatabase}
-            onChange={(e) => onPersistToDatabaseChange?.(e.target.checked)}
-            className="w-4 h-4 accent-emerald-600 rounded bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 cursor-pointer disabled:opacity-40"
-          />
+          {/* Persist Segments */}
+          <label className="flex items-center justify-between p-2 rounded-lg bg-surface-container-lowest/60 border border-surface-variant/20 cursor-pointer hover:bg-surface-container-lowest transition-colors">
+            <div className="flex flex-col">
+              <span className="text-xs font-medium text-on-surface">
+                {isAr ? 'حفظ كقالب معتمد في قاعدة البيانات' : 'Save permanently to Database'}
+              </span>
+              <span className="text-[10px] text-on-surface-variant">
+                {isAr ? 'حفظ المقاطع والتوقيت كقالب دائم في قاعدة البيانات بدلاً من الجلسة الحالية فقط' : 'Permanently save segment templates in DB instead of current run only'}
+              </span>
+            </div>
+            <input
+              type="checkbox"
+              disabled={disabled}
+              checked={persistToDatabase}
+              onChange={(e) => onPersistToDatabaseChange?.(e.target.checked)}
+              className="w-4 h-4 rounded border-surface-variant text-primary focus:ring-0 bg-surface-container cursor-pointer"
+            />
+          </label>
         </div>
       </div>
     </div>

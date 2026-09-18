@@ -3,6 +3,7 @@
 import React from 'react';
 import { DatasetStatus } from '@/services/api';
 import { useT } from '@/hooks/useT';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface DatasetStatusCardProps {
   status: DatasetStatus | null;
@@ -12,12 +13,17 @@ interface DatasetStatusCardProps {
 export default function DatasetStatusCard({ status, loading }: DatasetStatusCardProps) {
   const t = useT();
 
+  const { language } = useLanguage();
+  const isAr = language === 'ar';
+
   if (loading && !status) {
     return (
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex items-center justify-center min-h-[180px]">
+      <div className="bg-surface-container border border-surface-variant/40 rounded-xl p-6 flex items-center justify-center min-h-[180px]">
         <div className="flex flex-col items-center gap-2">
-          <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">Loading status...</span>
+          <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-xs text-on-surface-variant font-mono">
+            {isAr ? 'جاري فحص حالة البيانات...' : 'Checking dataset status...'}
+          </span>
         </div>
       </div>
     );
@@ -25,123 +31,169 @@ export default function DatasetStatusCard({ status, loading }: DatasetStatusCard
 
   if (!status) {
     return (
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-dashed rounded-xl p-6 flex items-center justify-center min-h-[180px] text-center">
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          No reciter selected yet.
+      <div className="bg-surface-container border border-surface-variant/40 border-dashed rounded-xl p-6 flex items-center justify-center min-h-[180px] text-center">
+        <p className="text-xs text-on-surface-variant">
+          {isAr ? 'لم يتم اختيار القارئ والسورة بعد.' : 'No reciter or Surah selected yet.'}
         </p>
       </div>
     );
   }
 
-  const renderTimingMode = (mode: string, timed: number, total: number) => {
+  // Calculate readiness score out of 5
+  let readyCount = 0;
+  if (status.audio) readyCount++;
+  if (status.glyphs) readyCount++;
+  if (status.timings.mode !== 'none') readyCount++;
+  if (status.translations?.ready) readyCount++;
+  if (status.approved_segments && status.approved_segments.length > 0) readyCount++;
+
+  const renderTimingBadge = (mode: string, timed: number, total: number) => {
     switch (mode) {
       case 'full':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900">
-            Full ({timed}/{total})
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-secondary/15 text-secondary border border-secondary/30">
+            {isAr ? `كامل (${timed}/${total})` : `Full (${timed}/${total})`}
           </span>
         );
       case 'partial':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 border border-amber-200 dark:border-amber-900">
-            Partial ({timed}/{total})
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary/15 text-primary border border-primary/30">
+            {isAr ? `جزئي (${timed}/${total})` : `Partial (${timed}/${total})`}
           </span>
         );
       case 'fallback':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-cyan-50 text-cyan-700 dark:bg-cyan-950/20 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-900">
-            Proportional Fallback
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
+            {isAr ? 'نسبي تلقائي' : 'Fallback'}
           </span>
         );
       case 'none':
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-400 border border-red-200 dark:border-red-900">
-            None
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/15 text-red-400 border border-red-500/30">
+            {isAr ? 'غير متوفر' : 'Missing'}
           </span>
         );
     }
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col gap-4">
-      <div className="border-b border-slate-100 dark:border-slate-800/60 pb-2 flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Dataset Status</h3>
-        {loading && (
-          <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-mono">
-            <div className="w-3 h-3 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-            <span>Syncing...</span>
-          </div>
-        )}
+    <div className="bg-surface-container rounded-xl border border-surface-variant/40 p-4 flex flex-col gap-3 shadow-sm">
+      {/* Header with 5/5 score */}
+      <div className="flex items-center justify-between border-b border-surface-variant/30 pb-2.5">
+        <span className="text-xs font-bold text-on-surface flex items-center gap-1.5">
+          <span className="material-symbols-outlined text-[16px] text-primary">database</span>
+          <span>{isAr ? 'حالة البيانات ومصفوفة الجاهزية' : 'Dataset Status Matrix'}</span>
+        </span>
+        <div className="flex items-center gap-2">
+          {loading && (
+            <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+          )}
+          <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
+            readyCount >= 4
+              ? 'bg-secondary/15 text-secondary border-secondary/30'
+              : 'bg-primary/15 text-primary border-primary/30'
+          }`}>
+            {readyCount}/5 {isAr ? 'جاهزة' : 'Ready'}
+          </span>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        {/* Glyphs */}
-        <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl p-3 flex items-center justify-between">
-          <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Glyphs</span>
-          {status.glyphs ? (
-            <span className="text-emerald-500 text-sm font-bold">Available</span>
+      {/* 2x2 Grid of Status Pills */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+        {/* Audio */}
+        <div className="p-2 rounded-lg bg-surface-container-lowest flex items-center justify-between border border-surface-variant/25">
+          <span className="text-on-surface-variant flex items-center gap-1">
+            <span className="material-symbols-outlined text-[14px]">graphic_eq</span>
+            <span>{isAr ? 'الملف الصوتي:' : 'Audio File:'}</span>
+          </span>
+          {status.audio ? (
+            <span className="px-1.5 py-0.5 rounded bg-secondary/15 text-secondary font-bold text-[10px]">
+              {isAr ? 'متوفر' : 'Available'}
+            </span>
           ) : (
-            <span className="text-red-500 text-sm font-bold">Missing</span>
+            <span className="px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 font-bold text-[10px]">
+              {isAr ? 'مفقود' : 'Missing'}
+            </span>
           )}
         </div>
 
-        {/* Audio */}
-        <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl p-3 flex items-center justify-between">
-          <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Audio</span>
-          {status.audio ? (
-            <span className="text-emerald-500 text-sm font-bold">Available</span>
+        {/* Glyphs */}
+        <div className="p-2 rounded-lg bg-surface-container-lowest flex items-center justify-between border border-surface-variant/25">
+          <span className="text-on-surface-variant flex items-center gap-1">
+            <span className="material-symbols-outlined text-[14px]">menu_book</span>
+            <span>{isAr ? 'الرسم العثماني:' : 'Mushaf Glyphs:'}</span>
+          </span>
+          {status.glyphs ? (
+            <span className="px-1.5 py-0.5 rounded bg-secondary/15 text-secondary font-bold text-[10px]">
+              {isAr ? 'متوفر' : 'Available'}
+            </span>
           ) : (
-            <span className="text-red-500 text-sm font-bold">Missing</span>
+            <span className="px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 font-bold text-[10px]">
+              {isAr ? 'مفقود' : 'Missing'}
+            </span>
           )}
         </div>
 
         {/* Timings */}
-        <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl p-3 col-span-2 flex items-center justify-between">
-          <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Timings</span>
-          {renderTimingMode(status.timings.mode, status.timings.timedWords, status.timings.totalWords)}
+        <div className="p-2 rounded-lg bg-surface-container-lowest flex items-center justify-between border border-surface-variant/25">
+          <span className="text-on-surface-variant flex items-center gap-1">
+            <span className="material-symbols-outlined text-[14px]">timer</span>
+            <span>{isAr ? 'توقيتات Audition:' : 'Audition Timings:'}</span>
+          </span>
+          {renderTimingBadge(status.timings.mode, status.timings.timedWords, status.timings.totalWords)}
         </div>
 
-        {/* Translations (Sahih International) */}
-        <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl p-3 col-span-2 flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Translations (Sahih International)</span>
-            {status.translations?.ready ? (
-              <span className="text-emerald-500 text-sm font-bold">Available</span>
-            ) : (
-              <span className="text-red-500 text-sm font-bold">Unavailable</span>
-            )}
-          </div>
-          {status.translations && !status.translations.ready && status.translations.error && (
-            <div className="mt-1 p-2 bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 text-[10px] font-mono rounded border border-red-150 dark:border-red-900/40 whitespace-pre-line leading-normal">
-              {status.translations.error}
-            </div>
-          )}
-        </div>
-
-        {/* Approved Segments count */}
-        <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl p-3 col-span-2 flex items-center justify-between">
-          <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Approved AI Segments</span>
-          {status.approved_segments && status.approved_segments.length > 0 ? (
-            <span className="text-emerald-500 text-sm font-bold">{status.approved_segments.length} segments</span>
-          ) : (
-            <span className="text-amber-500 text-sm font-bold">None</span>
-          )}
-        </div>
-
-        {/* Ready to Render */}
-        <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl p-3 col-span-2 flex items-center justify-between">
-          <span className="text-sm text-slate-800 dark:text-slate-250 font-bold">Ready to Render</span>
-          {status.renderable ? (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-bold bg-emerald-600 text-white">
-              Ready
+        {/* Translation */}
+        <div className="p-2 rounded-lg bg-surface-container-lowest flex items-center justify-between border border-surface-variant/25">
+          <span className="text-on-surface-variant flex items-center gap-1">
+            <span className="material-symbols-outlined text-[14px]">translate</span>
+            <span>{isAr ? 'الترجمة الإنجليزية:' : 'Translation:'}</span>
+          </span>
+          {status.translations?.ready ? (
+            <span className="px-1.5 py-0.5 rounded bg-secondary/15 text-secondary font-bold text-[10px]">
+              {isAr ? 'متوفر (Saheeh)' : 'Ready (Saheeh)'}
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-bold bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-              Not Ready
+            <span className="px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 font-bold text-[10px]">
+              {isAr ? 'غير متوفر' : 'Unavailable'}
             </span>
           )}
         </div>
+      </div>
+
+      {/* Approved Segments Count */}
+      <div className="p-2 rounded-lg bg-surface-container-lowest flex items-center justify-between border border-primary/30">
+        <span className="text-on-surface text-[11px] font-semibold flex items-center gap-1">
+          <span className="material-symbols-outlined text-[14px] text-primary">auto_awesome</span>
+          <span>{isAr ? 'المقاطع المعتمدة للإنتاج:' : 'Approved AI Segments:'}</span>
+        </span>
+        {status.approved_segments && status.approved_segments.length > 0 ? (
+          <span className="px-2 py-0.5 rounded bg-primary/20 text-primary font-bold text-xs font-mono">
+            {status.approved_segments.length} {isAr ? 'مقطع جاهز' : 'segments ready'}
+          </span>
+        ) : (
+          <span className="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant text-[10px] font-mono">
+            {isAr ? 'لا يوجد (توليد الذكاء مطلوب)' : 'None (AI generation needed)'}
+          </span>
+        )}
+      </div>
+
+      {/* Readiness Status Footer */}
+      <div className="p-2 rounded-lg bg-surface-container-lowest flex items-center justify-between border border-surface-variant/25">
+        <span className="text-on-surface text-[11px] font-semibold">
+          {isAr ? 'حالة الجاهزية للتصدير:' : 'Ready to Render:'}
+        </span>
+        {status.renderable ? (
+          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-secondary text-on-secondary shadow-sm flex items-center gap-1">
+            <span className="material-symbols-outlined text-[12px]">check</span>
+            <span>{isAr ? 'جاهز للتصدير ✓' : 'Ready ✓'}</span>
+          </span>
+        ) : (
+          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-surface-container text-on-surface-variant">
+            {isAr ? 'في انتظار استكمال المتطلبات' : 'Pending requirements'}
+          </span>
+        )}
       </div>
     </div>
   );

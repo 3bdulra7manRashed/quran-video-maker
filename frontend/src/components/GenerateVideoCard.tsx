@@ -102,72 +102,92 @@ export default function GenerateVideoCard({
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col gap-4 font-sans">
-      <div>
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-          {isAr ? 'تصدير الفيديو' : 'Render Video'}
-        </h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-sans">
-          {isAr ? 'إنشاء الفيديو النهائي باستخدام الإعدادات المحددة.' : 'Generate the final video using the selected configuration.'}
-        </p>
+    <div className="bg-surface-container rounded-xl border border-primary/30 p-5 flex flex-col gap-4 shadow-lg shadow-black/20 font-sans">
+      <div className="flex items-center justify-between border-b border-surface-variant/30 pb-3">
+        <div className="flex items-center gap-2">
+          <span className="p-1 rounded bg-primary/10 text-primary material-symbols-outlined text-[18px]">rocket_launch</span>
+          <div>
+            <h3 className="text-xs font-bold text-on-surface">
+              {isAr ? 'جاهزية التصدير وبدء الإنتاج' : 'Export Readiness & Render Trigger'}
+            </h3>
+            <p className="text-[10px] text-on-surface-variant">
+              {isAr ? 'التحقق المسبق من المتطلبات وبدء معالجة الفيديو' : 'Pre-flight check and video render initialization'}
+            </p>
+          </div>
+        </div>
+        <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
+          allPrereqsMet
+            ? 'bg-secondary/15 text-secondary border-secondary/30'
+            : 'bg-primary/15 text-primary border-primary/30'
+        }`}>
+          {allPrereqsMet ? (isAr ? 'مكتمل ✓' : 'Ready ✓') : (isAr ? 'غير مكتمل ⚠️' : 'Incomplete ⚠️')}
+        </span>
       </div>
 
       {/* Prerequisites Checklist */}
-      <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex flex-col gap-2">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
-          {isAr ? 'متطلبات التصدير' : 'Export Prerequisites'}
+      <div className="bg-surface-container-lowest rounded-xl p-3 border border-surface-variant/30 flex flex-col gap-2">
+        <h4 className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+          {isAr ? 'قائمة الفحص المسبق (Pre-Flight Checklist)' : 'Pre-Flight Checklist'}
         </h4>
 
         {/* Prepared Check */}
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-slate-700 dark:text-slate-350">
-            {isAr ? 'تجهيز بيانات السورة' : 'Dataset prepared'}
+        <div className="flex items-center justify-between text-xs py-1">
+          <span className="text-on-surface flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[14px] text-on-surface-variant">menu_book</span>
+            <span>{isAr ? 'تجهيز بيانات السورة والرسم العثماني' : 'Dataset prepared (Mushaf glyphs)'}</span>
           </span>
           {isPrepared ? (
-            <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-              ✓ {isAr ? 'جاهز' : 'Prepared'}
+            <span className="px-1.5 py-0.5 rounded bg-secondary/15 text-secondary font-bold text-[10px] flex items-center gap-1">
+              <span className="material-symbols-outlined text-[12px]">check_circle</span>
+              <span>{isAr ? 'جاهز' : 'Ready'}</span>
             </span>
           ) : (
-            <span className="text-red-500 font-semibold flex items-center gap-1">
-              ✗ {isAr ? 'غير جاهز' : 'Not prepared'}
+            <span className="px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 font-bold text-[10px] flex items-center gap-1">
+              <span className="material-symbols-outlined text-[12px]">cancel</span>
+              <span>{isAr ? 'غير جاهز' : 'Missing'}</span>
             </span>
           )}
         </div>
 
         {/* Audio Check */}
-        <div className="flex items-center justify-between text-xs border-t border-slate-100 dark:border-slate-900/60 pt-2">
-          <span className="text-slate-700 dark:text-slate-350">
-            {isAr ? 'رفع الملف الصوتي' : 'Audio uploaded'}
+        <div className="flex items-center justify-between text-xs py-1 border-t border-surface-variant/15">
+          <span className="text-on-surface flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[14px] text-on-surface-variant">graphic_eq</span>
+            <span>{isAr ? 'الملف الصوتي للقارئ المختار' : 'Audio file uploaded'}</span>
           </span>
           {isAudioUploaded ? (
-            <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-              ✓ {isAr ? 'مرفوع' : 'Uploaded'}
+            <span className="px-1.5 py-0.5 rounded bg-secondary/15 text-secondary font-bold text-[10px] flex items-center gap-1">
+              <span className="material-symbols-outlined text-[12px]">check_circle</span>
+              <span>{isAr ? 'مرفوع' : 'Uploaded'}</span>
             </span>
           ) : (
-            <span className="text-red-500 font-semibold flex items-center gap-1">
-              ✗ {isAr ? 'غير مرفوع' : 'Not uploaded'}
+            <span className="px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 font-bold text-[10px] flex items-center gap-1">
+              <span className="material-symbols-outlined text-[12px]">cancel</span>
+              <span>{isAr ? 'غير مرفوع' : 'Missing'}</span>
             </span>
           )}
         </div>
 
         {/* Timings Check */}
-        <div className="flex items-center justify-between text-xs border-t border-slate-100 dark:border-slate-900/60 pt-2">
-          <span className="text-slate-700 dark:text-slate-350">
-            {layout === 'reels' 
-              ? (isAr ? 'استيراد توقيت المقاطع' : 'Segment Timings imported')
-              : (isAr ? 'استيراد توقيت السطور' : 'Line Timings imported')
-            }
+        <div className="flex items-center justify-between text-xs py-1 border-t border-surface-variant/15">
+          <span className="text-on-surface flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[14px] text-on-surface-variant">timer</span>
+            <span>
+              {layout === 'reels' 
+                ? (isAr ? 'توقيت المقاطع البصرية' : 'Segment Timings')
+                : (isAr ? 'توقيت سطور المصحف' : 'Line Timings')
+              }
+            </span>
           </span>
           {isTimingsReady ? (
-            <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-              ✓ {isWordTimingsImported ? (isAr ? 'مستورد' : 'Imported') : (isAr ? 'جاهز (جلسة العمل)' : 'Ready (Session)')}
+            <span className="px-1.5 py-0.5 rounded bg-secondary/15 text-secondary font-bold text-[10px] flex items-center gap-1">
+              <span className="material-symbols-outlined text-[12px]">check_circle</span>
+              <span>{isWordTimingsImported ? (isAr ? 'مستورد' : 'Imported') : (isAr ? 'جاهز (جلسة العمل)' : 'Ready (Session)')}</span>
             </span>
           ) : (
-            <span className="text-red-500 font-semibold flex items-center gap-1">
-              ✗ {layout === 'reels' 
-                ? (isAr ? 'غير مستورد' : 'Segment Timings not imported')
-                : (isAr ? 'غير مستورد' : 'Line Timings not imported')
-              }
+            <span className="px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 font-bold text-[10px] flex items-center gap-1">
+              <span className="material-symbols-outlined text-[12px]">cancel</span>
+              <span>{isAr ? 'غير متوفر' : 'Missing'}</span>
             </span>
           )}
         </div>
@@ -177,23 +197,33 @@ export default function GenerateVideoCard({
         <button
           onClick={handleGenerate}
           disabled={!allPrereqsMet || rendering}
-          className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:bg-emerald-700/20 disabled:text-emerald-500/50 disabled:cursor-not-allowed text-white font-bold px-4 py-3 rounded-xl transition-none flex items-center justify-center gap-2 cursor-pointer text-sm"
+          className={`w-full py-3 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            allPrereqsMet && !rendering
+              ? 'bg-primary hover:bg-tertiary text-on-primary shadow-[0_0_16px_rgba(242,202,80,0.3)] hover:shadow-[0_0_20px_rgba(242,202,80,0.4)]'
+              : 'bg-surface-container-high text-on-surface-variant/40 border border-surface-variant/30 opacity-60 cursor-not-allowed'
+          }`}
         >
           {rendering ? (
-            <span>{isAr ? 'جاري بدء التصدير...' : 'Processing Render...'}</span>
+            <>
+              <div className="w-4 h-4 border-2 border-on-primary border-t-transparent rounded-full animate-spin"></div>
+              <span>{isAr ? 'جاري بدء معالجة التصدير...' : 'Initializing Render Process...'}</span>
+            </>
           ) : (
-            <span>{isAr ? '🎬 بدء التصدير' : '🎬 Render Video'}</span>
+            <>
+              <span className="material-symbols-outlined text-[18px]">movie_creation</span>
+              <span>{isAr ? 'بدء التصدير 🎬' : 'Start Video Render 🎬'}</span>
+            </>
           )}
         </button>
 
         {!allPrereqsMet && (
-          <span className="text-[10px] text-amber-600 dark:text-amber-400 text-center font-mono mt-1">
-            ⚠️ {isAr ? 'برجاء استيفاء جميع المتطلبات لتفعيل زر التصدير.' : 'Please satisfy all prerequisites to enable video export.'}
+          <span className="text-[11px] text-primary/80 text-center font-mono mt-0.5">
+            ⚠️ {isAr ? 'يرجى استيفاء متطلبات الفحص المسبق لتفعيل التصدير.' : 'Please satisfy all checklist items to enable render.'}
           </span>
         )}
 
         {errorMsg && (
-          <div className="bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-400 border border-red-200 dark:border-red-900/50 px-3 py-2 rounded-xl text-xs font-mono mt-2">
+          <div className="bg-red-500/15 text-red-400 border border-red-500/30 px-3 py-2 rounded-xl text-xs font-mono mt-2">
             {errorMsg}
           </div>
         )}

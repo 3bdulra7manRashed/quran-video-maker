@@ -2,6 +2,7 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { useT } from '@/hooks/useT';
+import { useLanguage } from '@/hooks/useLanguage';
 
 import { DatasetStatus } from '@/services/api';
 
@@ -97,31 +98,40 @@ export default function DatasetActions({
 
   const isButtonDisabled = disabled || preparing || uploadingAudio || uploadingTimings || refreshing;
 
+  const { language } = useLanguage();
+  const isAr = language === 'ar';
+
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col gap-4">
-      <div className="border-b border-slate-100 dark:border-slate-800/60 pb-2">
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Dataset Actions</h3>
+    <div className="bg-surface-container rounded-xl border border-surface-variant/40 p-4 flex flex-col gap-3 shadow-sm">
+      <div className="flex items-center justify-between border-b border-surface-variant/30 pb-2.5">
+        <span className="text-xs font-bold text-on-surface flex items-center gap-1.5">
+          <span className="material-symbols-outlined text-[16px] text-primary">sync</span>
+          <span>{isAr ? 'إجراءات البيانات وتحديث الملفات' : 'Dataset Actions & Sync'}</span>
+        </span>
       </div>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2.5">
         {/* Prepare Dataset */}
         <button
           onClick={handlePrepare}
           disabled={isButtonDisabled}
-          className="w-full bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-semibold px-4 py-2.5 rounded-xl text-xs disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer"
+          className="w-full py-2.5 px-3 rounded-lg bg-surface-container-high hover:bg-surface-bright text-on-surface border border-surface-variant/50 text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm disabled:opacity-40 cursor-pointer"
         >
           {preparing ? (
             <>
-              <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-              <span>Preparing Dataset...</span>
+              <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+              <span>{isAr ? 'جاري تجهيز البيانات...' : 'Preparing Dataset...'}</span>
             </>
           ) : refreshing && lastAction === 'prepare' ? (
             <>
-              <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-              <span>Syncing...</span>
+              <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+              <span>{isAr ? 'جاري المزامنة...' : 'Syncing...'}</span>
             </>
           ) : (
-            <span>⚡ Prepare Dataset</span>
+            <>
+              <span className="material-symbols-outlined text-[16px] text-primary">bolt</span>
+              <span>{isAr ? 'إعداد وتحديث البيانات ⚡' : 'Prepare & Update Dataset ⚡'}</span>
+            </>
           )}
         </button>
 
@@ -138,14 +148,20 @@ export default function DatasetActions({
             <button
               onClick={() => audioInputRef.current?.click()}
               disabled={isButtonDisabled}
-              className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 font-semibold px-4 py-2.5 rounded-xl text-xs disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-2 px-3 rounded-lg bg-surface-container-lowest hover:bg-surface-container-high text-on-surface border border-surface-variant/30 text-xs font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-40 cursor-pointer"
             >
               {uploadingAudio ? (
-                <span>Uploading Audio...</span>
+                <>
+                  <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                  <span>{isAr ? 'جاري رفع الملف الصوتي...' : 'Uploading Audio...'}</span>
+                </>
               ) : refreshing && lastAction === 'audio' ? (
-                <span>Refreshing...</span>
+                <span>{isAr ? 'جاري التحديث...' : 'Refreshing...'}</span>
               ) : (
-                <span>🎵 Upload Audio (.mp3)</span>
+                <>
+                  <span className="material-symbols-outlined text-[16px] text-secondary">audio_file</span>
+                  <span>{isAr ? 'رفع الملف الصوتي (.mp3)' : 'Upload Audio (.mp3)'}</span>
+                </>
               )}
             </button>
           </div>
@@ -164,14 +180,20 @@ export default function DatasetActions({
             <button
               onClick={() => timingsInputRef.current?.click()}
               disabled={isButtonDisabled}
-              className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 font-semibold px-4 py-2.5 rounded-xl text-xs disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-2 px-3 rounded-lg bg-surface-container-lowest hover:bg-surface-container-high text-on-surface border border-surface-variant/30 text-xs font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-40 cursor-pointer"
             >
               {uploadingTimings ? (
-                <span>Uploading Timings...</span>
+                <>
+                  <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                  <span>{isAr ? 'جاري رفع ملف التوقيتات...' : 'Uploading Timings...'}</span>
+                </>
               ) : refreshing && lastAction === 'timings' ? (
-                <span>Refreshing...</span>
+                <span>{isAr ? 'جاري التحديث...' : 'Refreshing...'}</span>
               ) : (
-                <span>⏱️ Upload Timings (.json)</span>
+                <>
+                  <span className="material-symbols-outlined text-[16px] text-primary">schedule</span>
+                  <span>{isAr ? 'رفع توقيتات Audition (.json)' : 'Upload Timings (.json)'}</span>
+                </>
               )}
             </button>
           </div>
@@ -183,8 +205,8 @@ export default function DatasetActions({
         <div
           className={`px-3 py-2 rounded-xl text-xs font-mono border ${
             message.type === 'success'
-              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900'
-              : 'bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-400 border-red-200 dark:border-red-900'
+              ? 'bg-secondary/10 text-secondary border-secondary/30'
+              : 'bg-red-500/10 text-red-400 border-red-500/30'
           }`}
         >
           {message.text}

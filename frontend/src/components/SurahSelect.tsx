@@ -18,8 +18,11 @@ export default function SurahSelect({ surahs, selectedNumber, onSelect, loading 
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-        {isAr ? 'اختر السورة' : 'Choose Surah'}
+      <label className="text-[11px] font-semibold text-on-surface-variant flex items-center justify-between">
+        <span>{isAr ? 'اختر السورة القرآنية' : 'Choose Quran Surah'}</span>
+        {selectedNumber !== '' && (
+          <span className="text-[10px] text-primary font-mono font-medium">✓ {isAr ? 'محددة' : 'Selected'}</span>
+        )}
       </label>
 
       <div className="relative">
@@ -27,19 +30,29 @@ export default function SurahSelect({ surahs, selectedNumber, onSelect, loading 
           value={selectedNumber}
           onChange={(e) => onSelect(Number(e.target.value))}
           disabled={loading}
-          className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 ps-3 pe-8 py-2 rounded-xl appearance-none focus:outline-none focus:border-slate-450 dark:focus:border-slate-700 disabled:opacity-50 font-medium text-sm cursor-pointer"
+          style={{ backgroundColor: '#18181b', color: '#ffffff' }}
+          className="w-full bg-zinc-900 border border-zinc-700/60 text-white ps-3 pe-8 py-2 rounded-xl appearance-none focus:outline-none focus:border-amber-500 disabled:opacity-40 font-medium text-xs cursor-pointer transition-colors"
         >
-          <option value="" className="text-slate-500 dark:text-slate-400">
+          <option
+            value=""
+            style={{ backgroundColor: '#18181b', color: '#a1a1aa' }}
+            className="bg-zinc-900 text-zinc-400"
+          >
             {t('render.selectSurahPlaceholder')}
           </option>
           {surahs.map((s) => (
-            <option key={s.number} value={s.number}>
-              {s.number}. {s.name_english} ({s.name_arabic})
+            <option
+              key={s.number}
+              value={s.number}
+              style={{ backgroundColor: '#18181b', color: '#ffffff' }}
+              className="bg-zinc-900 text-white hover:bg-amber-500/10 hover:text-amber-500 checked:bg-amber-500/20 checked:text-amber-400"
+            >
+              {s.number}. {s.name_arabic} ({s.name_english})
             </option>
           ))}
         </select>
-        <div className="absolute inset-y-0 end-3 flex items-center pointer-events-none text-slate-400 text-xs">
-          ▼
+        <div className="absolute inset-y-0 end-2.5 flex items-center pointer-events-none text-zinc-400 text-xs">
+          <span className="material-symbols-outlined text-[18px]">arrow_drop_down</span>
         </div>
       </div>
     </div>
