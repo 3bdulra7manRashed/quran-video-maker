@@ -61,6 +61,7 @@ export function useSegmentTimingRecorder({
   const segmentTimingsRef = useRef<Record<number, SegmentTimingRecord>>({});
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const playPromiseRef = useRef<Promise<void> | null>(null);
 
   // Keep activeIndexRef in sync with activeIndex
   const handleSetActiveIndex = React.useCallback((idx: number | ((prev: number) => number)) => {
@@ -110,7 +111,7 @@ export function useSegmentTimingRecorder({
     setEndTime(0);
     setErrorMsg(null);
     hasSubmittedRef.current = false;
-  }, [reciterSlug, surahNumber]);
+  }, [reciterSlug, surahNumber, scope, ayahNumber, fromAyah, toAyah]);
 
   // Audio HTML5 listeners mapping helpers
   const handlePlay = () => {
@@ -191,19 +192,50 @@ export function useSegmentTimingRecorder({
   // Playback control functions
   const play = () => {
     if (audioRef.current) {
-      audioRef.current.play().catch((err) => {
-        console.error('Audio playback failed:', err);
-        setRecordingState('Error');
-        setErrorMsg(`Audio playback failed: ${err.message}`);
-      });
+      const promise = audioRef.current.play();
+      if (promise !== undefined) {
+        playPromiseRef.current = promise;
+        promise
+          .catch((err) => {
+            if (err.name === 'AbortError') {
+              // Benign browser error when pause() interrupts play()
+              return;
+            }
+            console.error('Audio playback failed:', err);
+            setRecordingState('Error');
+            setErrorMsg(`Audio playback failed: ${err.message}`);
+          })
+          .finally(() => {
+            if (playPromiseRef.current === promise) {
+              playPromiseRef.current = null;
+            }
+          });
+      }
     }
   };
 
   const pause = () => {
     if (audioRef.current) {
-      audioRef.current.pause();
+      if (playPromiseRef.current) {
+        playPromiseRef.current
+          .then(() => {
+            audioRef.current?.pause();
+          })
+          .catch(() => {
+            // Handled in play().catch
+          });
+      } else {
+        audioRef.current.pause();
+      }
     }
   };
+
+  // Pause audio safely on unmount
+  useEffect(() => {
+    return () => {
+      pause();
+    };
+  }, []);
 
   const togglePlayPause = () => {
     if (isPlaying) {

@@ -30,8 +30,10 @@ class DatasetStatusController
         }
 
         $surahNumber = (int) $surahNumber;
+        $fromAyah = $request->query('from_ayah') !== null ? (int) $request->query('from_ayah') : null;
+        $toAyah = $request->query('to_ayah') !== null ? (int) $request->query('to_ayah') : null;
 
-        $result = $this->datasetStatusService->evaluate($reciterSlug, $surahNumber);
+        $result = $this->datasetStatusService->evaluate($reciterSlug, $surahNumber, $fromAyah, $toAyah);
 
         return response()->json($result);
     }

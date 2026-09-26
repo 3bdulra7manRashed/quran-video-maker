@@ -203,11 +203,33 @@ export default function ConsolePage() {
     }
   }, [selectedSurah, maxAyahs]);
 
+  // Re-fetch dataset status when scope or ayah range changes
+  // so that approved_segments reflects the current selection
+  useEffect(() => {
+    if (selectedReciter && selectedSurah !== '') {
+      loadDatasetStatus();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope, ayahNumber, fromAyah, toAyah]);
+
   async function loadDatasetStatus() {
     if (!selectedReciter || selectedSurah === '') return;
     setLoadingStatus(true);
     try {
-      const stats = await api.getDatasetStatus(selectedReciter, selectedSurah);
+      // Compute ayah range based on current scope so the backend returns
+      // approved_segments that match the exact range saved during approval.
+      let scopedFromAyah: number | undefined;
+      let scopedToAyah: number | undefined;
+      if (scope === 'single') {
+        scopedFromAyah = ayahNumber;
+        scopedToAyah = ayahNumber;
+      } else if (scope === 'range') {
+        scopedFromAyah = fromAyah;
+        scopedToAyah = toAyah;
+      }
+      // scope === 'full' → leave undefined so backend defaults to full surah
+
+      const stats = await api.getDatasetStatus(selectedReciter, selectedSurah, scopedFromAyah, scopedToAyah);
       setStatus(stats);
     } catch (err) {
       console.error('Failed to load status:', err);

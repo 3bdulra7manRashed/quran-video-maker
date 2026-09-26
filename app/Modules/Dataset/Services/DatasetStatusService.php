@@ -26,9 +26,11 @@ class DatasetStatusService
      *
      * @param string $reciterSlug
      * @param int $surahNumber
+     * @param int|null $fromAyah
+     * @param int|null $toAyah
      * @return array
      */
-    public function evaluate(string $reciterSlug, int $surahNumber): array
+    public function evaluate(string $reciterSlug, int $surahNumber, ?int $fromAyah = null, ?int $toAyah = null): array
     {
         $reciter = Reciter::findBySlug($reciterSlug);
         $surah = Surah::where('number', $surahNumber)->first();
@@ -46,14 +48,21 @@ class DatasetStatusService
 
         $approvedSegments = [];
         if ($reciter) {
+            $startAyah = $fromAyah ?? 1;
+            $endAyah = $toAyah ?? ($surah ? $surah->verses_count : 114);
+
             $latestVersion = \App\Modules\Quran\Models\ReelsGeneratedContent::where('reciter_id', $reciter->id)
                 ->where('surah_number', $surahNumber)
+                ->where('start_ayah', $startAyah)
+                ->where('end_ayah', $endAyah)
                 ->where('approval_status', \App\Enums\ContentApprovalStatus::APPROVED)
                 ->max('content_version');
 
             if ($latestVersion !== null) {
                 $approvedSegments = \App\Modules\Quran\Models\ReelsGeneratedContent::where('reciter_id', $reciter->id)
                     ->where('surah_number', $surahNumber)
+                    ->where('start_ayah', $startAyah)
+                    ->where('end_ayah', $endAyah)
                     ->where('approval_status', \App\Enums\ContentApprovalStatus::APPROVED)
                     ->where('content_version', $latestVersion)
                     ->orderBy('segment_order')
@@ -73,6 +82,8 @@ class DatasetStatusService
         return [
             'reciter' => $reciterSlug,
             'surah' => $surahNumber,
+            'from_ayah' => $fromAyah,
+            'to_ayah' => $toAyah,
             'glyphs' => $glyphs,
             'audio' => $audio,
             'timings' => $timings,

@@ -15,6 +15,8 @@ export interface Surah {
 export interface DatasetStatus {
   reciter: string;
   surah: number;
+  from_ayah?: number | null;
+  to_ayah?: number | null;
   glyphs: boolean;
   audio: boolean;
   timings: {
@@ -107,8 +109,18 @@ export class ApiService {
     return res.json();
   }
 
-  async getDatasetStatus(reciter: string, surah: number): Promise<DatasetStatus> {
-    const res = await fetch(`${this.baseUrl}/api/datasets/status?reciter=${reciter}&surah=${surah}`);
+  async getDatasetStatus(reciter: string, surah: number, fromAyah?: number, toAyah?: number): Promise<DatasetStatus> {
+    const params = new URLSearchParams({
+      reciter,
+      surah: surah.toString(),
+    });
+    if (fromAyah !== undefined && fromAyah !== null) {
+      params.append('from_ayah', fromAyah.toString());
+    }
+    if (toAyah !== undefined && toAyah !== null) {
+      params.append('to_ayah', toAyah.toString());
+    }
+    const res = await fetch(`${this.baseUrl}/api/datasets/status?${params.toString()}`);
     if (!res.ok) throw new Error('Failed to fetch dataset status');
     return res.json();
   }

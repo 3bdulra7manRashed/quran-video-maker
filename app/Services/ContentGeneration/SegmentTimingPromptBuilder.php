@@ -2,6 +2,7 @@
 
 namespace App\Services\ContentGeneration;
 
+use App\Enums\ContentApprovalStatus;
 use App\Modules\Quran\Models\Surah;
 use App\Modules\Quran\Models\Reciter;
 use App\Modules\Quran\Models\ReelsGeneratedContent;
@@ -48,12 +49,30 @@ class SegmentTimingPromptBuilder
             throw new \RuntimeException("Reciter '{$reciterSlug}' not found.");
         }
 
+        $surah = Surah::where('number', $surahNumber)->first();
+        $startAyah = $fromAyah ?? 1;
+        $endAyah = $toAyah ?? ($surah ? $surah->verses_count : 114);
+
         // Fetch approved segments from reels_generated_content
-        $segmentsQuery = ReelsGeneratedContent::where('reciter_id', $reciter->id)
-            ->where('surah_number', $surahNumber);
-            
-        // Note: Filter if segments can be scoped, but usually Reels content is surah-scoped.
-        $segments = $segmentsQuery->orderBy('segment_order')->get();
+        $latestVersion = ReelsGeneratedContent::where('reciter_id', $reciter->id)
+            ->where('surah_number', $surahNumber)
+            ->where('start_ayah', $startAyah)
+            ->where('end_ayah', $endAyah)
+            ->where('approval_status', ContentApprovalStatus::APPROVED)
+            ->max('content_version');
+
+        if ($latestVersion === null) {
+            throw new \RuntimeException("No approved segment definitions found in the database. Please generate and approve segments first.");
+        }
+
+        $segments = ReelsGeneratedContent::where('reciter_id', $reciter->id)
+            ->where('surah_number', $surahNumber)
+            ->where('start_ayah', $startAyah)
+            ->where('end_ayah', $endAyah)
+            ->where('approval_status', ContentApprovalStatus::APPROVED)
+            ->where('content_version', $latestVersion)
+            ->orderBy('segment_order')
+            ->get();
 
         if ($segments->isEmpty()) {
             throw new \RuntimeException("No approved segment definitions found in the database. Please generate and approve segments first.");
