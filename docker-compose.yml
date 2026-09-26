@@ -1,0 +1,131 @@
+services:
+  # ====================================================
+  # Backend API & Admin (Laravel 12 + Nginx + FFmpeg)
+  # ====================================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quran_backend
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    environment:
+      APP_NAME: "${APP_NAME:-QuranVideoMaker}"
+      APP_ENV: "${APP_ENV:-production}"
+      APP_DEBUG: "${APP_DEBUG:-false}"
+      APP_KEY: "${APP_KEY:-base64:1itc9RJje9/S2e0Hgsr9IfChEy1gfTyvyQkmq6omAAM=}"
+      APP_URL: "${APP_URL:-http://localhost:8000}"
+      DB_CONNECTION: "mysql"
+      DB_HOST: "${DB_HOST:-db}"
+      DB_PORT: "${DB_PORT:-3306}"
+      DB_DATABASE: "${DB_DATABASE:-quran_video_maker}"
+      DB_USERNAME: "${DB_USERNAME:-quran_user}"
+      DB_PASSWORD: "${DB_PASSWORD:-quran_password_secret}"
+      QUEUE_CONNECTION: "database"
+      DB_QUEUE_RETRY_AFTER: 3600
+      SESSION_DRIVER: "database"
+      CACHE_STORE: "database"
+      FILESYSTEM_DISK: "local"
+      FFMPEG_PATH: "ffmpeg"
+      FFPROBE_PATH: "ffprobe"
+      QURAN_STORAGE_PATH: "/var/www/html/storage/quran-video-data"
+      RUN_MIGRATIONS: "true"
+    volumes:
+      - backend_storage:/var/www/html/storage
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/up || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+
+  # ====================================================
+  # Background Queue Worker (For Video Rendering)
+  # ====================================================
+  queue:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quran_queue
+    restart: unless-stopped
+    command: ["php", "artisan", "queue:work", "--verbose", "--tries=1", "--timeout=0"]
+    environment:
+      APP_NAME: "${APP_NAME:-QuranVideoMaker}"
+      APP_ENV: "${APP_ENV:-production}"
+      APP_DEBUG: "${APP_DEBUG:-false}"
+      APP_KEY: "${APP_KEY:-base64:1itc9RJje9/S2e0Hgsr9IfChEy1gfTyvyQkmq6omAAM=}"
+      APP_URL: "${APP_URL:-http://localhost:8000}"
+      DB_CONNECTION: "mysql"
+      DB_HOST: "${DB_HOST:-db}"
+      DB_PORT: "${DB_PORT:-3306}"
+      DB_DATABASE: "${DB_DATABASE:-quran_video_maker}"
+      DB_USERNAME: "${DB_USERNAME:-quran_user}"
+      DB_PASSWORD: "${DB_PASSWORD:-quran_password_secret}"
+      QUEUE_CONNECTION: "database"
+      DB_QUEUE_RETRY_AFTER: 3600
+      SESSION_DRIVER: "database"
+      CACHE_STORE: "database"
+      FILESYSTEM_DISK: "local"
+      FFMPEG_PATH: "ffmpeg"
+      FFPROBE_PATH: "ffprobe"
+      QURAN_STORAGE_PATH: "/var/www/html/storage/quran-video-data"
+      RUN_MIGRATIONS: "false"
+    volumes:
+      - backend_storage:/var/www/html/storage
+    depends_on:
+      backend:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+
+  # ====================================================
+  # Frontend Application (Next.js 16)
+  # ====================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://localhost:8000}"
+    container_name: quran_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://localhost:8000}"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # ====================================================
+  # Database Service (MariaDB 11)
+  # ====================================================
+  db:
+    image: mariadb:11
+    container_name: quran_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD:-root_password_secret}"
+      MYSQL_DATABASE: "${DB_DATABASE:-quran_video_maker}"
+      MYSQL_USER: "${DB_USERNAME:-quran_user}"
+      MYSQL_PASSWORD: "${DB_PASSWORD:-quran_password_secret}"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  backend_storage:
+    name: quran_backend_storage
+  db_data:
+    name: quran_db_data
