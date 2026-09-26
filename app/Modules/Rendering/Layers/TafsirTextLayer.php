@@ -30,6 +30,73 @@ class TafsirTextLayer implements RenderLayerInterface
     protected ?Arabic $arabic = null;
 
     /**
+     * Map of raw base Unicode Arabic characters (0x0600-0x06FF) to their
+     * explicit isolated Presentation Forms-B (and Forms-A) equivalents.
+     * ArPHP outputs raw codepoints for isolated forms (form 0); this replaces
+     * them with proper presentation glyphs so GD/FreeType renders the intended shape.
+     */
+    protected static array $isolatedFormFixes = [
+        // Non-connecting / right-connecting only letters
+        "\u{0621}" => "\u{FE80}", // Hamza (ء)
+        "\u{0622}" => "\u{FE81}", // Alef with Madda Above (آ)
+        "\u{0623}" => "\u{FE83}", // Alef with Hamza Above (أ)
+        "\u{0624}" => "\u{FE85}", // Waw with Hamza Above (ؤ)
+        "\u{0625}" => "\u{FE87}", // Alef with Hamza Below (إ)
+        "\u{0627}" => "\u{FE8D}", // Alef (ا)
+        "\u{062F}" => "\u{FEA9}", // Dal (د)
+        "\u{0630}" => "\u{FEAB}", // Thal (ذ)
+        "\u{0631}" => "\u{FEAD}", // Reh (ر)
+        "\u{0632}" => "\u{FEAF}", // Zain (ز)
+        "\u{0648}" => "\u{FEED}", // Waw (و)
+        "\u{0629}" => "\u{FE93}", // Teh Marbuta (ة)
+        "\u{0649}" => "\u{FEEF}", // Alef Maksura (ى)
+        "\u{0671}" => "\u{FB50}", // Alef Wasla (ٱ)
+
+        // Dual-connecting letters (in isolated position)
+        "\u{0626}" => "\u{FE89}", // Yeh with Hamza Above (ئ)
+        "\u{0628}" => "\u{FE8F}", // Beh (ب)
+        "\u{062A}" => "\u{FE95}", // Teh (ت)
+        "\u{062B}" => "\u{FE99}", // Theh (ث)
+        "\u{062C}" => "\u{FE9D}", // Jeem (ج)
+        "\u{062D}" => "\u{FEA1}", // Hah (ح)
+        "\u{062E}" => "\u{FEA5}", // Khah (خ)
+        "\u{0633}" => "\u{FEB1}", // Seen (س)
+        "\u{0634}" => "\u{FEB5}", // Sheen (ش)
+        "\u{0635}" => "\u{FEB9}", // Sad (ص)
+        "\u{0636}" => "\u{FEBD}", // Dad (ض)
+        "\u{0637}" => "\u{FEC1}", // Tah (ط)
+        "\u{0638}" => "\u{FEC5}", // Zah (ظ)
+        "\u{0639}" => "\u{FEC9}", // Ain (ع)
+        "\u{063A}" => "\u{FECD}", // Ghain (غ)
+        "\u{0641}" => "\u{FED1}", // Feh (ف)
+        "\u{0642}" => "\u{FED5}", // Qaf (ق)
+        "\u{0643}" => "\u{FED9}", // Kaf (ك)
+        "\u{0644}" => "\u{FEDD}", // Lam (ل)
+        "\u{0645}" => "\u{FEE1}", // Meem (م)
+        "\u{0646}" => "\u{FEE5}", // Noon (ن)
+        "\u{0647}" => "\u{FEE9}", // Heh (ه)
+        "\u{064A}" => "\u{FEF1}", // Yeh (ي)
+    ];
+
+    /**
+     * Replace raw base Arabic codepoints in shaped text with their explicit
+     * isolated presentation form glyphs.
+     */
+    public function fixIsolatedForms(string $shaped): string
+    {
+        return strtr($shaped, self::$isolatedFormFixes);
+    }
+
+    /**
+     * Shape Arabic text using ArPHP and normalize raw isolated codepoints to Presentation Forms-B.
+     */
+    public function shapeArabicText(string $text): string
+    {
+        $shaped = $this->getArabicConverter()->utf8Glyphs($text, 1000);
+        return $this->fixIsolatedForms($shaped);
+    }
+
+    /**
      * @param \App\Modules\Rendering\Domain\TranslationSegment[] $tafsirSegments
      */
     public function __construct(array $tafsirSegments = [])
@@ -398,6 +465,9 @@ class TafsirTextLayer implements RenderLayerInterface
             return;
         }
 
+        // Post-process shaped lines to ensure all isolated forms are mapped to Presentation Forms-B
+        $lines = array_map([$this, 'fixIsolatedForms'], $lines);
+
         // 5. Measure bounding box for each line
         $bboxes = [];
         $widths = [];
@@ -526,15 +596,13 @@ class TafsirTextLayer implements RenderLayerInterface
             return [];
         }
 
-        $arabicConv = $this->getArabicConverter();
-
         $greedyLines = [];
         $currentLogicalWords = [];
 
         foreach ($words as $word) {
             $testWords = array_merge($currentLogicalWords, [$word]);
             // Pass max_chars = 1000 to prevent premature artificial wrapping at 50 chars
-            $testShaped = $arabicConv->utf8Glyphs(implode(' ', $testWords), 1000);
+            $testShaped = $this->shapeArabicText(implode(' ', $testWords));
 
             $bbox = imagettfbbox($fontSize, 0, $fontPath, $testShaped);
             $width = abs($bbox[4] - $bbox[0]);
@@ -555,7 +623,7 @@ class TafsirTextLayer implements RenderLayerInterface
         $linesCount = count($greedyLines);
         if ($linesCount <= 1) {
             return [
-                $arabicConv->utf8Glyphs(implode(' ', $greedyLines[0]), 1000)
+                $this->shapeArabicText(implode(' ', $greedyLines[0]))
             ];
         }
 
@@ -585,8 +653,8 @@ class TafsirTextLayer implements RenderLayerInterface
                 $slice1 = array_slice($words, 0, $bestSplit + 1);
                 $slice2 = array_slice($words, $bestSplit + 1);
                 return [
-                    $arabicConv->utf8Glyphs(implode(' ', $slice1), 1000),
-                    $arabicConv->utf8Glyphs(implode(' ', $slice2), 1000),
+                    $this->shapeArabicText(implode(' ', $slice1)),
+                    $this->shapeArabicText(implode(' ', $slice2)),
                 ];
             }
         }
@@ -611,7 +679,7 @@ class TafsirTextLayer implements RenderLayerInterface
         if ($result['penalty'] === INF || empty($result['splits'])) {
             $fallbackLines = [];
             foreach ($greedyLines as $lw) {
-                $fallbackLines[] = $arabicConv->utf8Glyphs(implode(' ', $lw), 1000);
+                $fallbackLines[] = $this->shapeArabicText(implode(' ', $lw));
             }
             return $fallbackLines;
         }
@@ -620,11 +688,11 @@ class TafsirTextLayer implements RenderLayerInterface
         $start = 0;
         foreach ($result['splits'] as $splitIndex) {
             $slice = array_slice($words, $start, $splitIndex - $start + 1);
-            $balancedLines[] = $arabicConv->utf8Glyphs(implode(' ', $slice), 1000);
+            $balancedLines[] = $this->shapeArabicText(implode(' ', $slice));
             $start = $splitIndex + 1;
         }
         $slice = array_slice($words, $start);
-        $balancedLines[] = $arabicConv->utf8Glyphs(implode(' ', $slice), 1000);
+        $balancedLines[] = $this->shapeArabicText(implode(' ', $slice));
 
         return $balancedLines;
     }
@@ -641,7 +709,7 @@ class TafsirTextLayer implements RenderLayerInterface
 
         $slice = array_slice($words, $start, $end - $start + 1);
         $logicalText = implode(' ', $slice);
-        $shapedText = $this->getArabicConverter()->utf8Glyphs($logicalText, 1000);
+        $shapedText = $this->shapeArabicText($logicalText);
 
         $bbox = imagettfbbox($fontSize, 0, $fontPath, $shapedText);
         $width = abs($bbox[4] - $bbox[0]);

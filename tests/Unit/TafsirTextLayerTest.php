@@ -616,6 +616,73 @@ class TafsirTextLayerTest extends TestCase
         $this->assertEquals(2, $extensive['tier'], "Must select Tier 2 for extensive text");
         $this->assertCount(2, $extensive['lines'], "Must fit into 2 lines in Tier 2");
     }
+
+    public function test_shape_arabic_text_converts_isolated_raw_codepoints_to_presentation_forms(): void
+    {
+        $layer = new TafsirTextLayer();
+
+        // 1. "بتوحيده": Heh after Dal (non-connecting) must be isolated presentation form U+FEE9, not raw U+0647
+        $shaped = $layer->shapeArabicText("بتوحيده");
+        $this->assertStringContainsString("\u{FEE9}", $shaped, "Final isolated 'ه' in 'بتوحيده' must be mapped to U+FEE9");
+        $this->assertStringNotContainsString("\u{0647}", $shaped, "Raw base codepoint U+0647 must not appear in shaped output");
+
+        // 2. "عبادة": Teh Marbuta and Dal after Alef must be presentation forms U+FE93 and U+FEA9
+        $shapedIbadah = $layer->shapeArabicText("عبادة");
+        $this->assertStringContainsString("\u{FE93}", $shapedIbadah, "Isolated 'ة' must be mapped to U+FE93");
+        $this->assertStringContainsString("\u{FEA9}", $shapedIbadah, "Isolated 'د' must be mapped to U+FEA9");
+        $this->assertStringNotContainsString("\u{0629}", $shapedIbadah, "Raw U+0629 must not appear");
+        $this->assertStringNotContainsString("\u{062F}", $shapedIbadah, "Raw U+062F must not appear");
+
+        // 3. Connected Heh in "به" or "عليه" must remain proper connected final form U+FEEA
+        $shapedConnected = $layer->shapeArabicText("به");
+        $this->assertStringContainsString("\u{FEEA}", $shapedConnected, "Connected final 'ه' must be U+FEEA");
+
+        // 4. Complete sentence: verify zero raw base Arabic codepoints (U+0621 to U+064A) remain
+        $sentence = "بتوحيده وإخلاص العبادة له وحده لا شريك له";
+        $shapedSentence = $layer->shapeArabicText($sentence);
+        $chars = preg_split('//u', $shapedSentence, -1, PREG_SPLIT_NO_EMPTY);
+        $rawCharsFound = [];
+        foreach ($chars as $c) {
+            $ord = mb_ord($c);
+            if ($ord >= 0x0621 && $ord <= 0x064A) {
+                $rawCharsFound[] = sprintf("%s (U+%04X)", $c, $ord);
+            }
+        }
+        $this->assertEmpty(
+            $rawCharsFound,
+            "Shaped sentence should have zero raw Arabic base characters, found: " . implode(', ', $rawCharsFound)
+        );
+    }
+
+    public function test_render_preserves_isolated_presentation_forms_on_canvas(): void
+    {
+        $layer = new TafsirTextLayer();
+
+        $width = 1080;
+        $height = 1920;
+        $im = imagecreatetruecolor($width, $height);
+        imagefilledrectangle($im, 0, 0, $width, $height, imagecolorallocate($im, 0, 0, 0));
+
+        $arabicSegment = new Segment(1, 1, 1, [1], 0, 1000);
+        $tafsirSegment = new TranslationSegment(1, "بتوحيده", 1, 1, 0, 1000);
+
+        $layoutData = [
+            'theme' => 'quran_me',
+            'tafsirBounds' => [
+                'x' => 540,
+                'y' => 1081,
+                'fontPath' => $this->fontPath,
+                'fontSize' => 30,
+            ],
+        ];
+
+        $context = new FrameContext($im, $width, $height, $layoutData, $arabicSegment);
+        // Render must complete without error and layout the fixed isolated glyph
+        $layer->render($tafsirSegment, $context);
+
+        $this->assertNotNull($context->layoutData['tafsirCapsuleBounds'] ?? null);
+        imagedestroy($im);
+    }
 }
 
 

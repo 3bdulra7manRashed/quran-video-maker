@@ -8,6 +8,7 @@ use App\Modules\Segmentation\DTO\Segment;
 use App\Modules\Layout\Services\FontResolver;
 use App\Modules\Shared\Services\QuranPathResolver;
 use App\Modules\Rendering\Layers\FooterLayer;
+use App\Modules\Shared\Utils\ArabicShaper;
 use ArPHP\I18N\Arabic;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -108,7 +109,7 @@ class SegmentRenderer
                 }
 
                 $arabic = new Arabic('Glyphs');
-                $reciterText = $arabic->utf8Glyphs($rawReciterText);
+                $reciterText = ArabicShaper::fixIsolatedForms($arabic->utf8Glyphs($rawReciterText));
 
                 $reciterSize = 20;
                 $reciterY = $headerConfig['reciterY'] ?? 320;

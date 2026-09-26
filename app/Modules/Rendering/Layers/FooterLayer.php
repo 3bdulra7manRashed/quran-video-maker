@@ -4,6 +4,7 @@ namespace App\Modules\Rendering\Layers;
 
 use App\Modules\Rendering\Contracts\RenderLayerInterface;
 use App\Modules\Rendering\Domain\FrameContext;
+use App\Modules\Shared\Utils\ArabicShaper;
 use ArPHP\I18N\Arabic;
 
 class FooterLayer implements RenderLayerInterface
@@ -173,7 +174,7 @@ class FooterLayer implements RenderLayerInterface
             $reciterY = $footerConfig['reciter']['y'] ?? self::DEFAULT_RECITER_Y;
 
             if (file_exists($arabicFont)) {
-                $reciterText = $this->getArabicConverter()->utf8Glyphs($rawReciter);
+                $reciterText = ArabicShaper::fixIsolatedForms($this->getArabicConverter()->utf8Glyphs($rawReciter));
                 $bbox = imagettfbbox($reciterSize, 0, $arabicFont, $reciterText);
                 $textWidth = abs($bbox[4] - $bbox[0]);
                 $x = (int) ($centerX - ($textWidth / 2));

@@ -76,12 +76,74 @@ class ArabicShaper
         "\u{0626}" => ["\u{FE89}", "\u{FE8A}", "\u{FE8B}", "\u{FE8C}"],
         // Teh Marbuta
         "\u{0629}" => ["\u{FE93}", "\u{FE94}", "\u{FE93}", "\u{FE94}"],
+        // Alef with Madda Above
+        "\u{0622}" => ["\u{FE81}", "\u{FE82}", "\u{FE81}", "\u{FE82}"],
+        // Alef Wasla
+        "\u{0671}" => ["\u{FB50}", "\u{FB51}", "\u{FB50}", "\u{FB51}"],
     ];
 
     // Characters that do NOT connect to their left (cannot have initial or medial form on their left)
     private static array $rightConnectingOnly = [
-        "\u{0621}", "\u{0627}", "\u{0623}", "\u{0624}", "\u{0625}", "\u{062f}", "\u{0630}", "\u{0631}", "\u{0632}", "\u{0648}", "\u{0649}", "\u{0629}"
+        "\u{0621}", "\u{0622}", "\u{0623}", "\u{0624}", "\u{0625}", "\u{0627}", "\u{062f}", "\u{0630}", "\u{0631}", "\u{0632}", "\u{0648}", "\u{0649}", "\u{0629}", "\u{0671}"
     ];
+
+    /**
+     * Map of raw base Unicode Arabic characters (0x0600-0x06FF) to their
+     * explicit isolated Presentation Forms-B (and Forms-A) equivalents.
+     * ArPHP outputs raw codepoints for isolated forms (form 0); this replaces
+     * them with proper presentation glyphs so GD/FreeType renders the intended shape.
+     */
+    public static array $isolatedFormFixes = [
+        // Non-connecting / right-connecting only letters
+        "\u{0621}" => "\u{FE80}", // Hamza (ء)
+        "\u{0622}" => "\u{FE81}", // Alef with Madda Above (آ)
+        "\u{0623}" => "\u{FE83}", // Alef with Hamza Above (أ)
+        "\u{0624}" => "\u{FE85}", // Waw with Hamza Above (ؤ)
+        "\u{0625}" => "\u{FE87}", // Alef with Hamza Below (إ)
+        "\u{0627}" => "\u{FE8D}", // Alef (ا)
+        "\u{062F}" => "\u{FEA9}", // Dal (د)
+        "\u{0630}" => "\u{FEAB}", // Thal (ذ)
+        "\u{0631}" => "\u{FEAD}", // Reh (ر)
+        "\u{0632}" => "\u{FEAF}", // Zain (ز)
+        "\u{0648}" => "\u{FEED}", // Waw (و)
+        "\u{0629}" => "\u{FE93}", // Teh Marbuta (ة)
+        "\u{0649}" => "\u{FEEF}", // Alef Maksura (ى)
+        "\u{0671}" => "\u{FB50}", // Alef Wasla (ٱ)
+
+        // Dual-connecting letters (in isolated position)
+        "\u{0626}" => "\u{FE89}", // Yeh with Hamza Above (ئ)
+        "\u{0628}" => "\u{FE8F}", // Beh (ب)
+        "\u{062A}" => "\u{FE95}", // Teh (ت)
+        "\u{062B}" => "\u{FE99}", // Theh (ث)
+        "\u{062C}" => "\u{FE9D}", // Jeem (ج)
+        "\u{062D}" => "\u{FEA1}", // Hah (ح)
+        "\u{062E}" => "\u{FEA5}", // Khah (خ)
+        "\u{0633}" => "\u{FEB1}", // Seen (س)
+        "\u{0634}" => "\u{FEB5}", // Sheen (ش)
+        "\u{0635}" => "\u{FEB9}", // Sad (ص)
+        "\u{0636}" => "\u{FEBD}", // Dad (ض)
+        "\u{0637}" => "\u{FEC1}", // Tah (ط)
+        "\u{0638}" => "\u{FEC5}", // Zah (ظ)
+        "\u{0639}" => "\u{FEC9}", // Ain (ع)
+        "\u{063A}" => "\u{FECD}", // Ghain (غ)
+        "\u{0641}" => "\u{FED1}", // Feh (ف)
+        "\u{0642}" => "\u{FED5}", // Qaf (ق)
+        "\u{0643}" => "\u{FED9}", // Kaf (ك)
+        "\u{0644}" => "\u{FEDD}", // Lam (ل)
+        "\u{0645}" => "\u{FEE1}", // Meem (م)
+        "\u{0646}" => "\u{FEE5}", // Noon (ن)
+        "\u{0647}" => "\u{FEE9}", // Heh (ه)
+        "\u{064A}" => "\u{FEF1}", // Yeh (ي)
+    ];
+
+    /**
+     * Replace raw base Arabic codepoints in shaped text with their explicit
+     * isolated presentation form glyphs.
+     */
+    public static function fixIsolatedForms(string $shaped): string
+    {
+        return strtr($shaped, self::$isolatedFormFixes);
+    }
 
     /**
      * Shape and reverse Arabic text for drawing in standard LTR environments like GD.

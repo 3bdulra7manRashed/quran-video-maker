@@ -6,6 +6,7 @@ use App\Modules\Layout\DTO\Frame;
 use App\Modules\Layout\Services\FontResolver;
 use App\Modules\Quran\Models\Surah;
 use App\Modules\Shared\Services\QuranPathResolver;
+use App\Modules\Shared\Utils\ArabicShaper;
 use ArPHP\I18N\Arabic;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -83,7 +84,7 @@ class FrameRenderer
         $reciterText = '';
         if ($reciterNameArabic !== '') {
             $arabic = new Arabic('Glyphs');
-            $reciterText = $arabic->utf8Glyphs($reciterNameArabic);
+            $reciterText = ArabicShaper::fixIsolatedForms($arabic->utf8Glyphs($reciterNameArabic));
         }
 
         if ($reciterText !== '') {
