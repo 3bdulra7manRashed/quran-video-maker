@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Jobs\PrepareDatasetJob;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 
 class DatasetPrepareController
@@ -14,10 +15,6 @@ class DatasetPrepareController
      */
     public function prepare(Request $request): JsonResponse
     {
-        if (function_exists('set_time_limit')) {
-            @set_time_limit(0);
-        }
-
         $validator = Validator::make($request->all(), [
             'reciter' => 'required|string|exists:reciters,slug',
             'surah'   => 'required|integer|exists:surahs,number',
@@ -32,19 +29,28 @@ class DatasetPrepareController
         $reciterSlug = $request->input('reciter');
         $surahNumber = (int) $request->input('surah');
 
-        $jobId = app(\Illuminate\Contracts\Bus\Dispatcher::class)->dispatch(
-            new PrepareDatasetJob($reciterSlug, $surahNumber)
-        );
+        $cacheKey = "dataset_prepare_{$reciterSlug}_{$surahNumber}";
+        $existing = Cache::get($cacheKey);
 
-        $response = [
-            'status' => 'processing',
-        ];
-
-        // Only return real trackable job ID if driver is capable and returned a scalar ID
-        if (is_scalar($jobId) && $jobId !== null) {
-            $response['job_id'] = $jobId;
+        // If already queued or downloading, return current status without double-queueing
+        if ($existing && in_array($existing['status'] ?? '', ['queued', 'downloading'], true)) {
+            return response()->json([
+                'status'  => $existing['status'],
+                'message' => $existing['message'] ?? 'جاري تجهيز بيانات وتلاوة السورة بالفعل...',
+            ]);
         }
 
-        return response()->json($response);
+        Cache::put($cacheKey, [
+            'status'     => 'queued',
+            'message'    => 'بدأ تجهيز وتنزيل ملفات السورة في الخلفية...',
+            'started_at' => now()->toIso8601String(),
+        ], now()->addHours(2));
+
+        PrepareDatasetJob::dispatch($reciterSlug, $surahNumber);
+
+        return response()->json([
+            'status'  => 'queued',
+            'message' => 'بدأ تجهيز وتنزيل ملفات السورة، يمكنك المتابعة وسننبهك فور الانتهاء.',
+        ]);
     }
 }

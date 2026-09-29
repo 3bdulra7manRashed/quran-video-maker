@@ -46,10 +46,13 @@ export default function DatasetActions({
     }
   }, [refreshing]);
 
+  const isPreparing = preparing || status?.preparation?.status === 'queued' || status?.preparation?.status === 'downloading';
+
   const handlePrepare = async () => {
     setPreparing(true);
     setLastAction('prepare');
     try {
+      showMessage(t('render.prepareStarted'), 'success');
       await onPrepare();
       showMessage(t('render.prepareSuccess'), 'success');
     } catch (err: any) {
@@ -96,7 +99,7 @@ export default function DatasetActions({
     }
   };
 
-  const isButtonDisabled = disabled || preparing || uploadingAudio || uploadingTimings || refreshing;
+  const isButtonDisabled = disabled || isPreparing || uploadingAudio || uploadingTimings || refreshing;
 
   const { language } = useLanguage();
   const isAr = language === 'ar';
@@ -117,10 +120,12 @@ export default function DatasetActions({
           disabled={isButtonDisabled}
           className="w-full py-2.5 px-3 rounded-lg bg-surface-container-high hover:bg-surface-bright text-on-surface border border-surface-variant/50 text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm disabled:opacity-40 cursor-pointer"
         >
-          {preparing ? (
+          {isPreparing ? (
             <>
               <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-              <span>{isAr ? 'جاري تجهيز البيانات...' : 'Preparing Dataset...'}</span>
+              <span>
+                {status?.preparation?.message || t('render.preparing')}
+              </span>
             </>
           ) : refreshing && lastAction === 'prepare' ? (
             <>

@@ -161,6 +161,7 @@ type RenderKeys =
   | 'timingNone'
   | 'datasetActions'
   | 'prepareDataset'
+  | 'prepareStarted'
   | 'preparing'
   | 'refreshing'
   | 'uploadAudio'

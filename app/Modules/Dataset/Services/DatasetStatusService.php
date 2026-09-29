@@ -79,6 +79,15 @@ class DatasetStatusService
 
         $translationsStatus = $this->evaluateTranslations();
 
+        $cacheKey = "dataset_prepare_{$reciterSlug}_{$surahNumber}";
+        $prepStatus = \Illuminate\Support\Facades\Cache::get($cacheKey);
+
+        if (!$prepStatus) {
+            $prepStatus = [
+                'status' => ($audio && $glyphs) ? 'completed' : 'idle',
+            ];
+        }
+
         return [
             'reciter' => $reciterSlug,
             'surah' => $surahNumber,
@@ -91,6 +100,7 @@ class DatasetStatusService
             'coverage' => $coverage,
             'approved_segments' => $approvedSegments,
             'translations' => $translationsStatus,
+            'preparation' => $prepStatus,
         ];
     }
 

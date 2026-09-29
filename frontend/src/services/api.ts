@@ -32,10 +32,19 @@ export interface DatasetStatus {
     ready: boolean;
     error: string | null;
   };
+  preparation?: {
+    status: 'idle' | 'queued' | 'downloading' | 'completed' | 'failed';
+    message?: string;
+    step?: string;
+    error?: string;
+    started_at?: string;
+    completed_at?: string;
+  };
 }
 
 export interface PrepareResponse {
   status: string;
+  message?: string;
   job_id?: string | number;
 }
 

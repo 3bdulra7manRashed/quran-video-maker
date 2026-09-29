@@ -246,14 +246,15 @@ export default function ConsolePage() {
       pollingIntervalRef.current = null;
     }
 
-    // Trigger backend dataset preparation job
+    // Trigger backend dataset preparation queue job
     await api.prepareDataset(selectedReciter, selectedSurah);
 
     setLoadingStatus(true);
 
     return new Promise<void>((resolve, reject) => {
       let attempts = 0;
-      const maxAttempts = 80; // 120s total (80 * 1500ms)
+      // Allow graceful background polling (up to 600 attempts * 1500ms = 15 minutes) for large surahs
+      const maxAttempts = 600;
       const targetReciter = selectedReciter;
       const targetSurah = selectedSurah;
 
@@ -266,9 +267,10 @@ export default function ConsolePage() {
           const stats = await api.getDatasetStatus(targetReciter, targetSurah);
           setStatus(stats);
 
-          const isReady = stats.renderable || (stats.glyphs && stats.audio);
+          const isReady = stats.renderable || (stats.glyphs && stats.audio) || stats.preparation?.status === 'completed';
+          const isFailed = stats.preparation?.status === 'failed';
 
-          if (isReady || attempts >= maxAttempts) {
+          if (isReady || isFailed || attempts >= maxAttempts) {
             if (pollingIntervalRef.current) {
               clearInterval(pollingIntervalRef.current);
               pollingIntervalRef.current = null;
@@ -277,8 +279,10 @@ export default function ConsolePage() {
 
             if (isReady) {
               resolve();
+            } else if (isFailed) {
+              reject(new Error(stats.preparation?.error || (isAr ? 'تعذر تجهيز ملفات السورة، يرجى المحاولة مجدداً.' : 'Failed to prepare Surah files, please try again.')));
             } else {
-              reject(new Error('Dataset preparation timed out after 120 seconds.'));
+              reject(new Error(isAr ? 'استغرق تنزيل السورة وقتاً أطول من المتوقع، يرجى التحقق من سرعة الإنترنت.' : 'Downloading took longer than expected, please check your connection.'));
             }
           }
         } catch (err) {
@@ -289,7 +293,7 @@ export default function ConsolePage() {
               pollingIntervalRef.current = null;
             }
             setLoadingStatus(false);
-            reject(new Error('Dataset status polling encountered an error.'));
+            reject(new Error(isAr ? 'حدث خطأ أثناء فحص حالة بيانات السورة.' : 'Error checking Surah status.'));
           }
         } finally {
           inFlight = false;
