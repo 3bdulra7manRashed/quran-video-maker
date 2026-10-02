@@ -5,6 +5,7 @@ namespace App\Modules\Rendering\Layers;
 use App\Modules\Rendering\Contracts\RenderLayerInterface;
 use App\Modules\Rendering\Domain\FrameContext;
 use App\Modules\Rendering\Domain\TranslationSegment;
+use App\Services\ContentGeneration\ContentNormalizer;
 use Illuminate\Support\Facades\Log;
 
 class TranslationTextLayer implements RenderLayerInterface
@@ -136,11 +137,8 @@ class TranslationTextLayer implements RenderLayerInterface
             return;
         }
 
-        // Clean up footnote tags e.g. <sup foot_note=...>, HTML, and brackets
-        $translationText = preg_replace('/<sup\b[^>]*>.*?<\/sup>/is', '', $translationText);
-        $translationText = strip_tags($translationText);
-        $translationText = preg_replace('/\[[^\]]*\]/', '', $translationText);
-        $translationText = trim(preg_replace('/\s+/u', ' ', $translationText));
+        // Clean up footnote tags, brackets, and normalize transliteration symbols (e.g. ʿ -> ')
+        $translationText = ContentNormalizer::normalizeTranslation($translationText);
 
         if ($translationText === '') {
             return;

@@ -4,7 +4,8 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "dev:all": "concurrently -n \"api,queue,frontend\" -c \"blue,green,magenta\" \"php artisan serve\" \"php artisan queue:work --timeout=0\" \"npm --prefix frontend run dev\""
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",

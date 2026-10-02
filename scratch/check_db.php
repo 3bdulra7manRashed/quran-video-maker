@@ -1,17 +1,20 @@
 <?php
 
-require __DIR__ . '/../vendor/autoload.php';
-$app = require_once __DIR__ . '/../bootstrap/app.php';
-$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+require 'vendor/autoload.php';
+$app = require_once 'bootstrap/app.php';
+$kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
+$kernel->bootstrap();
 
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\DB;
-
-$columns = Schema::getColumnListing('reciters');
-echo "Columns: " . implode(', ', $columns) . "\n";
-
-$reciters = DB::table('reciters')->get();
-echo "Total reciters in DB: " . $reciters->count() . "\n";
-foreach ($reciters as $r) {
-    echo json_encode($r, JSON_UNESCAPED_UNICODE) . "\n";
+$t = App\Modules\Quran\Models\AyahTranslation::where('surah_number', 62)->where('ayah_number', 9)->first();
+if ($t) {
+    echo "Text: " . $t->text . "\n";
+    echo "Hex: " . bin2hex($t->text) . "\n";
+} else {
+    echo "Not found in DB\n";
+    // Check json file
+    $jsonPath = storage_path('app/quran/translations/sahih_international.json');
+    if (file_exists($jsonPath)) {
+        $data = json_decode(file_get_contents($jsonPath), true);
+        echo "Found json file with keys: " . count($data) . "\n";
+    }
 }

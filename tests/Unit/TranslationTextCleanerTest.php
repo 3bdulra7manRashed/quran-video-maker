@@ -107,5 +107,21 @@ class TranslationTextCleanerTest extends TestCase
         $this->assertStringNotContainsString('<sup', $cleaned);
         $this->assertEquals('By the morning brightness And the night when it covers with darkness,', $cleaned);
     }
+
+    public function test_normalizes_jumuah_and_transliteration_characters(): void
+    {
+        $input = 'when [the adhān] is called for the prayer on the day of Jumuʿah [Friday], then proceed';
+        $cleaned = TranslationTextCleaner::clean($input);
+        $this->assertStringNotContainsString('ʿ', $cleaned);
+        $this->assertStringNotContainsString('[Friday]', $cleaned);
+        $this->assertEquals("when is called for the prayer on the day of Jumu'ah, then proceed", $cleaned);
+    }
+
+    public function test_normalizes_underdot_and_special_consonants(): void
+    {
+        $input = 'al-Masjid al-Ḥarām to al-Masjid al-Aqṣā and Prophet Muḥammad';
+        $cleaned = TranslationTextCleaner::clean($input);
+        $this->assertEquals('al-Masjid al-Harām to al-Masjid al-Aqsā and Prophet Muhammad', $cleaned);
+    }
 }
 

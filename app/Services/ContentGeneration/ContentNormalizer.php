@@ -38,6 +38,43 @@ class ContentNormalizer
     }
 
     /**
+     * Normalize transliteration symbols and characters without font glyph support (e.g. ʿ, ʾ, ḥ, ṣ)
+     * to standard Latin characters and apostrophes.
+     */
+    public static function normalizeTransliteration(string $text): string
+    {
+        $map = [
+            // Ayn / Hamzah and modifiers
+            'ʿ' => "'", // U+02BF MODIFIER LETTER REVERSED COMMA (e.g. Jumuʿah -> Jumu'ah)
+            'ʻ' => "'", // U+02BB MODIFIER LETTER TURNED COMMA
+            'ʽ' => "'", // U+02BD MODIFIER LETTER REVERSED COMMA VARIANT
+            'ʾ' => "'", // U+02BE MODIFIER LETTER RIGHT HALF RING
+            'ʼ' => "'", // U+02BC MODIFIER LETTER APOSTROPHE
+            '‘' => "'", // U+2018 LEFT SINGLE QUOTATION MARK
+            '’' => "'", // U+2019 RIGHT SINGLE QUOTATION MARK
+            '‛' => "'", // U+201B SINGLE HIGH-REVERSED-9 QUOTATION MARK
+            '′' => "'", // U+2032 PRIME
+            '‵' => "'", // U+2035 REVERSED PRIME
+            '`' => "'",
+            '´' => "'",
+
+            // Latin Extended consonants with underdots or special diacritics
+            'ḥ' => 'h', 'Ḥ' => 'H', // U+1E25, U+1E24
+            'ṣ' => 's', 'Ṣ' => 'S', // U+1E63, U+1E62
+            'ṭ' => 't', 'Ṭ' => 'T', // U+1E6D, U+1E6C
+            'ḍ' => 'd', 'Ḍ' => 'D', // U+1E0D, U+1E0C
+            'ẓ' => 'z', 'Ẓ' => 'Z', // U+1E93, U+1E92
+            'ṯ' => 'th', 'Ṯ' => 'Th', // U+1E6F, U+1E6E
+            'ḏ' => 'dh', 'Ḏ' => 'Dh', // U+1E0F, U+1E0E
+
+            // Ligatures & symbols
+            'ﷺ' => '', // U+FDFA
+        ];
+
+        return strtr($text, $map);
+    }
+
+    /**
      * Normalize translation text (e.g. English) for comparison and preview.
      */
     public static function normalizeTranslation(string $text): string
@@ -51,14 +88,18 @@ class ContentNormalizer
         // 1. Remove bracketed comments "[...]"
         $text = preg_replace('/\[[^\]]*\]/', '', $text);
         
-        // 2. Normalize quotes
-        $text = str_replace(['“', '”', '‘', '’'], ['"', '"', "'", "'"], $text);
+        // 2. Normalize transliteration characters (ʿ, ʾ, ḥ, etc.) and quotes
+        $text = self::normalizeTransliteration($text);
+        $text = str_replace(['“', '”'], ['"', '"'], $text);
         
-        // 3. Collapse multiple spaces
-        $text = preg_replace('/\s+/', ' ', $text);
-        
-        // 4. Remove spaces before punctuation (e.g. "word ." -> "word.")
+        // 3. Remove spaces before punctuation (e.g. "word ." -> "word.")
         $text = preg_replace('/\s+([.,;:?!])/', '$1', $text);
+
+        // 4. Clean up punctuation artifacts (like double commas left over from removal)
+        $text = preg_replace('/,+/is', ',', $text);
+
+        // 5. Collapse multiple spaces
+        $text = preg_replace('/\s+/', ' ', $text);
 
         return trim($text);
     }
