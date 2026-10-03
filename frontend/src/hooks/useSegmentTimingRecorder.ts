@@ -400,10 +400,14 @@ export function useSegmentTimingRecorder({
     setActiveIndex(prevIdx);
     activeIndexRef.current = prevIdx;
 
-    // Seek slightly back before the previous marker split
+    // Reset debounce and submit flags
+    lastMarkTimeRef.current = 0;
+    hasSubmittedRef.current = false;
+
+    // Seek directly to the exact start of the previous segment so the user can re-listen & re-record it from the beginning
     const prevStartMs = updated[prevSegment?.order]?.start_ms ?? Math.round(startTime * 1000);
     const prevStartSec = prevStartMs / 1000;
-    const seekTime = Math.max(startTime, audioRef.current ? Math.max(prevStartSec, audioRef.current.currentTime - 2.0) : prevStartSec);
+    const seekTime = Math.max(startTime, prevStartSec);
     if (audioRef.current) {
       audioRef.current.currentTime = seekTime;
       setCurrentTime(seekTime);

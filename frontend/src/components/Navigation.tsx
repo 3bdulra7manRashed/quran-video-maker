@@ -67,11 +67,10 @@ export default function Navigation({ apiUrl, onApiUrlChange }: NavigationProps) 
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
-                    isActive
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${isActive
                       ? 'bg-[#242b29] text-[#f2ca50] shadow-[inset_0_1px_0_rgba(242,202,80,0.3)]'
                       : 'text-[#94a3b8] hover:text-[#dde4e0] hover:bg-[#1a211f]'
-                  }`}
+                    }`}
                 >
                   <span className="material-symbols-outlined text-[16px]">{link.icon}</span>
                   <span>{t(link.labelKey)}</span>
