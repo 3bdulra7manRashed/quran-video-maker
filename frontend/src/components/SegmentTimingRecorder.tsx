@@ -88,8 +88,12 @@ export default function SegmentTimingRecorder({
   // Keyboard navigation and recording controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Prevent browser default actions (like page scrolling with space bar)
-      if (['Space', ' ', 'Backspace', 'ArrowLeft', 'ArrowRight', 'Escape'].includes(e.key) || e.code === 'Space') {
+      // Prevent browser default actions (like page scrolling with space bar, browser undo, etc.)
+      if (
+        ['Space', ' ', 'Backspace', 'ArrowLeft', 'ArrowRight', 'Escape'].includes(e.key) ||
+        e.code === 'Space' ||
+        (e.ctrlKey && ['z', 'r'].includes(e.key.toLowerCase()))
+      ) {
         e.preventDefault();
       }
 
@@ -710,7 +714,7 @@ export default function SegmentTimingRecorder({
                 className="px-4 py-2.5 bg-[#f2ca50]/15 hover:bg-[#f2ca50]/25 text-[#f2ca50] rounded-xl text-xs font-bold border border-[#f2ca50]/30 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
               >
                 <span className="material-symbols-outlined text-[16px]">undo</span>
-                <span>{isAr ? 'تراجع (Backspace)' : 'Undo Mark'}</span>
+                <span>{isAr ? 'تراجع (Ctrl+Z)' : 'Undo (Ctrl+Z)'}</span>
               </button>
 
               <button
@@ -767,7 +771,7 @@ export default function SegmentTimingRecorder({
                 <span>{isAr ? 'تثبيت المقطع والتالي' : 'Record & Advance'}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <kbd className="px-1.5 py-0.5 rounded bg-[#1a211f] text-[#f2ca50] font-mono font-bold border border-[#26332e]">Backspace</kbd>
+                <kbd className="px-1.5 py-0.5 rounded bg-[#1a211f] text-[#f2ca50] font-mono font-bold border border-[#26332e]">Ctrl+Z / ⌫</kbd>
                 <span>{isAr ? 'تراجع عن آخر توقيت' : 'Undo & Seek Back'}</span>
               </div>
               <div className="flex items-center gap-1.5">
