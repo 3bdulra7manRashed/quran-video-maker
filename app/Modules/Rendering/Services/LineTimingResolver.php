@@ -126,8 +126,32 @@ class LineTimingResolver
                     }
                 }
 
-                $map[$lineNumber] = $lineStart ?? 0;
+                $map[$lineNumber] = $lineStart;
             }
+
+            // Defensive interpolation: fill any null or non-monotonic values
+            $totalLines = count($lineGroups);
+            $audioEndMs = (int) round($totalDuration * 1000);
+            if (!isset($map[1]) || $map[1] === null) {
+                $map[1] = 0;
+            }
+            for ($i = 1; $i <= $totalLines; $i++) {
+                if ($map[$i] === null || ($i > 1 && $map[$i] <= $map[$i - 1])) {
+                    $nextValidLine = null;
+                    for ($j = $i + 1; $j <= $totalLines; $j++) {
+                        if (isset($map[$j]) && $map[$j] !== null && $map[$j] > ($map[$i - 1] ?? 0)) {
+                            $nextValidLine = $j;
+                            break;
+                        }
+                    }
+                    $prevTime = $map[$i - 1] ?? 0;
+                    $nextTime = $nextValidLine ? $map[$nextValidLine] : $audioEndMs;
+                    $remainingSteps = ($nextValidLine ?? ($totalLines + 1)) - ($i - 1);
+                    $stepDuration = ($nextTime - $prevTime) / max(1, $remainingSteps);
+                    $map[$i] = (int) round($prevTime + $stepDuration);
+                }
+            }
+
             return $map;
         }
 

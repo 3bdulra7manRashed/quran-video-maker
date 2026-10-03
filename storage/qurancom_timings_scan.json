@@ -1,0 +1,257 @@
+{
+    "scanned_at": "2026-10-03 07:07:10",
+    "total": 12,
+    "with_word_timings": [
+        {
+            "id": 8,
+            "name": "Mohamed Siddiq al-Minshawi",
+            "style": "Mujawwad",
+            "sample_ayah": "1:1",
+            "sample_segments": [
+                [
+                    1,
+                    0,
+                    4840
+                ],
+                [
+                    2,
+                    4840,
+                    5370
+                ],
+                [
+                    3,
+                    5370,
+                    6880
+                ]
+            ]
+        },
+        {
+            "id": 2,
+            "name": "AbdulBaset AbdulSamad",
+            "style": "Murattal",
+            "sample_ayah": "1:1",
+            "sample_segments": [
+                [
+                    1,
+                    0,
+                    1040
+                ],
+                [
+                    2,
+                    1040,
+                    1660
+                ],
+                [
+                    3,
+                    1660,
+                    2610
+                ]
+            ]
+        },
+        {
+            "id": 1,
+            "name": "AbdulBaset AbdulSamad",
+            "style": "Mujawwad",
+            "sample_ayah": "1:1",
+            "sample_segments": [
+                [
+                    1,
+                    0,
+                    960
+                ],
+                [
+                    2,
+                    970,
+                    1420
+                ],
+                [
+                    3,
+                    1430,
+                    2670
+                ]
+            ]
+        },
+        {
+            "id": 4,
+            "name": "Abu Bakr al-Shatri",
+            "style": "",
+            "sample_ayah": "1:1",
+            "sample_segments": [
+                [
+                    1,
+                    0,
+                    630
+                ],
+                [
+                    2,
+                    650,
+                    1570
+                ],
+                [
+                    3,
+                    1570,
+                    3110
+                ]
+            ]
+        },
+        {
+            "id": 5,
+            "name": "Hani ar-Rifai",
+            "style": "",
+            "sample_ayah": "1:1",
+            "sample_segments": [
+                [
+                    2,
+                    7,
+                    3972
+                ]
+            ]
+        },
+        {
+            "id": 12,
+            "name": "Mahmoud Khalil Al-Husary",
+            "style": "Muallim",
+            "sample_ayah": "1:1",
+            "sample_segments": [
+                [
+                    1,
+                    0,
+                    660
+                ],
+                [
+                    2,
+                    660,
+                    1410
+                ],
+                [
+                    3,
+                    1410,
+                    2740
+                ]
+            ]
+        },
+        {
+            "id": 6,
+            "name": "Mahmoud Khalil Al-Husary",
+            "style": "",
+            "sample_ayah": "1:1",
+            "sample_segments": [
+                [
+                    1,
+                    0,
+                    540
+                ],
+                [
+                    2,
+                    540,
+                    1350
+                ],
+                [
+                    3,
+                    1350,
+                    2356
+                ]
+            ]
+        },
+        {
+            "id": 7,
+            "name": "Mishari Rashid al-`Afasy",
+            "style": "",
+            "sample_ayah": "1:1",
+            "sample_segments": [
+                [
+                    1,
+                    0,
+                    580
+                ],
+                [
+                    2,
+                    580,
+                    1409
+                ],
+                [
+                    3,
+                    1409,
+                    2502
+                ]
+            ]
+        },
+        {
+            "id": 10,
+            "name": "Sa`ud ash-Shuraym",
+            "style": "",
+            "sample_ayah": "1:1",
+            "sample_segments": [
+                [
+                    1,
+                    131,
+                    641
+                ],
+                [
+                    2,
+                    651,
+                    1151
+                ],
+                [
+                    3,
+                    1161,
+                    2101
+                ]
+            ]
+        },
+        {
+            "id": 3,
+            "name": "Abdur-Rahman as-Sudais",
+            "style": "",
+            "sample_ayah": "1:1",
+            "sample_segments": [
+                [
+                    1,
+                    0,
+                    650
+                ],
+                [
+                    2,
+                    650,
+                    1130
+                ],
+                [
+                    3,
+                    1130,
+                    1860
+                ]
+            ]
+        },
+        {
+            "id": 9,
+            "name": "Mohamed Siddiq al-Minshawi",
+            "style": "Murattal",
+            "sample_ayah": "1:1",
+            "sample_segments": [
+                [
+                    1,
+                    20,
+                    830
+                ],
+                [
+                    2,
+                    830,
+                    1490
+                ],
+                [
+                    3,
+                    1490,
+                    2610
+                ]
+            ]
+        }
+    ],
+    "without_word_timings": [
+        {
+            "id": 11,
+            "name": "Mohamed al-Tablawi",
+            "style": "",
+            "reason": "No segments array"
+        }
+    ]
+}

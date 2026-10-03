@@ -145,6 +145,8 @@ class ImportWordTimingsService
             ->orderBy('word_index')
             ->get();
 
+        $timings = $this->normalizeTimings($timings, $spokenWords->count());
+
         $this->validateTimings($verseKey, $timings, $spokenWords);
 
         // Check if DB timings are already matching file timings exactly
@@ -257,4 +259,32 @@ class ImportWordTimingsService
             $previousEndMs = $endMs;
         }
     }
+
+    /**
+     * Normalize timing entries if a reciter repeated words/phrases.
+     * When reciters repeat, Quran.com returns duplicate word indices (e.g. 11, 12, 13, 11, 12, 13, 14).
+     * We keep the latest continuous occurrence for each word_index.
+     */
+    private function normalizeTimings(array $timings, int $dbSpokenCount): array
+    {
+        if (count($timings) === $dbSpokenCount) {
+            return $timings;
+        }
+
+        $collapsed = [];
+        foreach ($timings as $entry) {
+            if (is_array($entry) && count($entry) === 3) {
+                $wIdx = $entry[0];
+                $collapsed[$wIdx] = $entry;
+            }
+        }
+
+        ksort($collapsed);
+        if (count($collapsed) === $dbSpokenCount) {
+            return array_values($collapsed);
+        }
+
+        return $timings;
+    }
 }
+

@@ -485,9 +485,12 @@ class SegmentationService
                 $nextStart = $normalizedStartTimes[$nextFirstLineNum] ?? 0;
 
                 // Rule 1 & 3: For every line except the last: end_ms = next_line_start_ms.
-                // If next line timing is missing, zero, or less than/equal to current start time: end_ms = audio_duration_ms (trimmedDurationMs)
+                // If next line timing is missing, zero, or less than/equal to current start time, distribute remaining time reasonably instead of jumping to video end.
                 if ($nextStart === 0 || $nextStart <= $segStartMs) {
-                    $segEndMs = $trimmedDurationMs;
+                    $remainingScreens = count($screens) - $index;
+                    $remainingTime = max(1000, $trimmedDurationMs - $segStartMs);
+                    $estimatedDuration = (int) round($remainingTime / max(1, $remainingScreens));
+                    $segEndMs = min($trimmedDurationMs, $segStartMs + max(1500, $estimatedDuration));
                 } else {
                     $segEndMs = $nextStart;
                 }
